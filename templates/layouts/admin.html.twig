@@ -1,0 +1,13 @@
+{% extends 'layouts/app.html.twig' %}
+
+{% block content %}
+
+<div class="mb-6">
+<h1 class="text-2xl font-bold">
+{% block admin_title %}Admin Panel{% endblock %}
+</h1>
+</div>
+
+{% block admin_content %}{% endblock %}
+
+{% endblock %}

@@ -1,0 +1,39 @@
+<!-- ================= STK PUSH SECTION ================= -->
+<div id="stk-section" class="hidden relative min-h-screen p-4">
+    <img src="{{ asset('images/background.png') }}" class="absolute inset-0 w-full h-full object-cover opacity-20 -z-10">
+    <div class="relative z-10 max-w-xl mx-auto bg-white rounded-xl shadow p-4 md:p-6">
+        <h2 class="text-2xl font-bold mb-4 text-center">STK Push</h2>
+
+        <!-- TOGGLE -->
+        <!-- TOGGLE -->
+        <div class="flex mb-4 gap-2">
+            <button data-type="paybill" class="stk-type flex-1 bg-green-600 text-white py-2 rounded">PAYBILL</button>
+            <button data-type="till" class="stk-type flex-1 bg-gray-300 text-white py-2 rounded">TILL (Buy Goods)</button>
+
+        </div>
+
+
+        <!-- FORM -->
+        <div id="stk-push-form" class="space-y-3">
+            <input required type="tel" id="stk_phone" placeholder="Phone Number (07.... or 2547...)" class="w-full border rounded p-3">
+            <input required type="number" id="stk_amount" placeholder="Amount" class="w-full border rounded p-3">
+            <input required type="text" id="stk-account" placeholder="Account (Order number or Selling Point e.g poolshop)" class="w-full border rounded p-3">
+            <button id="stk_push_btn" class="w-full bg-purple-600 hover:bg-purple-700 text-white py-3 rounded font-bold">Send STK Push</button>
+        </div>
+
+        <!-- LOADER -->
+        <div id="stk-push-loader" class="loader mt-4 text-center">
+            <svg class="animate-spin h-8 w-8 text-blue-600 mx-auto" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+            </svg>
+            <p id="stk-loader-text" class="text-blue-600 mt-2">Waiting for payment</p>
+        </div>
+
+        <!-- RESULT -->
+        <div id="stk-push-status" class="mt-4 text-center text-sm"></div>
+
+        <!-- BACK TO TRANSACTIONS BUTTON -->
+        <button id="back-to-transactions" class="mt-4 w-full bg-gray-500 hover:bg-gray-600 text-white py-2 rounded font-semibold">Back to Transactions</button>
+    </div>
+</div>

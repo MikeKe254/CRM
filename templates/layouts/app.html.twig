@@ -1,0 +1,23 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+
+<div class="flex min-h-screen">
+
+    {% include 'components/sidebar.html.twig' %}
+
+    <div class="flex-1">
+
+        {% include 'components/navbar.html.twig' %}
+
+        <main class="p-6">
+
+            {% block content %}{% endblock %}
+
+        </main>
+
+    </div>
+
+</div>
+
+{% endblock %}

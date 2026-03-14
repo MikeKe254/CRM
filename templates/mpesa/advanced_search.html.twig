@@ -1,0 +1,110 @@
+<!-- ADVANCED SEARCH PANEL -->
+<div id="advanced-search-panel" class="hidden mt-4 bg-white rounded-xl shadow p-4">
+
+    <div class="flex items-center justify-between mb-3">
+        <h3 class="text-base font-bold">Advanced Search</h3>
+
+        <button id="advanced-back-btn" title="Back to Live Feed" class="flex items-center gap-1 text-gray-600 hover:text-yellow-600">
+            <i class="fa-solid fa-arrow-left"></i>
+            <span class="text-xs">Back</span>
+        </button>
+    </div>
+
+
+
+    <!-- PAYMENT TYPE (NOT COLLAPSIBLE) -->
+    <div class="mb-3">
+        <label class="block text-sm font-semibold mb-1">Short Code (Payment Type)</label>
+        <div class="flex gap-4 text-sm">
+            <label class="flex items-center gap-1">
+                <input type="radio" name="adv-type-radio" value="all" checked onclick="document.getElementById('adv-type').value='all'">
+                All
+            </label>
+            <label class="flex items-center gap-1">
+                <input type="radio" name="adv-type-radio" value="paybill" onclick="document.getElementById('adv-type').value='paybill'">
+                Paybill
+            </label>
+            <label class="flex items-center gap-1">
+                <input type="radio" name="adv-type-radio" value="till" onclick="document.getElementById('adv-type').value='till'">
+                Till
+            </label>
+        </div>
+        <!-- Hidden select still used by backend -->
+        <select id="adv-type" class="hidden">
+            <option value="all" selected></option>
+            <option value="paybill"></option>
+            <option value="till"></option>
+        </select>
+    </div>
+
+    <!-- DATE ROW (NOT COLLAPSIBLE) -->
+    <div class="grid grid-cols-2 gap-3 mb-3">
+        <div>
+            <label class="block text-sm font-semibold mb-1">Date From</label>
+            <input type="date" id="adv-date-from" class="w-full border rounded p-2">
+        </div>
+        <div>
+            <label class="block text-sm font-semibold mb-1">Date To</label>
+            <input type="date" id="adv-date-to" class="w-full border rounded p-2">
+        </div>
+    </div>
+
+    <!-- TIME ROW (NOT COLLAPSIBLE) -->
+    <div class=" hidden grid grid-cols-2 gap-3 mb-3">
+        <div>
+            <label class="block text-sm font-semibold mb-1">Time From</label>
+            <input type="time" id="adv-time-from" class="w-full border rounded p-2" disabled>
+        </div>
+        <div>
+            <label class="block text-sm font-semibold mb-1">Time To</label>
+            <input type="time" id="adv-time-to" class="w-full border rounded p-2" disabled>
+        </div>
+    </div>
+
+    <!-- COLLAPSIBLE: PHONE + NAME -->
+    <details class="mb-3">
+        <summary class="cursor-pointer text-sm font-semibold text-blue-600">
+            Phone & Customer Name
+        </summary>
+        <div class="grid grid-cols-2 gap-3 mt-2">
+            <input type="text" id="adv-msisdn" placeholder="Phone (2547...)" class="w-full border rounded p-2">
+            <input type="text" id="adv-name" placeholder="Customer Name" class="w-full border rounded p-2">
+        </div>
+    </details>
+
+    <!-- COLLAPSIBLE: TRANSACTION ID + REFERENCE + AMOUNT -->
+    <details class="mb-4">
+        <summary class="cursor-pointer text-sm font-semibold text-blue-600">
+            Transaction ID, Reference & Amount
+        </summary>
+
+        <div class="grid grid-cols-3 gap-3 mt-2">
+            <input type="text" id="adv-transaction-id" placeholder="Transaction ID" class="w-full border rounded p-2">
+
+            <input type="text" id="adv-reference" placeholder="Reference" class="w-full border rounded p-2">
+
+            <input type="number" id="adv-amount" placeholder="Amount" class="w-full border rounded p-2">
+        </div>
+    </details>
+
+
+
+    <!-- ACTIONS -->
+    <div class="flex items-center gap-4 mt-2">
+
+        <button id="advanced-search-btn" title="Search" class="flex items-center gap-1 text-blue-600 hover:text-blue-800">
+            <i class="fa-solid fa-magnifying-glass"></i>
+            <span class="text-xs">Search</span>
+        </button>
+
+        <button id="advanced-clear-btn" title="Clear Filters" class="flex items-center gap-1 text-gray-600 hover:text-gray-800">
+            <i class="fa-solid fa-broom"></i>
+            <span class="text-xs">Clear</span>
+        </button>
+
+        <!-- LOADER -->
+        <span class="loader ml-2 text-sm text-gray-700">Loading...</span>
+
+    </div>
+
+</div>

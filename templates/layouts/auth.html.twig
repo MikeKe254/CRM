@@ -1,0 +1,26 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}{% block auth_title %}Authentication{% endblock %}{% endblock %}
+
+{% block body %}
+
+<div class="min-h-screen flex items-center justify-center bg-gray-100">
+
+    <div class="w-full max-w-md">
+
+        <div class="text-center mb-6">
+            <h1 class="text-3xl font-bold">CRM</h1>
+            <p class="text-gray-500">Customer Intelligence System</p>
+        </div>
+
+        <div class="bg-white shadow rounded-lg p-8">
+
+            {% block auth_content %}{% endblock %}
+
+        </div>
+
+    </div>
+
+</div>
+
+{% endblock %}

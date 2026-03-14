@@ -1,0 +1,27 @@
+{% extends 'layouts/auth.html.twig' %}
+
+{% block auth_title %}Unlock Account{% endblock %}
+
+{% block auth_content %}
+
+<h2 class="text-xl font-semibold mb-6">Reset Password</h2>
+
+<form method="post">
+
+<div class="mb-6">
+<label class="block text-sm font-medium mb-1">Email Address</label>
+<input type="email" name="email"
+class="w-full border rounded px-3 py-2">
+</div>
+
+<button class="w-full bg-blue-600 text-white py-2 rounded hover:bg-blue-700">
+Send Reset Link
+</button>
+
+<div class="text-sm text-center mt-4">
+<a href="/login" class="text-blue-600 hover:underline">
+Back to login
+</a>
+</div>
+
+{% endblock %}

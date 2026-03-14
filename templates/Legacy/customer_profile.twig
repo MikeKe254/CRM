@@ -1,0 +1,104 @@
+<div class="space-y-6">
+
+    <!-- Customer Header -->
+    <div class="flex items-center justify-between border-b pb-3">
+        <div>
+            <h3 class="text-2xl font-semibold text-gray-900">
+                {{ customer.first_name|default('Unknown Customer') }}
+            </h3>
+
+            <p class="text-sm text-gray-500 font-mono">
+                {{ customer.msisdn }}
+            </p>
+        </div>
+    </div>
+
+
+    {% for section in sections %}
+
+    <div class="space-y-2">
+
+        <!-- Section Title -->
+        <h4 class="text-sm font-semibold text-gray-700 uppercase tracking-wider border-l-4 border-indigo-500 pl-2">
+            {{ section.title }}
+        </h4>
+
+        <!-- Dynamic Metrics Grid -->
+        <div class="grid gap-3 [grid-template-columns:repeat(auto-fit,minmax(190px,1fr))]">
+
+            {% for field in section.fields %}
+
+                {% if field.key not in [
+                    'profile_created_at',
+                    'profile_updated_at'
+                ] %}
+
+                    {% set value = field.value %}
+
+                    {# Multiply ratios #}
+                    {% if field.key in [
+                        'weekday_visit_ratio',
+                        'weekend_visit_ratio',
+                        'morning_visit_ratio',
+                        'afternoon_visit_ratio',
+                        'evening_visit_ratio',
+                        'night_visit_ratio'
+                    ] %}
+                        {% set value = (value * 100)|round(2) ~ '%' %}
+                    {% endif %}
+
+                    {# Revenue share #}
+                    {% if field.key == 'revenue_share_percent' %}
+                        {% set value = value ~ '%' %}
+                    {% endif %}
+
+                    {# Percentile #}
+                    {% if field.key == 'top_spender_percentile' %}
+                        {% set value = 'Top ' ~ value ~ ' %' %}
+                    {% endif %}
+
+                    {# Monetary values #}
+                    {% if field.key in [
+                        'all_time_spend',
+                        'average_spend',
+                        'highest_transaction',
+                        'lowest_transaction',
+                        'spend_velocity_per_month',
+                        'predicted_lifetime_value',
+                        'search_spend'
+                    ] %}
+                        {% set value = 'KES ' ~ value %}
+                    {% endif %}
+
+
+                    <!-- Metric Card -->
+                    <div class="bg-slate-50 border border-slate-200 rounded-md p-3 hover:bg-white transition">
+
+                        <!-- Label -->
+                        <div class="text-xs uppercase tracking-wide text-gray-500">
+                            {{ field.label }}
+                        </div>
+
+                        <!-- Value -->
+                        <div class="text-base font-semibold text-gray-900 font-mono mt-1">
+                            {{ value }}
+                        </div>
+
+                        <!-- Definition -->
+                        <div class="text-xs text-gray-400 mt-1 leading-snug">
+                            {{ field.definition }}
+                        </div>
+
+                    </div>
+
+                {% endif %}
+
+            {% endfor %}
+
+        </div>
+
+    </div>
+
+    {% endfor %}
+
+</div>

@@ -1,0 +1,17 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+
+<div class="min-h-screen flex flex-col">
+
+{% include 'components/public_header.html.twig' %}
+
+<main class="flex-1 max-w-6xl mx-auto p-6 w-full">
+{% block content %}{% endblock %}
+</main>
+
+{% include 'components/footer.html.twig' %}
+
+</div>
+
+{% endblock %}
