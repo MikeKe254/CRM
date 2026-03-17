@@ -110,13 +110,6 @@
             <span class="sidebar-label">Roles</span>
         </a>
 
-        <a href="{{ path('admin_permissions') }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_permissions' %}active{% endif %}"
-           data-tooltip="Permissions">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-            <span class="sidebar-label">Permissions</span>
-        </a>
-
         <a href="{{ path('admin_terminals') }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_terminals' %}active{% endif %}"
            data-tooltip="POS Terminals">

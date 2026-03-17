@@ -254,9 +254,10 @@ final class CheckPermissionService
     private function fetchConstraints(int $rolePermissionId): array
     {
         $rows = $this->db->fetchAllAssociative(
-            'SELECT constraint_key, constraint_value
-             FROM role_permission_constraints
-             WHERE role_permission_id = :id',
+            'SELECT c.constraint_key, rpc.constraint_value
+             FROM role_permission_constraints rpc
+             JOIN constraints c ON c.id = rpc.constraint_id
+             WHERE rpc.role_permission_id = :id',
             ['id' => $rolePermissionId],
         );
 

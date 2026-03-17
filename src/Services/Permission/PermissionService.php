@@ -414,8 +414,8 @@ final class PermissionService
         // Upsert constraint
         $existing = $this->db->fetchOne(
             'SELECT id FROM role_permission_constraints
-             WHERE role_permission_id = :rp_id AND constraint_key = :key',
-            ['rp_id' => $rolePermissionId, 'key' => $key],
+             WHERE role_permission_id = :rp_id AND constraint_id = :constraint_id',
+            ['rp_id' => $rolePermissionId, 'constraint_id' => $key],
         );
 
         if ($existing) {
@@ -430,7 +430,7 @@ final class PermissionService
         } else {
             $this->db->insert('role_permission_constraints', [
                 'role_permission_id' => $rolePermissionId,
-                'constraint_key'     => $key,
+                'constraint_id'      => $key,
                 'constraint_value'   => $value,
             ]);
             $action      = 'SET_CONSTRAINT';
@@ -470,8 +470,8 @@ final class PermissionService
 
         $deleted = (int) $this->db->executeStatement(
             'DELETE FROM role_permission_constraints
-             WHERE role_permission_id = :rp_id AND constraint_key = :key',
-            ['rp_id' => $rolePermissionId, 'key' => $key],
+             WHERE role_permission_id = :rp_id AND constraint_id = :constraint_id',
+            ['rp_id' => $rolePermissionId, 'constraint_id' => $key],
         );
 
         if ($deleted === 0) {
@@ -528,9 +528,10 @@ final class PermissionService
     public function getConstraints(int $rolePermissionId): array
     {
         return $this->db->fetchAllAssociative(
-            'SELECT constraint_key, constraint_value
-             FROM role_permission_constraints
-             WHERE role_permission_id = :id',
+            'SELECT rpc.constraint_id, c.constraint_key, rpc.constraint_value
+             FROM role_permission_constraints rpc
+             JOIN constraints c ON c.id = rpc.constraint_id
+             WHERE rpc.role_permission_id = :id',
             ['id' => $rolePermissionId],
         );
     }

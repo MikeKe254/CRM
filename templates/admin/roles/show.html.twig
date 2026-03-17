@@ -1,10 +1,11 @@
 {% extends 'layouts/admin.html.twig' %}
 
 {% block admin_title %}{{ role.name }}{% endblock %}
-{% block admin_subtitle %}Manage permissions assigned to this role{% endblock %}
+{% block admin_subtitle %}Manage permissions and constraints for this role{% endblock %}
 
 {% block admin_actions %}
-    <a href="{{ path('admin_roles') }}" class="btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;gap:6px;">
+    <a href="{{ path('admin_roles') }}"
+       class="inline-flex items-center gap-1.5 h-9 px-4 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Roles
     </a>
@@ -12,153 +13,333 @@
 
 {% block admin_content %}
 
-<div class="grid gap-6" style="grid-template-columns:1fr 320px;">
-
-    {# ── LEFT: ASSIGNED PERMISSIONS ── #}
+{# ── ROLE SUMMARY ── #}
+<div class="flex items-center gap-3 mb-5">
+    <div class="w-10 h-10 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
+        <svg width="18" height="18" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    </div>
     <div>
-        <div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
-            <div style="padding:16px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
-                <div>
-                    <div class="font-semibold text-gray-900" style="font-size:14px;">Assigned Permissions</div>
-                    <div style="font-size:12px;color:#9ca3af;margin-top:2px;">
-                        {% set total = 0 %}
-                        {% for section in assigned %}{% set total = total + section.permissions|length %}{% endfor %}
-                        {{ total }} permission{{ total != 1 ? 's' : '' }} assigned
-                    </div>
-                </div>
-            </div>
+        <div class="text-base font-semibold text-gray-900">{{ role.name }}</div>
+        <div class="text-xs text-gray-400">
+            <span id="assigned-count">{{ assignedIds|length }}</span> permission{{ assignedIds|length != 1 ? 's' : '' }} assigned
+            · {% if role.is_system_role %}<span class="text-purple-600 font-medium">System role</span>{% else %}<span class="text-gray-400">Custom role</span>{% endif %}
+        </div>
+    </div>
+</div>
 
-            {% if assigned|length > 0 %}
-                {% for section in assigned %}
-                <div style="padding:12px 20px 4px;">
-                    <div style="font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;margin-bottom:8px;">
-                        {{ section.category }}
-                    </div>
-                    {% for p in section.permissions %}
-                    <div id="assigned-perm-{{ p.role_permission_id }}"
-                         style="display:flex;align-items:center;justify-content:space-between;padding:8px 12px;border-radius:8px;border:1px solid #f3f4f6;margin-bottom:6px;background:#fafafa;">
-                        <div>
-                            <div style="font-size:13px;font-weight:500;color:#111827;">{{ p.name }}</div>
-                            <div style="font-size:11px;color:#9ca3af;">{{ p.action_key }}</div>
-                        </div>
-                        <div class="flex items-center gap-2">
-                            {% if p.constraints|length > 0 %}
-                            <span class="badge badge-amber">{{ p.constraints|length }} constraint{{ p.constraints|length != 1 ? 's' : '' }}</span>
-                            {% endif %}
-                            {% if can.assign %}
-                            <button class="row-action danger" style="padding:3px 8px;font-size:11px;"
-                                    onclick="revokePermission({{ role.id }}, {{ p.id }}, '{{ p.name|e('js') }}')">
-                                Remove
-                            </button>
-                            {% endif %}
-                        </div>
-                    </div>
-                    {% endfor %}
-                </div>
-                {% endfor %}
-            {% else %}
-            <div style="padding:40px;text-align:center;color:#9ca3af;">
-                <svg width="32" height="32" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24" style="margin:0 auto 8px;"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-                <div style="font-size:13px;">No permissions assigned yet.</div>
-                <div style="font-size:12px;margin-top:4px;">Add permissions from the panel on the right.</div>
+{# ── TABS ── #}
+<div class="flex border-b border-gray-200 mb-5 gap-1">
+    <button id="tab-permissions" onclick="switchTab('permissions')"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-indigo-600 text-indigo-600 -mb-px transition-colors">
+        Permissions
+        <span class="ml-1.5 text-xs bg-indigo-100 text-indigo-600 px-1.5 py-0.5 rounded-full">{{ assignedIds|length }}</span>
+    </button>
+    <button id="tab-constraints" onclick="switchTab('constraints')"
+            class="tab-btn px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 hover:text-gray-700 -mb-px transition-colors">
+        Constraints
+        <span class="ml-1.5 text-xs bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-full">{{ constraintData|length }}</span>
+    </button>
+</div>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# TAB 1 — PERMISSIONS                                                       #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div id="panel-permissions">
+
+    <div class="flex items-center justify-between mb-3">
+        <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input id="perm-search" type="text" placeholder="Search permissions…"
+                   class="h-9 pl-8 pr-3 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 w-56">
+        </div>
+    </div>
+
+    <div id="perm-sections" class="space-y-4">
+    {% for category, perms in all %}
+    <div class="perm-section bg-white rounded-xl border border-gray-200 overflow-hidden" data-category="{{ category }}">
+        <div class="flex items-center justify-between px-5 py-3 border-b border-gray-100">
+            <span class="text-sm font-semibold text-gray-900">{{ category }}</span>
+            <span class="text-xs text-gray-400">{{ perms|length }}</span>
+        </div>
+        <div class="divide-y divide-gray-50">
+        {% for p in perms %}
+        {% set isAssigned = p.id in assignedIds %}
+        <div class="perm-row flex items-center justify-between px-5 py-3.5 hover:bg-gray-50 transition-colors" id="perm-row-{{ p.id }}">
+            <div class="flex-1 min-w-0 pr-4">
+                <div class="text-sm font-medium text-gray-900">{{ p.name }}</div>
+                {% if p.description %}<div class="text-xs text-gray-400 mt-0.5">{{ p.description }}</div>{% endif %}
             </div>
+            {% if can.assign %}
+            <label class="toggle-switch flex-shrink-0 cursor-pointer">
+                <input type="checkbox"
+                       id="toggle-{{ p.id }}"
+                       data-perm-id="{{ p.id }}"
+                       {{ isAssigned ? 'checked' : '' }}
+                       onchange="togglePermission({{ role.id }}, {{ p.id }}, '{{ p.name|e('js') }}', this)">
+                <span class="toggle-slider"></span>
+            </label>
+            {% else %}
+                {% if isAssigned %}<span class="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-semibold">Assigned</span>{% endif %}
             {% endif %}
         </div>
-    </div>
-
-    {# ── RIGHT: ADD PERMISSION ── #}
-    <div>
-        <div class="bg-white rounded-xl border border-gray-100 overflow-hidden" style="position:sticky;top:72px;">
-            <div style="padding:16px 20px;border-bottom:1px solid #f3f4f6;">
-                <div class="font-semibold text-gray-900" style="font-size:14px;">Add Permission</div>
-                <div style="font-size:12px;color:#9ca3af;margin-top:2px;">Click a permission to assign it</div>
-            </div>
-
-            <div style="padding:12px;">
-                <div style="position:relative;margin-bottom:10px;">
-                    <svg width="13" height="13" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"
-                         style="position:absolute;left:9px;top:50%;transform:translateY(-50%);pointer-events:none;">
-                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
-                    </svg>
-                    <input class="filter-input" id="perm-search" placeholder="Filter permissions…"
-                           style="width:100%;padding-left:28px;box-sizing:border-box;">
-                </div>
-
-                <div id="available-perms" style="max-height:500px;overflow-y:auto;">
-                    {% for category, perms in all %}
-                    <div class="perm-category" style="margin-bottom:8px;">
-                        <div style="font-size:10px;font-weight:600;color:#9ca3af;text-transform:uppercase;letter-spacing:0.06em;padding:4px 4px 6px;">
-                            {{ category }}
-                        </div>
-                        {% for p in perms %}
-                        <button class="perm-item" data-perm-id="{{ p.id }}" data-perm-name="{{ p.name }}"
-                                onclick="assignPermission({{ role.id }}, {{ p.id }}, '{{ p.name|e('js') }}')"
-                                style="width:100%;text-align:left;padding:7px 10px;border-radius:6px;border:none;background:none;cursor:pointer;transition:background 0.12s;margin-bottom:2px;font-family:inherit;"
-                                onmouseover="this.style.background='#f3f4f6'" onmouseout="this.style.background='none'">
-                            <div style="font-size:12px;font-weight:500;color:#374151;">{{ p.name }}</div>
-                            <div style="font-size:11px;color:#9ca3af;">{{ p.action_key }}</div>
-                        </button>
-                        {% endfor %}
-                    </div>
-                    {% endfor %}
-                </div>
-            </div>
+        {% endfor %}
         </div>
     </div>
+    {% endfor %}
+    </div>
 
+</div>
+
+{# ══════════════════════════════════════════════════════════════════════════ #}
+{# TAB 2 — CONSTRAINTS                                                       #}
+{# ══════════════════════════════════════════════════════════════════════════ #}
+<div id="panel-constraints" class="hidden">
+
+    {% if assignedIds|length == 0 %}
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-12 text-center">
+        <svg width="32" height="32" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24" class="mx-auto mb-3"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div class="text-sm text-gray-400">No permissions assigned yet.</div>
+        <div class="text-xs text-gray-300 mt-1">Assign permissions first, then manage their constraints here.</div>
+    </div>
+    {% else %}
+
+    <p class="text-xs text-gray-400 mb-4">
+        Only assigned permissions with defined constraints are shown here.
+        Set a value to override the default for this role.
+    </p>
+
+    <div class="space-y-4">
+    {% for permId, constraints in constraintData %}
+    {% set permName = permissionNames[permId] ?? 'Permission #' ~ permId %}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+        <div class="flex items-center gap-2 px-5 py-3 border-b border-gray-100 bg-gray-50">
+            <div class="w-6 h-6 rounded bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                <svg width="12" height="12" fill="none" stroke="#4f46e5" stroke-width="2" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+            </div>
+            <span class="text-sm font-semibold text-gray-900">{{ permName }}</span>
+        </div>
+
+        <div class="divide-y divide-gray-50">
+        {% for c in constraints %}
+        <div class="flex items-center gap-4 px-5 py-4" id="constraint-row-{{ c.constraint_id }}-{{ permId }}">
+            <div class="flex-1 min-w-0">
+                <div class="text-sm font-medium text-gray-900">{{ c.constraint_name }}</div>
+                {% if c.constraint_description %}
+                <div class="text-xs text-gray-400 mt-0.5">{{ c.constraint_description }}</div>
+                {% endif %}
+                <div class="flex items-center gap-2 mt-1">
+                    <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-mono">{{ c.constraint_key }}</span>
+                    <span class="text-xs
+                        {% if c.constraint_type == 'time' %}bg-blue-50 text-blue-600
+                        {% elseif c.constraint_type == 'number' %}bg-amber-50 text-amber-600
+                        {% elseif c.constraint_type == 'currency' %}bg-green-50 text-green-600
+                        {% elseif c.constraint_type == 'list' %}bg-purple-50 text-purple-600
+                        {% elseif c.constraint_type == 'boolean' %}bg-pink-50 text-pink-600
+                        {% elseif c.constraint_type == 'percentage' %}bg-orange-50 text-orange-600
+                        {% else %}bg-gray-50 text-gray-500
+                        {% endif %}
+                        px-2 py-0.5 rounded font-medium">
+                        {{ c.constraint_type }}
+                    </span>
+                    {% if c.is_required %}
+                    <span class="text-xs bg-red-50 text-red-600 px-2 py-0.5 rounded font-medium">Required</span>
+                    {% endif %}
+                </div>
+            </div>
+
+            {# Value input — type-aware #}
+            <div class="flex items-center gap-2 flex-shrink-0 w-64">
+                {% if c.constraint_type == 'boolean' %}
+                    <label class="toggle-switch cursor-pointer"
+                           title="{{ c.constraint_value ? 'Enabled' : 'Disabled' }}">
+                        <input type="checkbox"
+                               id="cv-{{ c.constraint_id }}-{{ permId }}"
+                               {{ c.constraint_value == '1' or c.constraint_value == 'true' ? 'checked' : '' }}
+                               onchange="saveConstraint({{ rolePermissionMap[permId] ?? 0 }}, {{ c.constraint_id }}, this.checked ? '1' : '0', this)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    <span class="text-xs text-gray-400" id="cv-label-{{ c.constraint_id }}-{{ permId }}">
+                        {{ c.constraint_value == '1' or c.constraint_value == 'true' ? 'Enabled' : 'Disabled' }}
+                    </span>
+
+                {% elseif c.constraint_type == 'time' %}
+                    <input type="number" min="0"
+                           id="cv-{{ c.constraint_id }}-{{ permId }}"
+                           value="{{ c.constraint_value ?? c.default_value ?? '' }}"
+                           placeholder="{{ c.default_value ?? '0' }}"
+                           class="w-32 h-8 px-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           onchange="saveConstraint({{ rolePermissionMap[permId] ?? 0 }}, {{ c.constraint_id }}, this.value, this)">
+                    <span class="text-xs text-gray-400">seconds</span>
+
+                {% elseif c.constraint_type == 'percentage' %}
+                    <input type="number" min="0" max="100" step="0.01"
+                           id="cv-{{ c.constraint_id }}-{{ permId }}"
+                           value="{{ c.constraint_value ?? c.default_value ?? '' }}"
+                           placeholder="{{ c.default_value ?? '0' }}"
+                           class="w-24 h-8 px-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           onchange="saveConstraint({{ rolePermissionMap[permId] ?? 0 }}, {{ c.constraint_id }}, this.value, this)">
+                    <span class="text-xs text-gray-400">%</span>
+
+                {% elseif c.constraint_type == 'currency' %}
+                    <span class="text-xs text-gray-500 font-medium">KES</span>
+                    <input type="number" min="0" step="0.01"
+                           id="cv-{{ c.constraint_id }}-{{ permId }}"
+                           value="{{ c.constraint_value ?? c.default_value ?? '' }}"
+                           placeholder="{{ c.default_value ?? '0.00' }}"
+                           class="w-36 h-8 px-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           onchange="saveConstraint({{ rolePermissionMap[permId] ?? 0 }}, {{ c.constraint_id }}, this.value, this)">
+
+                {% elseif c.constraint_type == 'date' %}
+                    <input type="date"
+                           id="cv-{{ c.constraint_id }}-{{ permId }}"
+                           value="{{ c.constraint_value ?? c.default_value ?? '' }}"
+                           class="w-40 h-8 px-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           onchange="saveConstraint({{ rolePermissionMap[permId] ?? 0 }}, {{ c.constraint_id }}, this.value, this)">
+
+                {% elseif c.constraint_type == 'list' %}
+                    <input type="text"
+                           id="cv-{{ c.constraint_id }}-{{ permId }}"
+                           value="{{ c.constraint_value ?? c.default_value ?? '' }}"
+                           placeholder="e.g. 174379,123456"
+                           class="w-56 h-8 px-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           onchange="saveConstraint({{ rolePermissionMap[permId] ?? 0 }}, {{ c.constraint_id }}, this.value, this)">
+
+                {% else %}
+                    <input type="text"
+                           id="cv-{{ c.constraint_id }}-{{ permId }}"
+                           value="{{ c.constraint_value ?? c.default_value ?? '' }}"
+                           placeholder="{{ c.default_value ?? '' }}"
+                           class="w-56 h-8 px-2 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300"
+                           onchange="saveConstraint({{ rolePermissionMap[permId] ?? 0 }}, {{ c.constraint_id }}, this.value, this)">
+                {% endif %}
+
+                {# Save status indicator #}
+                <span class="save-indicator text-xs text-gray-300" id="save-{{ c.constraint_id }}-{{ permId }}">
+                    {% if c.constraint_value is not null %}
+                        <svg width="14" height="14" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 13 4 10"/></svg>
+                    {% endif %}
+                </span>
+            </div>
+        </div>
+        {% endfor %}
+
+    </div>
+    </div>
+    {% endfor %}
+
+    {% if constraintData|length == 0 %}
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-12 text-center">
+        <svg width="32" height="32" fill="none" stroke="#d1d5db" stroke-width="1.5" viewBox="0 0 24 24" class="mx-auto mb-3"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+        <div class="text-sm text-gray-400">No constraints defined for assigned permissions.</div>
+        <div class="text-xs text-gray-300 mt-1">Constraints are defined per permission in the system.</div>
+    </div>
+    {% endif %}
+
+    </div>
+{% endif %}
 </div>
 
 {% endblock %}
 
 {% block admin_scripts %}
-{{ parent() }}
 <script>
-// Filter available permissions
+const roleId = {{ role.id }};
+let assignedCount = {{ assignedIds|length }};
+
+// ── TABS ─────────────────────────────────────────────────────────────────────
+function switchTab(tab) {
+    const isPerms = tab === 'permissions';
+    document.getElementById('panel-permissions').classList.toggle('hidden', !isPerms);
+    document.getElementById('panel-constraints').classList.toggle('hidden', isPerms);
+
+    document.getElementById('tab-permissions').className = `tab-btn px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+        isPerms ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`;
+    document.getElementById('tab-constraints').className = `tab-btn px-4 py-2 text-sm font-medium border-b-2 -mb-px transition-colors ${
+        !isPerms ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700'
+    }`;
+}
+
+// ── SEARCH ────────────────────────────────────────────────────────────────────
 document.getElementById('perm-search').addEventListener('input', function() {
     const q = this.value.toLowerCase();
-    document.querySelectorAll('.perm-item').forEach(btn => {
-        const match = btn.textContent.toLowerCase().includes(q);
-        btn.style.display = match ? '' : 'none';
+    document.querySelectorAll('.perm-row').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
     });
-    document.querySelectorAll('.perm-category').forEach(cat => {
-        const visible = [...cat.querySelectorAll('.perm-item')].some(b => b.style.display !== 'none');
-        cat.style.display = visible ? '' : 'none';
+    document.querySelectorAll('.perm-section').forEach(section => {
+        const visible = [...section.querySelectorAll('.perm-row')].some(r => r.style.display !== 'none');
+        section.style.display = visible ? '' : 'none';
     });
 });
 
-async function assignPermission(roleId, permId, permName) {
+// ── TOGGLE PERMISSION ─────────────────────────────────────────────────────────
+async function togglePermission(roleId, permId, permName, checkbox) {
+    const isChecked = checkbox.checked;
+    checkbox.disabled = true;
+
+    const url = isChecked
+        ? `/dashboard/admin/roles/${roleId}/assign-permission`
+        : `/dashboard/admin/roles/${roleId}/revoke-permission`;
+
     try {
-        const res  = await fetch(`/dashboard/admin/roles/${roleId}/assign-permission`, {
+        const res  = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({ permission_id: permId }).toString(),
         });
         const data = await res.json();
+
         if (data.success) {
-            location.reload();
+            assignedCount += isChecked ? 1 : -1;
+            document.getElementById('assigned-count').textContent = assignedCount;
         } else {
+            checkbox.checked = !isChecked;
             alert(data.message);
         }
     } catch {
+        checkbox.checked = !isChecked;
         alert('An unexpected error occurred.');
+    } finally {
+        checkbox.disabled = false;
     }
 }
 
-async function revokePermission(roleId, permId, permName) {
-    if (!confirm(`Remove "${permName}" from this role?`)) return;
+// ── SAVE CONSTRAINT ───────────────────────────────────────────────────────────
+async function saveConstraint(rolePermissionId, constraintId, value, input) {
+    const permId  = input.closest('[id^="constraint-row-"]')?.id.split('-').pop();
+    const indEl   = document.getElementById(`save-${constraintId}-${permId}`);
+
+    if (indEl) indEl.innerHTML = '<span class="text-gray-300">Saving…</span>';
+
     try {
-        const res  = await fetch(`/dashboard/admin/roles/${roleId}/revoke-permission`, {
+        const res  = await fetch(`/dashboard/admin/roles/${roleId}/set-constraint`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams({ permission_id: permId }).toString(),
+            body: new URLSearchParams({
+                role_permission_id: rolePermissionId,
+                key:                constraintId,
+                value:              value,
+            }).toString(),
         });
         const data = await res.json();
+
         if (data.success) {
-            location.reload();
+            if (indEl) indEl.innerHTML = `
+                <svg width="14" height="14" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24">
+                    <polyline points="20 6 9 13 4 10"/>
+                </svg>`;
+            // Update boolean label if present
+            const labelEl = document.getElementById(`cv-label-${constraintId}-${permId}`);
+            if (labelEl) labelEl.textContent = value === '1' ? 'Enabled' : 'Disabled';
         } else {
+            if (indEl) indEl.innerHTML = '<span class="text-red-400">Failed</span>';
             alert(data.message);
         }
     } catch {
+        if (indEl) indEl.innerHTML = '<span class="text-red-400">Error</span>';
         alert('An unexpected error occurred.');
     }
 }

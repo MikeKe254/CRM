@@ -84,12 +84,81 @@ class RoleController extends AdminBaseController
             $allGrouped[$p['category']][] = $p;
         }
 
+        // Build flat array of assigned permission IDs
+        $assignedIds = [];
+        foreach ($assigned as $perms) {
+            foreach ($perms as $p) {
+                $assignedIds[] = (int) $p['permission_id'];
+            }
+        }
+
+        // Build role_permission_id map: permission_id => role_permission_id
+        $rolePermissionMap = [];
+        foreach ($assigned as $perms) {
+            foreach ($perms as $p) {
+                $rolePermissionMap[(int) $p['permission_id']] = (int) $p['role_permission_id'];
+            }
+        }
+
+        // Fetch all constraints with their permission links
+        // Only for permissions assigned to this role
+        $constraintData = [];
+        if (!empty($assignedIds)) {
+            $placeholders = implode(',', array_fill(0, count($assignedIds), '?'));
+            $rows = $this->db->fetchAllAssociative(
+                "SELECT
+                    pc.permission_id,
+                    pc.is_required,
+                    pc.default_value,
+                    c.id            AS constraint_id,
+                    c.name          AS constraint_name,
+                    c.constraint_key,
+                    c.constraint_type,
+                    c.description   AS constraint_description,
+                    rpc.id          AS role_constraint_id,
+                    rpc.constraint_value
+                 FROM permission_constraints pc
+                 JOIN constraints c ON c.id = pc.constraint_id
+                 LEFT JOIN role_permission_constraints rpc
+                    ON rpc.constraint_id = pc.constraint_id
+                    AND rpc.role_permission_id = (
+                        SELECT rp.id FROM role_permissions rp
+                        WHERE rp.role_id = ? AND rp.permission_id = pc.permission_id
+                        LIMIT 1
+                    )
+                 WHERE pc.permission_id IN ($placeholders)
+                 ORDER BY pc.permission_id, c.name",
+                array_merge([$id], $assignedIds),
+            );
+
+            // Group by permission_id
+            foreach ($rows as $row) {
+                $constraintData[(int) $row['permission_id']][] = $row;
+            }
+        }
+
+        // Fetch permission names for constraint tab display
+        $permissionNames = [];
+        foreach ($this->permissions->listAll() as $p) {
+            $permissionNames[(int) $p['id']] = $p['name'];
+        }
+
+        // All available constraints for the add form
+        $allConstraints = $this->db->fetchAllAssociative(
+            'SELECT * FROM constraints ORDER BY name'
+        );
+
         return $this->render('admin/roles/show.html.twig', [
-            'session'    => $session,
-            'role'       => $role,
-            'assigned'   => $assigned,
-            'all'        => $allGrouped,
-            'can'        => [
+            'session'           => $session,
+            'role'              => $role,
+            'assigned'          => $assigned,
+            'all'               => $allGrouped,
+            'assignedIds'       => $assignedIds,
+            'rolePermissionMap' => $rolePermissionMap,
+            'constraintData'    => $constraintData,
+            'permissionNames'   => $permissionNames,
+            'allConstraints'    => $allConstraints,
+            'can'               => [
                 'edit'   => $this->can->check($session, 'edit_roles'),
                 'assign' => $this->can->check($session, 'assign_permissions'),
             ],
