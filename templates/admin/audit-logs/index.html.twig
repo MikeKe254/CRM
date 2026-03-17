@@ -1,0 +1,132 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block admin_title %}Audit Logs{% endblock %}
+{% block admin_subtitle %}Track all system activity — super admin only{% endblock %}
+
+{% block admin_content %}
+
+{# ── FILTERS ── #}
+<form method="GET" class="bg-white rounded-xl border border-gray-100 p-4 mb-4">
+    <div class="flex flex-wrap items-end gap-3">
+
+        <div>
+            <label class="drawer-label">User</label>
+            <select class="drawer-select" name="user_id" style="width:160px;">
+                <option value="">All users</option>
+                {% for u in users %}
+                <option value="{{ u.id }}" {{ filters.user_id == u.id ? 'selected' : '' }}>{{ u.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="drawer-label">Action</label>
+            <input class="drawer-input" name="action" value="{{ filters.action ?? '' }}" placeholder="e.g. assign_permission" style="width:180px;">
+        </div>
+
+        <div>
+            <label class="drawer-label">Date From</label>
+            <input class="drawer-input" type="date" name="date_from" value="{{ filters.date_from ?? '' }}" style="width:150px;">
+        </div>
+
+        <div>
+            <label class="drawer-label">Date To</label>
+            <input class="drawer-input" type="date" name="date_to" value="{{ filters.date_to ?? '' }}" style="width:150px;">
+        </div>
+
+        <button type="submit" class="btn-primary" style="flex:none;padding:0 16px;">Filter</button>
+
+        {% if filters|filter(v => v is not empty)|length > 0 %}
+        <a href="{{ path('admin_audit_logs') }}" class="btn-ghost" style="text-decoration:none;display:inline-flex;align-items:center;height:36px;padding:0 16px;">
+            Clear
+        </a>
+        {% endif %}
+
+    </div>
+</form>
+
+<div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+
+    <div style="padding:12px 16px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
+        <span style="font-size:12px;color:#9ca3af;">{{ total }} log{{ total != 1 ? 's' : '' }} found</span>
+        {# Pagination info #}
+        {% if pages > 1 %}
+        <span style="font-size:12px;color:#9ca3af;">Page {{ page }} of {{ pages }}</span>
+        {% endif %}
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Time</th>
+                    <th>User</th>
+                    <th>Action</th>
+                    <th>Target</th>
+                    <th>Details</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in logs %}
+            <tr>
+                <td style="white-space:nowrap;font-size:12px;color:#6b7280;">
+                    {{ log.created_at|date('d M Y') }}<br>
+                    <span style="color:#9ca3af;">{{ log.created_at|date('H:i:s') }}</span>
+                </td>
+                <td>
+                    {% if log.user_name %}
+                    <div class="flex items-center gap-2">
+                        <div style="width:24px;height:24px;border-radius:50%;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:10px;font-weight:600;color:#4f46e5;flex-shrink:0;">
+                            {{ log.user_name|first|upper }}
+                        </div>
+                        <span style="font-size:13px;">{{ log.user_name }}</span>
+                    </div>
+                    {% else %}
+                    <span style="color:#9ca3af;font-size:13px;">System</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <code style="font-size:11px;background:#f3f4f6;padding:2px 7px;border-radius:4px;color:#374151;font-family:monospace;">
+                        {{ log.action }}
+                    </code>
+                </td>
+                <td style="font-size:12px;color:#6b7280;">
+                    {% if log.target_table %}
+                        {{ log.target_table }}{% if log.target_id %} #{{ log.target_id }}{% endif %}
+                    {% else %}—{% endif %}
+                </td>
+                <td style="max-width:220px;">
+                    {% if log.notes %}
+                    <span style="font-size:12px;color:#6b7280;" title="{{ log.notes }}">
+                        {{ log.notes|length > 60 ? log.notes|slice(0,60) ~ '…' : log.notes }}
+                    </span>
+                    {% else %}—{% endif %}
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align:center;padding:40px;color:#9ca3af;">No logs found for the selected filters.</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# ── PAGINATION ── #}
+    {% if pages > 1 %}
+    <div style="padding:12px 16px;border-top:1px solid #f3f4f6;display:flex;align-items:center;justify-content:center;gap:4px;">
+        {% for p in 1..pages %}
+        <a href="?{{ app.request.query|merge({page: p})|url_encode }}"
+           style="width:32px;height:32px;display:inline-flex;align-items:center;justify-content:center;border-radius:6px;font-size:13px;text-decoration:none;transition:background 0.15s;
+                  {{ p == page ? 'background:#4f46e5;color:#fff;font-weight:600;' : 'color:#374151;' }}"
+           onmouseover="{{ p != page ? 'this.style.background=\"#f3f4f6\"' : '' }}"
+           onmouseout="{{ p != page ? 'this.style.background=\"\"' : '' }}">
+            {{ p }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}

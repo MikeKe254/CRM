@@ -1,110 +1,82 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
+use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
-use Symfony\Component\Routing\Annotation\Route;
-use Symfony\Component\HttpFoundation\RequestStack;
+use Symfony\Component\Routing\Attribute\Route;
 
+/**
+ * Serves the POS dashboard.
+ * Access is gated by the angavu_terminal cookie — set during POS terminal authorization.
+ * No user session required to VIEW the dashboard — only to unlock it via PIN.
+ */
 #[Route('/legacy/mpesa')]
 class LegacyMpesaController extends AbstractController
 {
-    private $requestStack;
-
-    public function __construct(RequestStack $requestStack)
-    {
-        $this->requestStack = $requestStack;
-    }
-
-    /* ================= LOGGER ================= */
-
-    private function legacyLog($message)
-    {
-        $logFile = $this->getParameter('kernel.project_dir') . '/var/log/legacyMpesa.log';
-
-        $line = '[' . date('Y-m-d H:i:s') . '] ' . $message . PHP_EOL;
-
-        file_put_contents($logFile, $line, FILE_APPEND);
-    }
-
-    /* ================= DASHBOARD ================= */
+    public function __construct(private readonly Connection $db) {}
 
     #[Route('/dashboard', name: 'mpesa_dashboard')]
-    public function dashboard(): Response
+    public function dashboard(Request $request): Response
     {
-        $this->legacyLog("Dashboard route accessed");
+        $terminal  = $request->cookies->get('angavu_terminal', '');
+        $subdomain = $this->resolveSubdomain($request);
 
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+        // No terminal cookie → send to POS authorization page
+        if ($terminal === '') {
+            return $this->redirectToRoute('mpesa_login_page');
         }
 
-        if (empty($_SESSION['admin_logged_in'])) {
-            $this->legacyLog("User not logged in → redirect to login");
+        // Resolve company
+        $company = $this->db->fetchAssociative(
+            'SELECT id FROM companies WHERE subdomain = :subdomain LIMIT 1',
+            ['subdomain' => $subdomain],
+        );
 
-            return $this->redirectToRoute('mpesa_login');
+        if (!$company) {
+            return $this->redirectToRoute('mpesa_login_page');
         }
 
-        $isLocked = $_SESSION['user_locked'] ?? false;
+        // Check terminal is valid + not expired + not revoked
+        $valid = $this->db->fetchOne(
+            'SELECT id FROM pos_terminals
+             WHERE  company_id          = :company_id
+               AND  terminal_identifier = :identifier
+               AND  revoked_at IS NULL
+               AND  (expires_at IS NULL OR expires_at > NOW())
+             LIMIT 1',
+            ['company_id' => $company['id'], 'identifier' => $terminal],
+        );
 
+        if (!$valid) {
+            // Terminal expired or revoked → re-authorization required
+            return $this->redirectToRoute('mpesa_login_page');
+        }
+
+        // Terminal valid — serve dashboard always locked
+        // PIN unlock handled by SessionController
         return $this->render('mpesa/dashboard.html.twig', [
-            'is_locked' => $isLocked
+            'is_locked' => true,
         ]);
     }
 
-    /* ================= LOGIN ================= */
+    // =========================================================================
+    // PRIVATE
+    // =========================================================================
 
-    #[Route('/login', name: 'mpesa_login')]
-    public function login(): Response
+    private function resolveSubdomain(Request $request): string
     {
-        $this->legacyLog("Login route hit");
+        $host  = $request->getHost();
+        $parts = explode('.', $host);
 
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
+        if (count($parts) >= 3) {
+            return $parts[0];
         }
 
-        $path = $this->getParameter('kernel.project_dir')
-            . '/legacy/mpesa/login.php';
-
-        $this->legacyLog("Loading login file: " . $path);
-
-        if (!file_exists($path)) {
-            $this->legacyLog("LOGIN FILE NOT FOUND");
-            throw $this->createNotFoundException();
-        }
-
-        ob_start();
-        include $path;
-        $content = ob_get_clean();
-
-        return new Response($content);
-    }
-
-    /* ================= AJAX HANDLER ================= */
-
-    #[Route('/ajax/{file}', name: 'mpesa_ajax')]
-    public function ajax(string $file): Response
-    {
-        if (session_status() === PHP_SESSION_NONE) {
-            session_start();
-        }
-
-        $file = basename($file);
-
-        $path = $this->getParameter('kernel.project_dir')
-            . '/legacy/mpesa/ajax/' . $file;
-
-        $this->legacyLog("AJAX request: " . $file);
-
-        if (!file_exists($path)) {
-            $this->legacyLog("AJAX FILE NOT FOUND: " . $file);
-            throw $this->createNotFoundException();
-        }
-
-        ob_start();
-        include $path;
-        $content = ob_get_clean();
-
-        return new Response($content);
+        return $_ENV['DEFAULT_SUBDOMAIN'] ?? 'koma';
     }
 }

@@ -1,0 +1,155 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block admin_title %}Roles{% endblock %}
+{% block admin_subtitle %}Manage roles and their permission sets{% endblock %}
+
+{% block admin_actions %}
+    {% if can.create %}
+    <button class="btn-primary" style="flex:none;padding:0 16px;" onclick="openCreateRole()">
+        + Add Role
+    </button>
+    {% endif %}
+{% endblock %}
+
+{% block admin_content %}
+
+<div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+
+    <div class="admin-filter-bar" style="padding:14px 16px 0;">
+        <div style="position:relative;">
+            <svg width="14" height="14" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"
+                 style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input class="filter-input" id="role-search" placeholder="Search roles…" autocomplete="off">
+        </div>
+        <span style="font-size:12px;color:#9ca3af;margin-left:auto;">{{ roles|length }} role{{ roles|length != 1 ? 's' : '' }}</span>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="admin-table" id="roles-table">
+            <thead>
+                <tr>
+                    <th>Role Name</th>
+                    <th>Description</th>
+                    <th>Permissions</th>
+                    <th>Type</th>
+                    <th style="width:120px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for role in roles %}
+            <tr id="role-row-{{ role.id }}">
+                <td>
+                    <div class="flex items-center gap-2">
+                        <div style="width:30px;height:30px;border-radius:8px;background:#eef2ff;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                            <svg width="14" height="14" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        </div>
+                        <a href="{{ path('admin_roles_show', {id: role.id}) }}"
+                           class="font-medium text-gray-900 hover:text-indigo-600" style="font-size:13px;text-decoration:none;transition:color 0.15s;">
+                            {{ role.name }}
+                        </a>
+                    </div>
+                </td>
+                <td style="color:#6b7280;max-width:220px;">
+                    <span class="truncate block">{{ role.description ?? '—' }}</span>
+                </td>
+                <td>
+                    <span class="badge badge-blue">{{ role.permission_count }} permission{{ role.permission_count != 1 ? 's' : '' }}</span>
+                </td>
+                <td>
+                    {% if role.is_system_role %}
+                        <span class="badge badge-purple">System</span>
+                    {% else %}
+                        <span class="badge badge-gray">Custom</span>
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex items-center gap-1">
+                        <a href="{{ path('admin_roles_show', {id: role.id}) }}" class="row-action">
+                            Permissions
+                        </a>
+                        {% if can.edit and not role.is_system_role %}
+                        <button class="row-action primary" onclick="openEditRole({{ role|json_encode|e('html_attr') }})">
+                            Edit
+                        </button>
+                        {% endif %}
+                        {% if can.delete and not role.is_system_role %}
+                        <button class="row-action danger" onclick="deleteRole({{ role.id }}, '{{ role.name|e('js') }}')">
+                            Delete
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="5" style="text-align:center;padding:40px;color:#9ca3af;">No roles found.</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{{ parent() }}
+<script>
+liveFilter('role-search', 'roles-table');
+
+function roleFormHtml(r = {}) {
+    return `
+        <div id="drawer-error" class="drawer-error"></div>
+        <div class="drawer-field">
+            <label class="drawer-label">Role Name *</label>
+            <input class="drawer-input" id="f-name" value="${r.name ?? ''}" placeholder="e.g. Manager">
+        </div>
+        <div class="drawer-field">
+            <label class="drawer-label">Description</label>
+            <input class="drawer-input" id="f-desc" value="${r.description ?? ''}" placeholder="What does this role do?">
+        </div>
+    `;
+}
+
+function openCreateRole() {
+    openDrawer('Add Role', roleFormHtml(), `
+        <button class="btn-ghost" onclick="closeDrawer()">Cancel</button>
+        <button class="btn-primary" onclick="submitCreateRole()">Save</button>
+    `);
+}
+
+function openEditRole(role) {
+    openDrawer('Edit Role', roleFormHtml(role), `
+        <button class="btn-ghost" onclick="closeDrawer()">Cancel</button>
+        <button class="btn-primary" onclick="submitEditRole(${role.id})">Save</button>
+    `);
+}
+
+function submitCreateRole() {
+    adminFetch('{{ path('admin_roles_create') }}', {
+        name:        document.getElementById('f-name').value,
+        description: document.getElementById('f-desc').value,
+    }, () => location.reload());
+}
+
+function submitEditRole(id) {
+    adminFetch(`/dashboard/admin/roles/${id}/edit`, {
+        name:        document.getElementById('f-name').value,
+        description: document.getElementById('f-desc').value,
+    }, () => location.reload());
+}
+
+function deleteRole(id, name) {
+    adminDelete(`/dashboard/admin/roles/${id}/delete`,
+        `Delete role "${name}"? All users with this role will lose it.`,
+        () => {
+            const row = document.getElementById(`role-row-${id}`);
+            if (row) row.remove();
+        }
+    );
+}
+</script>
+{% endblock %}

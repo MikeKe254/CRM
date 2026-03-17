@@ -1,28 +1,18 @@
 import $ from "jquery";
 import Toastify from "toastify-js";
 
-export const scrollToTransactions = () => {
-    const $target = $('#transactions');
-    if (!$target.length) return;
-
-    const headerHeight = $('div.sticky').outerHeight() || 0;
-
-    $('html, body').animate({
-            scrollTop: $target.offset().top - headerHeight - 10
-        },
-        500
-    );
-};
-
-export const showToast = (text, success = true) => {
+// ================= TOAST =================
+export const showToast = (message, success = true) => {
     Toastify({
-        text: text,
+        text: message,
         duration: 3000,
-        gravity: "bottom",
+        gravity: "top",
         position: "right",
-        close: true,
-        backgroundColor: success ?
-            "linear-gradient(to right, #16a34a, #22c55e)" : "linear-gradient(to right, #dc2626, #ef4444)",
+        style: {
+            background: success
+                ? "linear-gradient(to right, #16a34a, #22c55e)"
+                : "linear-gradient(to right, #dc2626, #ef4444)",
+        },
         stopOnFocus: true
     }).showToast();
 };
@@ -61,9 +51,9 @@ export const showToast = (text, success = true) => {
 // ================= CUSTOMER PROFILE MODAL =================
 window.loadCustomerProfile = function(phone) {
 
-    const modal = document.getElementById('customerProfileModal');
+    const modal   = document.getElementById('customerProfileModal');
     const content = document.getElementById('customerProfileContent');
-    const title = document.getElementById('customerProfileTitle');
+    const title   = document.getElementById('customerProfileTitle');
 
     title.innerText = `Customer Profile - ${phone}`;
 
@@ -80,7 +70,8 @@ window.loadCustomerProfile = function(phone) {
         </div>
     `;
 
-    fetch('ajax/customer_profile.php', {
+    // ✅ URL updated to new Symfony route
+    fetch('/mpesa/customer/profile', {
         method: 'POST',
         headers: {
             'Content-Type': 'application/x-www-form-urlencoded'
@@ -98,7 +89,7 @@ window.loadCustomerProfile = function(phone) {
 
     })
     .catch(() => {
-        content.innerHTML = `<p class="text-red-500">Connection error.</p>`;
+        content.innerHTML = `<p class="text-red-500">Connection error. Please try again.</p>`;
     });
 
 };

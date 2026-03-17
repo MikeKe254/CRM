@@ -1,0 +1,240 @@
+/* ============================================================
+   SIDEBAR
+   ============================================================ */
+
+#sidebar {
+    width: 256px;
+    height: 100vh;
+    background: #0f1117;
+    display: flex;
+    flex-direction: column;
+    border-right: 1px solid rgba(255,255,255,0.06);
+    flex-shrink: 0;
+    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+    position: fixed;
+    top: 0;
+    left: 0;
+    z-index: 100;
+    transition: width 0.22s cubic-bezier(0.4,0,0.2,1);
+    overflow: hidden;
+}
+
+#sidebar.collapsed { width: 56px; }
+
+/* ── OVERLAY ────────────────────────────────────────────── */
+
+#sidebar-overlay {
+    display: none;
+    position: fixed;
+    inset: 0;
+    background: rgba(0,0,0,0.55);
+    z-index: 99;
+    backdrop-filter: blur(2px);
+}
+
+#sidebar-overlay.visible { display: block; }
+
+/* ── MAIN CONTENT OFFSET ────────────────────────────────── */
+
+#main-content {
+    margin-left: 256px;
+    transition: margin-left 0.22s cubic-bezier(0.4,0,0.2,1);
+    min-height: 100vh;
+    min-width: 0;
+    flex: 1;
+}
+
+#main-content.collapsed { margin-left: 56px; }
+
+/* ── LOGO HEADER ────────────────────────────────────────── */
+
+#sidebar-logo-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+    padding: 0 12px;
+    height: 56px;
+    border-bottom: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+}
+
+/* The A icon — always clickable, expands when collapsed */
+#sidebar-logo-icon {
+    width: 32px;
+    height: 32px;
+    background: #4f46e5;
+    border-radius: 8px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 14px;
+    color: #fff;
+    flex-shrink: 0;
+    cursor: pointer;
+    transition: background 0.15s;
+    user-select: none;
+}
+
+#sidebar-logo-icon:hover { background: #4338ca; }
+
+/* Text next to logo */
+#sidebar-logo-text {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    margin-left: 10px;
+    transition: opacity 0.15s, max-width 0.2s;
+    max-width: 160px;
+    white-space: nowrap;
+}
+
+/* Collapse toggle button — visible when expanded */
+#collapse-btn {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: rgba(255,255,255,0.35);
+    padding: 6px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    border-radius: 6px;
+    transition: color 0.15s, background 0.15s, opacity 0.15s;
+    opacity: 1;
+}
+
+#collapse-btn:hover {
+    color: #fff;
+    background: rgba(255,255,255,0.08);
+}
+
+/* When collapsed: hide text + collapse btn, logo icon becomes the expander */
+#sidebar.collapsed #sidebar-logo-text {
+    opacity: 0;
+    max-width: 0;
+    margin-left: 0;
+}
+
+#sidebar.collapsed #collapse-btn {
+    opacity: 0;
+    pointer-events: none;
+    width: 0;
+    padding: 0;
+}
+
+/* ── NAV LABELS ─────────────────────────────────────────── */
+
+.sidebar-label {
+    transition: opacity 0.15s ease, max-width 0.2s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    max-width: 200px;
+}
+
+.sidebar-section-label {
+    font-size: 10px;
+    font-weight: 600;
+    color: rgba(255,255,255,0.25);
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    padding: 6px 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    transition: opacity 0.15s ease, max-height 0.15s ease, padding 0.15s ease;
+    max-height: 30px;
+}
+
+#sidebar.collapsed .sidebar-label       { opacity: 0; max-width: 0; }
+#sidebar.collapsed .sidebar-section-label { opacity: 0; max-height: 0; padding-top: 0; padding-bottom: 0; }
+#sidebar.collapsed .sidebar-user-info   { opacity: 0; max-width: 0; }
+#sidebar.collapsed .sidebar-logout      { opacity: 0; max-width: 0; pointer-events: none; }
+
+/* ── LINKS ──────────────────────────────────────────────── */
+
+.sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 6px;
+    text-decoration: none;
+    color: rgba(255,255,255,0.55);
+    font-size: 13px;
+    font-weight: 500;
+    transition: background 0.15s, color 0.15s;
+    white-space: nowrap;
+    position: relative;
+}
+
+.sidebar-link:hover  { background: rgba(255,255,255,0.07); color: #fff; }
+.sidebar-link.active { background: rgba(99,102,241,0.18); color: #a5b4fc; }
+.sidebar-link svg    { flex-shrink: 0; width: 16px; height: 16px; }
+
+/* Tooltip when collapsed */
+#sidebar.collapsed .sidebar-link::after {
+    content: attr(data-tooltip);
+    position: absolute;
+    left: calc(100% + 12px);
+    top: 50%;
+    transform: translateY(-50%);
+    background: #1e2130;
+    color: #fff;
+    font-size: 12px;
+    padding: 5px 10px;
+    border-radius: 6px;
+    white-space: nowrap;
+    pointer-events: none;
+    opacity: 0;
+    transition: opacity 0.15s;
+    z-index: 200;
+    border: 1px solid rgba(255,255,255,0.1);
+}
+
+#sidebar.collapsed .sidebar-link:hover::after { opacity: 1; }
+
+/* ── USER FOOTER ────────────────────────────────────────── */
+
+#sidebar-user-footer {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-shrink: 0;
+    padding: 12px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+    overflow: hidden;
+}
+
+/* ── RESPONSIVE ─────────────────────────────────────────── */
+
+/* Tablet 641–1024px: auto icon-only, expand as overlay */
+@media (max-width: 1024px) {
+    #sidebar                    { width: 56px; }
+    #sidebar.collapsed          { width: 56px; }
+    #sidebar.mobile-open        { width: 256px; }
+    #main-content               { margin-left: 56px; }
+    #main-content.collapsed     { margin-left: 56px; }
+    #sidebar-overlay.visible    { display: block; }
+
+    /* On tablet, show the logo icon as the expander since collapse-btn is hidden */
+    #sidebar.mobile-open #sidebar-logo-text  { opacity: 1; max-width: 160px; margin-left: 10px; }
+    #sidebar.mobile-open #collapse-btn       { opacity: 1; pointer-events: auto; width: auto; padding: 6px; }
+}
+
+/* Mobile ≤640px: sidebar off-screen, hamburger in navbar */
+@media (max-width: 640px) {
+    #sidebar {
+        transform: translateX(-100%);
+        width: 256px;
+        transition: transform 0.22s cubic-bezier(0.4,0,0.2,1);
+    }
+    #sidebar.mobile-open        { transform: translateX(0); }
+    #sidebar.collapsed          { width: 256px; transform: translateX(-100%); }
+    #main-content,
+    #main-content.collapsed     { margin-left: 0; }
+
+    /* Always show logo text on mobile since it slides in full width */
+    #sidebar #sidebar-logo-text  { opacity: 1 !important; max-width: 160px !important; margin-left: 10px !important; }
+    #sidebar #collapse-btn       { opacity: 1 !important; pointer-events: auto !important; width: auto !important; padding: 6px !important; }
+}

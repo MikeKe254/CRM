@@ -2,8 +2,8 @@ import $ from "jquery";
 import { refreshTransactions } from "./transactions.js";
 import { resetInactivity } from "./inactivity.js";
 
-// ================= STK TYPE TOGGLE =================
-let stkType = 'paybill'; // default Paybill
+let stkType = 'paybill';
+
 $('.stk-type').on('click', function() {
     if ($(this).is(':disabled')) return;
     $('.stk-type').removeClass('bg-green-600 text-white').addClass('bg-gray-300');
@@ -13,20 +13,20 @@ $('.stk-type').on('click', function() {
     else $('#stk-account').addClass('hidden').val('');
 });
 
-// ================= STK PUSH =================
-const $stkForm = $('#stk-push-form');
+const $stkForm   = $('#stk-push-form');
 const $stkStatus = $('#stk-push-status');
-const $loader = $('#stk-push-loader');
+const $loader    = $('#stk-push-loader');
 const $loaderText = $('#stk-loader-text');
-const $backBtn = $('#back-to-transactions');
+const $backBtn   = $('#back-to-transactions');
 
 $loader.hide();
-$backBtn.show(); // always visible
+$backBtn.show();
 
 $('#stk_push_btn').on('click', function(e) {
     e.preventDefault();
-    const phone = $('#stk_phone').val();
-    const amount = $('#stk_amount').val();
+
+    const phone   = $('#stk_phone').val();
+    const amount  = $('#stk_amount').val();
     const account = $('#stk-account').val();
 
     if (!phone || !amount) {
@@ -38,7 +38,7 @@ $('#stk_push_btn').on('click', function(e) {
     $stkStatus.html('');
     $loader.show();
 
-    $.post('ajax/stk_push.php', {
+    $.post('/mpesa/stk/push', {
         type: stkType,
         phone,
         amount,
@@ -51,9 +51,10 @@ $('#stk_push_btn').on('click', function(e) {
             $stkStatus.html('<p class="text-red-600">STK Push failed: ' + res.ResponseDescription + '</p>');
             $stkForm.show();
         }
-    }, 'json').fail(function() {
+    }, 'json').fail(function(xhr) {
         $loader.hide();
-        $stkStatus.html('<p class="text-red-600">STK Push Error</p>');
+        const msg = xhr.responseJSON?.error ?? 'STK Push Error';
+        $stkStatus.html(`<p class="text-red-600">${msg}</p>`);
         $stkForm.show();
     });
 });
@@ -75,7 +76,7 @@ function pollTransaction(checkoutID, timeout = 90000) {
             return;
         }
 
-        $.getJSON('ajax/stk_status_check.php', {
+        $.getJSON('/mpesa/transactions/check', {
             checkout_id: checkoutID
         }, function(res) {
             if (res.found && res.result_code !== null) {
@@ -84,19 +85,16 @@ function pollTransaction(checkoutID, timeout = 90000) {
                 $backBtn.show();
 
                 if (res.result_code == 0) {
-                    // Build success details
                     let details = `<p class="text-green-600 font-bold">Payment Received ✅</p>`;
                     details += `<p><strong>Amount:</strong> KES ${res.amount}</p>`;
                     details += `<p><strong>Mpesa Receipt:</strong> ${res.mpesa_receipt}</p>`;
                     details += `<p><strong>Transaction Date:</strong> ${res.transaction_date}</p>`;
                     $stkStatus.html(details);
 
-                    // Reset form for next transaction
                     $stkForm.show().find('input').val('');
                     if (stkType === 'paybill') $('#stk-account').removeClass('hidden');
                     else $('#stk-account').addClass('hidden');
 
-                    // Keep the correct button highlighted
                     $('.stk-type').removeClass('bg-green-600 text-white').addClass('bg-gray-300');
                     $(`.stk-type[data-type="${stkType}"]`).removeClass('bg-gray-300').addClass('bg-green-600 text-white');
                 } else {
@@ -115,7 +113,6 @@ function pollTransaction(checkoutID, timeout = 90000) {
     }, 1000);
 }
 
-// ================= VIEW TOGGLE =================
 const showDashboard = () => {
     $('#stk-section').addClass('hidden');
     $('#dashboard').removeClass('hidden');
@@ -124,37 +121,21 @@ const showDashboard = () => {
 };
 
 $('#show-stk').on('click', function() {
-    // Hide dashboard, show STK
     $('#dashboard').addClass('hidden');
     $('#stk-section').removeClass('hidden');
-
-    // Stop inactivity timer
     clearTimeout(window.inactivityTimer);
-
-    // 🔑 Push history so BACK works
-    history.pushState({
-        stkMode: true
-    }, '');
+    history.pushState({ stkMode: true }, '');
 });
 
 $('#show-dashboard').on('click', showDashboard);
 $('#back-to-transactions').on('click', function() {
-    // Reset STK form inputs
     $('#stk_phone, #stk_amount, #stk-account').val('');
     if (stkType === 'paybill') $('#stk-account').removeClass('hidden');
     else $('#stk-account').addClass('hidden');
-
-    // Clear status and loader
     $('#stk-push-status').html('');
     $('#stk-push-loader').hide();
-
-    // Show the form again
     $('#stk-push-form').show();
-
-    // Highlight active button
     $('.stk-type').removeClass('bg-green-600 text-white').addClass('bg-gray-300');
     $(`.stk-type[data-type="${stkType}"]`).removeClass('bg-gray-300').addClass('bg-green-600 text-white');
-
-    // Go back to dashboard
     showDashboard();
 }).show();

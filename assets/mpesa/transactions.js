@@ -16,11 +16,16 @@ export const createCard = t => {
     </div>`;
 };
 
-export const refreshTransactions = () => {
+export const refreshTransactions = (search = '') => {
     resetTransactionSummary();
     $('.loader').show();
+
+    const params = {};
+    if (search) params.q = search;
+
     $.ajax({
-        url: 'ajax/fetch_transactions.php',
+        url: '/mpesa/transactions',
+        data: params,
         dataType: 'json',
         success: function(data) {
             $('.loader').hide();
@@ -31,6 +36,13 @@ export const refreshTransactions = () => {
             $('#transactions').html(html);
 
             setTimeout(() => $('.card-enter').addClass('card-enter-active'), 10);
+        },
+        error: function(xhr) {
+            $('.loader').hide();
+            if (xhr.status === 401) {
+                // Session expired — reload to show login
+                window.location.href = '/mpesa/login';
+            }
         }
     });
 };

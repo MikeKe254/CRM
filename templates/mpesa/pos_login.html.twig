@@ -1,0 +1,219 @@
+{% extends 'layouts/auth.html.twig' %}
+
+{% block auth_title %}POS Terminal Authorization | Koma Gardens & Resort{% endblock %}
+
+{% block auth_content %}
+
+    <div class="text-center mb-6">
+        <img src="{{ asset('images/logo.png') }}" alt="Koma Gardens Logo" class="h-14 mx-auto mb-3">
+        <h2 class="text-xl font-semibold text-gray-800">POS Terminal Setup</h2>
+        <p class="text-sm text-gray-500 mt-1">Koma Gardens & Resort</p>
+    </div>
+
+    {# ── MESSAGES ─────────────────────────────────────────────────────────── #}
+    <div id="pos-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded text-center"></div>
+
+    {# ══════════════════════════════════════════════════════════════════════ #}
+    {# STEP 1 — Verify credentials                                           #}
+    {# ══════════════════════════════════════════════════════════════════════ #}
+    <div id="pos-step-1">
+
+        <p class="text-sm text-gray-500 mb-5">
+            Enter your credentials to verify you have permission to authorize this device as a POS terminal.
+        </p>
+
+        <form id="pos-verify-form" class="space-y-4">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Email Address</label>
+                <input type="email" name="email" id="p-email"
+                       placeholder="email@example.com" required autocomplete="email"
+                       class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                <input type="password" name="password" id="p-password"
+                       placeholder="••••••••" required autocomplete="current-password"
+                       class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+            </div>
+
+            <button type="submit" id="p-verify-btn"
+                    class="w-full bg-purple-600 hover:bg-purple-700 text-white py-2 rounded text-sm font-semibold transition">
+                Verify Credentials
+            </button>
+
+        </form>
+
+    </div>
+
+    {# ══════════════════════════════════════════════════════════════════════ #}
+    {# STEP 2 — Terminal details                                             #}
+    {# ══════════════════════════════════════════════════════════════════════ #}
+    <div id="pos-step-2" class="hidden">
+
+        <div class="flex items-center gap-2 mb-5 p-3 bg-green-50 border border-green-200 rounded text-sm text-green-700">
+            <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+            <span id="pos-verified-name">Verified</span>
+        </div>
+
+        <p class="text-sm text-gray-500 mb-5">
+            Enter the details for this POS terminal. Authorization lasts 30 days.
+        </p>
+
+        <form id="pos-authorize-form" class="space-y-4">
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Device Name</label>
+                <input type="text" name="device_name" id="p-device-name"
+                       placeholder="e.g. Pool Bar Till, Reception POS" required
+                       class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <p class="text-xs text-gray-400 mt-1">A friendly name to identify this device.</p>
+            </div>
+
+            <div>
+                <label class="block text-sm font-medium text-gray-700 mb-1">Terminal ID</label>
+                <input type="text" name="terminal_identifier" id="p-terminal-id"
+                       placeholder="e.g. till-01, reception-pos-1" required
+                       class="w-full border border-gray-300 rounded px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-300">
+                <p class="text-xs text-gray-400 mt-1">Unique identifier for this device. Use a short slug.</p>
+            </div>
+
+            <div class="flex gap-3">
+                <button type="button" onclick="resetFlow()"
+                        class="flex-1 border border-gray-300 text-gray-600 py-2 rounded text-sm font-semibold hover:bg-gray-50 transition">
+                    Back
+                </button>
+                <button type="submit" id="p-authorize-btn"
+                        class="flex-1 bg-purple-600 hover:bg-purple-700 text-white py-2 rounded text-sm font-semibold transition">
+                    Authorize Terminal
+                </button>
+            </div>
+
+        </form>
+
+    </div>
+
+    {# ══════════════════════════════════════════════════════════════════════ #}
+    {# STEP 3 — Success                                                      #}
+    {# ══════════════════════════════════════════════════════════════════════ #}
+    <div id="pos-step-3" class="hidden text-center py-6">
+
+        <div class="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+            <svg class="w-8 h-8 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/>
+            </svg>
+        </div>
+
+        <h3 class="text-lg font-semibold text-gray-800 mb-2">Terminal Authorized</h3>
+        <p id="pos-success-message" class="text-sm text-gray-500 mb-2"></p>
+        <p class="text-sm text-gray-400 mb-6">Redirecting to POS dashboard…</p>
+
+        <div class="animate-spin rounded-full h-6 w-6 border-b-2 border-purple-600 mx-auto"></div>
+
+    </div>
+
+    <script>
+    function showError(msg) {
+        const el = document.getElementById('pos-error');
+        el.textContent = msg;
+        el.classList.remove('hidden');
+    }
+
+    function clearError() {
+        document.getElementById('pos-error').classList.add('hidden');
+    }
+
+    function setLoading(btnId, loading, label) {
+        const btn = document.getElementById(btnId);
+        btn.disabled = loading;
+        btn.textContent = loading ? 'Please wait…' : label;
+    }
+
+    function resetFlow() {
+        document.getElementById('pos-step-1').classList.remove('hidden');
+        document.getElementById('pos-step-2').classList.add('hidden');
+        document.getElementById('pos-step-3').classList.add('hidden');
+        document.getElementById('pos-verify-form').reset();
+        document.getElementById('pos-authorize-form').reset();
+        clearError();
+    }
+
+    // ── STEP 1 — VERIFY ──────────────────────────────────────────────────────
+    document.getElementById('pos-verify-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        clearError();
+        setLoading('p-verify-btn', true, 'Verify Credentials');
+
+        try {
+            const body = new URLSearchParams({
+                email:    document.getElementById('p-email').value,
+                password: document.getElementById('p-password').value,
+            });
+
+            const res  = await fetch('{{ path('mpesa_login_verify_pos_auth') }}', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body:    body.toString(),
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('pos-step-1').classList.add('hidden');
+                document.getElementById('pos-step-2').classList.remove('hidden');
+                document.getElementById('pos-verified-name').textContent =
+                    '✓ Authorized as ' + data.user.name;
+            } else {
+                showError(data.message ?? 'Verification failed.');
+            }
+        } catch {
+            showError('An unexpected error occurred. Please try again.');
+        } finally {
+            setLoading('p-verify-btn', false, 'Verify Credentials');
+        }
+    });
+
+    // ── STEP 2 — AUTHORIZE ───────────────────────────────────────────────────
+    document.getElementById('pos-authorize-form').addEventListener('submit', async function(e) {
+        e.preventDefault();
+        clearError();
+        setLoading('p-authorize-btn', true, 'Authorize Terminal');
+
+        try {
+            const body = new URLSearchParams({
+                device_name:         document.getElementById('p-device-name').value,
+                terminal_identifier: document.getElementById('p-terminal-id').value,
+            });
+
+            const res  = await fetch('{{ path('mpesa_login_authorize_terminal') }}', {
+                method:  'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body:    body.toString(),
+            });
+
+            const data = await res.json();
+
+            if (data.success) {
+                document.getElementById('pos-step-2').classList.add('hidden');
+                document.getElementById('pos-step-3').classList.remove('hidden');
+                document.getElementById('pos-success-message').textContent = data.message;
+
+                // Redirect to POS dashboard after short delay
+                setTimeout(() => {
+                    window.location.href = data.redirect;
+                }, 1500);
+            } else {
+                showError(data.message ?? 'Authorization failed.');
+            }
+        } catch {
+            showError('An unexpected error occurred. Please try again.');
+        } finally {
+            setLoading('p-authorize-btn', false, 'Authorize Terminal');
+        }
+    });
+    </script>
+
+{% endblock %}

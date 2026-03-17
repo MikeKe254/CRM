@@ -2,57 +2,35 @@
 
 {% block mpesa_content %}
 
-    {% include 'mpesa/lock_screen.html.twig' with { is_locked: is_locked } %}
+    {% include 'mpesa/lock_screen.html.twig' with { is_locked: true } %}
 
     <!-- ================= DASHBOARD ================= -->
-    <div id="dashboard" class="{{ is_locked ? 'hidden' : '' }} relative min-h-screen p-2 md:p-4 bg-white/0">
+    <div id="dashboard" class="hidden relative min-h-screen p-2 md:p-4 bg-white/0">
         <img src="{{ asset('images/background.png') }}" class="absolute inset-0 w-full h-full object-cover opacity-20 -z-10">
-
         <div class="relative z-10">
-
             {% include 'components/mpesa/header.html.twig' %}
-
             {% include 'components/mpesa/search_row.html.twig' %}
-
             {% include 'mpesa/advanced_search.html.twig' %}
-
             {% include 'mpesa/transactions.html.twig' %}
-
         </div>
     </div>
 
     {% include 'mpesa/stk_push.html.twig' %}
-
     {% include 'components/mpesa/info_modal.html.twig' %}
 
+    <!-- ================= CUSTOMER PROFILE MODAL ================= -->
     <div id="customerProfileModal" class="fixed inset-0 bg-black/40 hidden items-center justify-center z-50">
-
-        <!-- MODAL BOX -->
         <div class="bg-white rounded-xl shadow-xl w-[95%] lg:w-[80%] max-h-[90vh] flex flex-col">
-
-            <!-- HEADER -->
             <div class="flex justify-between items-center border-b px-5 py-3 flex-shrink-0">
-                <h2 id="customerProfileTitle" class="font-semibold text-lg">
-                    Customer Profile
-                </h2>
-
-                <button onclick="closeCustomerProfileModal()" class="text-gray-500 hover:text-black text-xl">
-                    &times;
-                </button>
+                <h2 id="customerProfileTitle" class="font-semibold text-lg">Customer Profile</h2>
+                <button onclick="closeCustomerProfileModal()" class="text-gray-500 hover:text-black text-xl">&times;</button>
             </div>
-
-            <!-- CONTENT -->
             <div id="customerProfileContent" class="p-5 overflow-y-auto">
-
-                <!-- Loader -->
                 <div class="flex justify-center items-center py-10">
                     <div class="animate-spin rounded-full h-8 w-8 border-b-2 border-gray-900"></div>
                 </div>
-
             </div>
-
         </div>
-
     </div>
 
 {% endblock %}

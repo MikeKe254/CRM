@@ -122,19 +122,20 @@ $('#advanced-search-btn').on('click', function() {
     $('.loader').show();
 
     const params = {
-        date_from: $('#adv-date-from').val(),
-        date_to: $('#adv-date-to').val(),
-        time_from: $('#adv-time-from').val(),
-        time_to: $('#adv-time-to').val(),
-        type: $('#adv-type').val(),
-        msisdn: $('#adv-msisdn').val(),
+        date_from:      $('#adv-date-from').val(),
+        date_to:        $('#adv-date-to').val(),
+        time_from:      $('#adv-time-from').val(),
+        time_to:        $('#adv-time-to').val(),
+        type:           $('#adv-type').val(),
+        msisdn:         $('#adv-msisdn').val(),
         transaction_id: $('#adv-transaction-id').val(),
-        reference: $('#adv-reference').val(),
-        amount: $('#adv-amount').val(),
-        name: $('#adv-name').val()
+        reference:      $('#adv-reference').val(),
+        amount:         $('#adv-amount').val(),
+        name:           $('#adv-name').val()
     };
 
-    $.getJSON('ajax/advanced_search.php', params, function(res) {
+    // ✅ URL updated — only change from original
+    $.getJSON('/mpesa/search', params, function(res) {
         $('.loader').hide();
 
         // 🔔 TOAST
@@ -145,14 +146,15 @@ $('#advanced-search-btn').on('click', function() {
         if (res.success && res.data.length) {
             res.data.forEach(t => html += createAdvancedCard(t));
 
-            // Load summary (unchanged logic)
+            // Load summary
             loadTransactionSummary(params);
 
             // ✅ Auto-scroll to summary, accounting for sticky header
             const $summary = $('#transaction-summary');
             if ($summary.length) {
                 const $header = $('header:visible, .sticky:visible, .fixed:visible').first();
-                const headerHeight = $header.length ? $header.outerHeight() : 0;
+                const headerHeight = $header.length ?
+                    $header.outerHeight() : 0;
 
                 $('html, body').animate({
                     scrollTop: $summary.offset().top - headerHeight - 10
@@ -173,8 +175,12 @@ $('#advanced-search-btn').on('click', function() {
             $('.card-enter').addClass('card-enter-active');
         }, 10);
 
-    }).fail(function() {
+    }).fail(function(xhr) {
         $('.loader').hide();
+        if (xhr.status === 401) {
+            window.location.href = '/mpesa/login';
+            return;
+        }
         showToast('Advanced search failed. Please try again.', false);
     });
 });

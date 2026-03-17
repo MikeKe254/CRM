@@ -1,0 +1,254 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block admin_title %}Users{% endblock %}
+{% block admin_subtitle %}Manage staff accounts and their roles{% endblock %}
+
+{% block admin_actions %}
+    {% if can.create %}
+    <button class="btn-primary" style="flex:none;padding:0 16px;" onclick="openCreateUser()">
+        + Add User
+    </button>
+    {% endif %}
+{% endblock %}
+
+{% block admin_content %}
+
+<div class="bg-white rounded-xl border border-gray-100 overflow-hidden">
+
+    {# ── FILTER BAR ── #}
+    <div class="admin-filter-bar" style="padding:14px 16px 0;">
+        <div style="position:relative;">
+            <svg width="14" height="14" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"
+                 style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;">
+                <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+            </svg>
+            <input class="filter-input" id="user-search" placeholder="Search users…" autocomplete="off">
+        </div>
+        <span style="font-size:12px;color:#9ca3af;margin-left:auto;">{{ users|length }} user{{ users|length != 1 ? 's' : '' }}</span>
+    </div>
+
+    {# ── TABLE ── #}
+    <div style="overflow-x:auto;">
+        <table class="admin-table" id="users-table">
+            <thead>
+                <tr>
+                    <th>Name</th>
+                    <th>Email</th>
+                    <th>Role</th>
+                    <th>Access</th>
+                    <th>Dashboard</th>
+                    <th>POS</th>
+                    <th style="width:80px;"></th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for user in users %}
+            <tr id="user-row-{{ user.id }}">
+                <td>
+                    <div class="flex items-center gap-2">
+                        <div style="width:30px;height:30px;border-radius:50%;background:#eef2ff;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:600;color:#4f46e5;flex-shrink:0;">
+                            {{ user.name|first|upper }}
+                        </div>
+                        <div>
+                            <div class="font-medium text-gray-900" style="font-size:13px;">{{ user.name }}</div>
+                            {% if user.is_super_admin %}
+                            <span class="badge badge-purple" style="font-size:10px;">Super Admin</span>
+                            {% endif %}
+                        </div>
+                    </div>
+                </td>
+                <td style="color:#6b7280;">{{ user.email ?? '—' }}</td>
+                <td>
+                    {% if user.roles %}
+                        {% for role in user.roles|split(', ') %}
+                        <span class="badge badge-blue">{{ role }}</span>
+                        {% endfor %}
+                    {% else %}
+                        <span style="color:#d1d5db;font-size:13px;">No role</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if user.is_super_admin %}
+                        <span class="badge badge-purple">Super Admin</span>
+                    {% elseif user.can_dashboard_login and user.can_pos_login %}
+                        <span class="badge badge-green">Full</span>
+                    {% elseif user.can_dashboard_login %}
+                        <span class="badge badge-blue">Dashboard</span>
+                    {% elseif user.can_pos_login %}
+                        <span class="badge badge-amber">POS only</span>
+                    {% else %}
+                        <span class="badge badge-gray">None</span>
+                    {% endif %}
+                </td>
+                <td>
+                    {% if can.edit %}
+                    <label class="toggle-switch">
+                        <input type="checkbox" {{ user.can_dashboard_login ? 'checked' : '' }}
+                               onchange="toggleUserAccess({{ user.id }}, 'dashboard', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    {% else %}
+                        {{ user.can_dashboard_login ? '✓' : '—' }}
+                    {% endif %}
+                </td>
+                <td>
+                    {% if can.edit %}
+                    <label class="toggle-switch">
+                        <input type="checkbox" {{ user.can_pos_login ? 'checked' : '' }}
+                               onchange="toggleUserAccess({{ user.id }}, 'pos', this.checked)">
+                        <span class="toggle-slider"></span>
+                    </label>
+                    {% else %}
+                        {{ user.can_pos_login ? '✓' : '—' }}
+                    {% endif %}
+                </td>
+                <td>
+                    <div class="flex items-center gap-1">
+                        {% if can.edit %}
+                        <button class="row-action primary" onclick="openEditUser({{ user|json_encode|e('html_attr') }})">
+                            Edit
+                        </button>
+                        {% endif %}
+                        {% if can.delete and not user.is_super_admin %}
+                        <button class="row-action danger" onclick="deleteUser({{ user.id }}, '{{ user.name|e('js') }}')">
+                            Delete
+                        </button>
+                        {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="7" style="text-align:center;padding:40px;color:#9ca3af;">No users found.</td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{{ parent() }}
+
+<script>
+const roles = {{ roles|json_encode|raw }};
+
+liveFilter('user-search', 'users-table');
+
+function userFormHtml(u = {}) {
+    const roleOptions = roles.map(r =>
+        `<option value="${r.id}" ${u.role_id == r.id ? 'selected' : ''}>${r.name}</option>`
+    ).join('');
+
+    return `
+        <div id="drawer-error" class="drawer-error"></div>
+
+        <div class="drawer-field">
+            <label class="drawer-label">Full Name *</label>
+            <input class="drawer-input" id="f-name" value="${u.name ?? ''}" placeholder="e.g. John Kamau">
+        </div>
+
+        <div class="drawer-field">
+            <label class="drawer-label">Email Address</label>
+            <input class="drawer-input" id="f-email" type="email" value="${u.email ?? ''}" placeholder="email@example.com">
+        </div>
+
+        <div class="drawer-field">
+            <label class="drawer-label">Password ${u.id ? '(leave blank to keep current)' : '*'}</label>
+            <input class="drawer-input" id="f-password" type="password" placeholder="••••••••">
+        </div>
+
+        <div class="drawer-field">
+            <label class="drawer-label">PIN (for POS) ${u.id ? '(leave blank to keep current)' : ''}</label>
+            <input class="drawer-input" id="f-pin" type="password" placeholder="4–6 digit PIN" maxlength="6">
+        </div>
+
+        <div class="drawer-field">
+            <label class="drawer-label">Role</label>
+            <select class="drawer-select" id="f-role">
+                <option value="">No role</option>
+                ${roleOptions}
+            </select>
+        </div>
+
+        <div class="drawer-field">
+            <label class="drawer-label">Access</label>
+            <div class="drawer-checkbox-row" onclick="document.getElementById('f-dash').click()">
+                <input type="checkbox" id="f-dash" ${u.can_dashboard_login ? 'checked' : ''} onclick="event.stopPropagation()">
+                <div>
+                    <div class="drawer-checkbox-label">Dashboard Login</div>
+                    <div class="drawer-checkbox-sub">Can access the management dashboard</div>
+                </div>
+            </div>
+            <div class="drawer-checkbox-row" onclick="document.getElementById('f-pos').click()">
+                <input type="checkbox" id="f-pos" ${u.can_pos_login ? 'checked' : ''} onclick="event.stopPropagation()">
+                <div>
+                    <div class="drawer-checkbox-label">POS Login</div>
+                    <div class="drawer-checkbox-sub">Can unlock POS terminal with PIN</div>
+                </div>
+            </div>
+        </div>
+    `;
+}
+
+function openCreateUser() {
+    openDrawer('Add User', userFormHtml(), `
+        <button class="btn-ghost" onclick="closeDrawer()">Cancel</button>
+        <button class="btn-primary" onclick="submitCreateUser()">Save</button>
+    `);
+}
+
+function openEditUser(user) {
+    openDrawer('Edit User', userFormHtml(user), `
+        <button class="btn-ghost" onclick="closeDrawer()">Cancel</button>
+        <button class="btn-primary" onclick="submitEditUser(${user.id})">Save</button>
+    `);
+}
+
+function submitCreateUser() {
+    adminFetch('{{ path('admin_users_create') }}', {
+        name:                document.getElementById('f-name').value,
+        email:               document.getElementById('f-email').value,
+        password:            document.getElementById('f-password').value,
+        pin:                 document.getElementById('f-pin').value,
+        role_id:             document.getElementById('f-role').value,
+        can_dashboard_login: document.getElementById('f-dash').checked ? 1 : 0,
+        can_pos_login:       document.getElementById('f-pos').checked ? 1 : 0,
+    }, () => location.reload());
+}
+
+function submitEditUser(id) {
+    adminFetch(`/dashboard/admin/users/${id}/edit`, {
+        name:                document.getElementById('f-name').value,
+        email:               document.getElementById('f-email').value,
+        password:            document.getElementById('f-password').value,
+        pin:                 document.getElementById('f-pin').value,
+        role_id:             document.getElementById('f-role').value,
+        can_dashboard_login: document.getElementById('f-dash').checked ? 1 : 0,
+        can_pos_login:       document.getElementById('f-pos').checked ? 1 : 0,
+    }, () => location.reload());
+}
+
+function deleteUser(id, name) {
+    adminDelete(`/dashboard/admin/users/${id}/delete`,
+        `Delete "${name}"? This cannot be undone.`,
+        () => {
+            const row = document.getElementById(`user-row-${id}`);
+            if (row) row.remove();
+        }
+    );
+}
+
+function toggleUserAccess(id, type, enabled) {
+    const field = type === 'dashboard' ? 'can_dashboard_login' : 'can_pos_login';
+    fetch(`/dashboard/admin/users/${id}/edit`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({ [field]: enabled ? 1 : 0 }).toString(),
+    });
+}
+</script>
+{% endblock %}

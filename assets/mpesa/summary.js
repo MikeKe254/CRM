@@ -11,7 +11,8 @@ export function loadTransactionSummary(filters) {
     $loader.show();
     $content.addClass('hidden').html('');
 
-    $.getJSON('ajax/transaction_summary.php', filters, function(res) {
+    // ✅ URL updated — only change from original
+    $.getJSON('/mpesa/search/summary', filters, function(res) {
 
         $loader.hide();
 

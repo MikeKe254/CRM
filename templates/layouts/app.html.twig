@@ -2,18 +2,16 @@
 
 {% block body %}
 
-<div class="flex min-h-screen">
+<div style="display: flex; min-height: 100vh;">
 
     {% include 'components/sidebar.html.twig' %}
 
-    <div class="flex-1">
+    <div id="main-content" style="flex: 1; min-width: 0; transition: margin-left 0.2s ease;">
 
         {% include 'components/navbar.html.twig' %}
 
         <main class="p-6">
-
             {% block content %}{% endblock %}
-
         </main>
 
     </div>

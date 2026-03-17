@@ -1,0 +1,98 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block admin_title %}Permissions{% endblock %}
+{% block admin_subtitle %}All available system permissions grouped by category{% endblock %}
+
+{% block admin_content %}
+
+<div class="admin-filter-bar">
+    <div style="position:relative;">
+        <svg width="14" height="14" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24"
+             style="position:absolute;left:10px;top:50%;transform:translateY(-50%);pointer-events:none;">
+            <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        </svg>
+        <input class="filter-input" id="perm-search" placeholder="Search permissions…" autocomplete="off">
+    </div>
+    <div class="flex items-center gap-2">
+        {% for cat in categories %}
+        <button class="cat-filter row-action" data-cat="{{ cat }}" onclick="filterByCategory('{{ cat|e('js') }}')"
+                style="font-size:11px;padding:3px 10px;">
+            {{ cat }}
+        </button>
+        {% endfor %}
+        <button class="row-action" onclick="filterByCategory('')" style="font-size:11px;padding:3px 10px;">All</button>
+    </div>
+</div>
+
+<div id="perm-sections">
+{% for category, perms in grouped %}
+<div class="perm-section bg-white rounded-xl border border-gray-100 overflow-hidden mb-4" data-category="{{ category }}">
+
+    <div style="padding:14px 20px;border-bottom:1px solid #f3f4f6;display:flex;align-items:center;justify-content:space-between;">
+        <div class="font-semibold text-gray-900" style="font-size:14px;">{{ category }}</div>
+        <span class="badge badge-blue">{{ perms|length }}</span>
+    </div>
+
+    <div style="overflow-x:auto;">
+        <table class="admin-table">
+            <thead>
+                <tr>
+                    <th>Permission</th>
+                    <th>Action Key</th>
+                    <th>Category</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for p in perms %}
+            <tr class="perm-row">
+                <td>
+                    <div class="font-medium text-gray-900" style="font-size:13px;">{{ p.name }}</div>
+                    {% if p.description is defined and p.description %}
+                    <div style="font-size:11px;color:#9ca3af;margin-top:1px;">{{ p.description }}</div>
+                    {% endif %}
+                </td>
+                <td>
+                    <code style="font-size:11px;background:#f3f4f6;padding:2px 7px;border-radius:4px;color:#4f46e5;font-family:monospace;">
+                        {{ p.action_key }}
+                    </code>
+                </td>
+                <td>
+                    <span class="badge badge-gray">{{ p.category }}</span>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+{% endfor %}
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+{{ parent() }}
+<script>
+document.getElementById('perm-search').addEventListener('input', function() {
+    const q = this.value.toLowerCase();
+    document.querySelectorAll('.perm-row').forEach(row => {
+        row.style.display = row.textContent.toLowerCase().includes(q) ? '' : 'none';
+    });
+    document.querySelectorAll('.perm-section').forEach(section => {
+        const visible = [...section.querySelectorAll('.perm-row')].some(r => r.style.display !== 'none');
+        section.style.display = visible ? '' : 'none';
+    });
+});
+
+function filterByCategory(cat) {
+    document.querySelectorAll('.perm-section').forEach(section => {
+        section.style.display = (!cat || section.dataset.category === cat) ? '' : 'none';
+    });
+    document.querySelectorAll('.cat-filter').forEach(btn => {
+        btn.style.background = btn.dataset.cat === cat ? '#eef2ff' : '';
+        btn.style.color      = btn.dataset.cat === cat ? '#4f46e5' : '';
+        btn.style.borderColor = btn.dataset.cat === cat ? '#c7d2fe' : '';
+    });
+}
+</script>
+{% endblock %}
