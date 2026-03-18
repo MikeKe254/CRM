@@ -48,24 +48,24 @@ class AuditLogController extends AdminBaseController
         $params = ['company_id' => $session->company->id];
 
         if ($filters['user_id']) {
-            $where[]             = 'ul.user_id = :user_id';
-            $params['user_id']   = $filters['user_id'];
+            $where[]           = 'ul.user_id = :user_id';
+            $params['user_id'] = $filters['user_id'];
         }
         if ($filters['action']) {
-            $where[]           = 'ul.action LIKE :action';
-            $params['action']  = '%' . $filters['action'] . '%';
+            $where[]          = 'ul.action LIKE :action';
+            $params['action'] = '%' . $filters['action'] . '%';
         }
         if ($filters['target_table']) {
-            $where[]                  = 'ul.target_table = :target_table';
-            $params['target_table']   = $filters['target_table'];
+            $where[]                 = 'ul.target_table = :target_table';
+            $params['target_table']  = $filters['target_table'];
         }
         if ($filters['date_from']) {
-            $where[]                = 'ul.created_at >= :date_from';
-            $params['date_from']    = $filters['date_from'] . ' 00:00:00';
+            $where[]             = 'ul.created_at >= :date_from';
+            $params['date_from'] = $filters['date_from'] . ' 00:00:00';
         }
         if ($filters['date_to']) {
-            $where[]              = 'ul.created_at <= :date_to';
-            $params['date_to']    = $filters['date_to'] . ' 23:59:59';
+            $where[]           = 'ul.created_at <= :date_to';
+            $params['date_to'] = $filters['date_to'] . ' 23:59:59';
         }
 
         $whereSQL = 'WHERE ' . implode(' AND ', $where);
@@ -75,6 +75,8 @@ class AuditLogController extends AdminBaseController
             $params,
         );
 
+        // LIMIT and OFFSET must be interpolated as integers — DBAL binds named
+        // parameters as strings, and MariaDB rejects LIMIT '50' OFFSET '0'.
         $logs = $this->db->fetchAllAssociative(
             "SELECT ul.*, u.name AS user_name, p.name AS permission_name
              FROM   user_logs ul
@@ -82,8 +84,8 @@ class AuditLogController extends AdminBaseController
              LEFT JOIN permissions p ON p.id = ul.permission_id
              {$whereSQL}
              ORDER  BY ul.created_at DESC
-             LIMIT  :limit OFFSET :offset",
-            array_merge($params, ['limit' => $perPage, 'offset' => $offset]),
+             LIMIT  {$perPage} OFFSET {$offset}",
+            $params,
         );
 
         $users = $this->db->fetchAllAssociative(

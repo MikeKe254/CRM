@@ -29,43 +29,31 @@
         <span class="text-sm font-semibold text-gray-900">{{ category }}</span>
         <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold">{{ perms|length }}</span>
     </div>
-    <table class="w-full">
-        <thead>
-            <tr class="border-b border-gray-100">
-                <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Permission</th>
-                <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Action Key</th>
-            </tr>
-        </thead>
-        <tbody>
-        {% for p in perms %}
-        <tr class="perm-row border-b border-gray-50 hover:bg-gray-50 last:border-0">
-            <td class="px-4 py-3">
-                <div class="text-sm font-medium text-gray-900">{{ p.name }}</div>
-                {% if p.description is defined and p.description %}
-                <div class="text-xs text-gray-400 mt-0.5">{{ p.description }}</div>
-                {% endif %}
-            </td>
-            <td class="px-4 py-3">
-                <code class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-mono">{{ p.action_key }}</code>
-            </td>
-        </tr>
-        {% endfor %}
-        </tbody>
-    </table>
+    <div class="divide-y divide-gray-50">
+    {% for p in perms %}
+    <div class="perm-row px-5 py-3.5 hover:bg-gray-50 transition-colors">
+        <div class="text-sm font-medium text-gray-900">{{ p.name }}</div>
+        {% if p.description is defined and p.description %}
+        <div class="text-xs text-gray-400 mt-0.5">{{ p.description }}</div>
+        {% endif %}
+    </div>
+    {% endfor %}
+    </div>
 </div>
 {% endfor %}
 </div>
+
 {% endblock %}
 
 {% block admin_scripts %}
 <script>
-document.getElementById('perm-search').addEventListener('input', function() {
+document.getElementById('perm-search').oninput = function() {
     const q = this.value.toLowerCase();
     document.querySelectorAll('.perm-row').forEach(r => r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none');
     document.querySelectorAll('.perm-section').forEach(s => {
         s.style.display = [...s.querySelectorAll('.perm-row')].some(r => r.style.display !== 'none') ? '' : 'none';
     });
-});
+};
 
 function filterByCategory(btn) {
     const cat = btn.dataset.cat;

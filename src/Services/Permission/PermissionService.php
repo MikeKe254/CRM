@@ -104,7 +104,7 @@ final class PermissionService
      */
     public function listByRoleGrouped(int $roleId, int $companyId): array
     {
-        $flat   = $this->listByRole($roleId, $companyId);
+        $flat    = $this->listByRole($roleId, $companyId);
         $grouped = [];
 
         foreach ($flat as $permission) {
@@ -133,10 +133,10 @@ final class PermissionService
     /**
      * Assign a permission to a role.
      *
-     * @param AuthResult $actor      The user performing this action
-     * @param int        $roleId     The role to assign to
+     * @param AuthResult $actor        The user performing this action
+     * @param int        $roleId       The role to assign to
      * @param int        $permissionId
-     * @param int        $companyId  Tenant scope
+     * @param int        $companyId    Tenant scope
      */
     public function assignPermission(
         AuthResult $actor,
@@ -170,6 +170,15 @@ final class PermissionService
             return PermissionResult::fail('Permission not found.', 404);
         }
 
+        // ── Ownership check — cannot assign a permission you don't have ───────
+        // Super admins bypass this; regular users can only delegate what they own.
+        if (!$actor->user->isSuperAdmin && !$this->actorHasPermission($actor, $permissionId, $companyId)) {
+            return PermissionResult::fail(
+                "You cannot assign the '{$permission['name']}' permission because you don't have it yourself.",
+                403,
+            );
+        }
+
         // ── Duplicate check ───────────────────────────────────────────────────
         $existing = $this->db->fetchOne(
             'SELECT id FROM role_permissions WHERE role_id = :role_id AND permission_id = :permission_id',
@@ -193,13 +202,13 @@ final class PermissionService
 
         // ── Audit log ─────────────────────────────────────────────────────────
         $this->log(
-            actor:       $actor,
-            companyId:   $companyId,
+            actor:        $actor,
+            companyId:    $companyId,
             permissionId: $permissionId,
-            action:      'ASSIGN_PERMISSION',
-            targetTable: 'role_permissions',
-            targetId:    $rolePermissionId,
-            description: "Assigned permission '{$permission['name']}' to role '{$role['name']}'.",
+            action:       'ASSIGN_PERMISSION',
+            targetTable:  'role_permissions',
+            targetId:     $rolePermissionId,
+            description:  "Assigned permission '{$permission['name']}' to role '{$role['name']}'.",
         );
 
         return PermissionResult::ok(
@@ -277,6 +286,14 @@ final class PermissionService
             return PermissionResult::fail(
                 'This permission is not assigned to the role.',
                 404,
+            );
+        }
+
+        // ── Ownership check — cannot revoke a permission you don't have ───────
+        if (!$actor->user->isSuperAdmin && !$this->actorHasPermission($actor, $permissionId, $companyId)) {
+            return PermissionResult::fail(
+                "You cannot revoke the '{$rolePermission['permission_name']}' permission because you don't have it yourself.",
+                403,
             );
         }
 
@@ -560,7 +577,10 @@ final class PermissionService
 
     /**
      * Assert the actor can manage permissions.
-     * Allowed if: super admin OR has the 'assign_permissions' permission.
+     * Allowed if: super admin OR has the ASSIGN_PERMISSIONS action_key.
+     *
+     * Matches on action_key (stable machine identifier) rather than name
+     * (human label that may differ between environments or be title-cased).
      */
     private function assertCanManage(AuthResult $actor, int $companyId): PermissionResult
     {
@@ -573,14 +593,14 @@ final class PermissionService
              FROM user_roles ur
              JOIN role_permissions rp ON rp.role_id = ur.role_id
              JOIN permissions p ON p.id = rp.permission_id
-             WHERE ur.user_id    = :user_id
-               AND p.name        = :permission
+             WHERE ur.user_id     = :user_id
+               AND p.action_key   = :action_key
                AND rp.role_id IN (
                    SELECT id FROM roles WHERE company_id = :company_id
                )',
             [
                 'user_id'    => $actor->user->id,
-                'permission' => 'assign_permissions',
+                'action_key' => 'ASSIGN_PERMISSIONS',
                 'company_id' => $companyId,
             ],
         );
@@ -615,6 +635,34 @@ final class PermissionService
         );
     }
 
+    /**
+     * Check whether the actor personally holds a specific permission
+     * via any of their own roles within the company.
+     *
+     * Used to enforce: you can only assign/revoke permissions you yourself have.
+     */
+    private function actorHasPermission(AuthResult $actor, int $permissionId, int $companyId): bool
+    {
+        $result = $this->db->fetchOne(
+            'SELECT rp.id
+             FROM user_roles ur
+             JOIN role_permissions rp ON rp.role_id = ur.role_id
+             WHERE ur.user_id      = :user_id
+               AND rp.permission_id = :permission_id
+               AND rp.role_id IN (
+                   SELECT id FROM roles WHERE company_id = :company_id
+               )
+             LIMIT 1',
+            [
+                'user_id'       => $actor->user->id,
+                'permission_id' => $permissionId,
+                'company_id'    => $companyId,
+            ],
+        );
+
+        return (bool) $result;
+    }
+
     private function isSystemRole(array $role): bool
     {
         return (bool) ($role['is_system_role'] ?? false);
@@ -635,15 +683,15 @@ final class PermissionService
     ): void {
         try {
             $this->db->insert('user_logs', [
-                'company_id'   => $companyId,
-                'user_id'      => $actor->user->id,
-                'permission_id'=> $permissionId,
-                'action'       => $action,
-                'target_table' => $targetTable,
-                'target_id'    => $targetId,
-                'description'  => $description,
-                'ip_address'   => null,
-                'created_at'   => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'company_id'    => $companyId,
+                'user_id'       => $actor->user->id,
+                'permission_id' => $permissionId,
+                'action'        => $action,
+                'target_table'  => $targetTable,
+                'target_id'     => $targetId,
+                'description'   => $description,
+                'ip_address'    => null,
+                'created_at'    => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
             ]);
         } catch (\Throwable) {
             // Logging must never break the main flow

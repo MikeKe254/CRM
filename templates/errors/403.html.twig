@@ -1,0 +1,114 @@
+{% extends 'layouts/admin.html.twig' %}
+
+{% block admin_title %}{% endblock %}
+{% block admin_subtitle %}{% endblock %}
+
+{% block admin_content %}
+
+<div class="min-h-[72vh] flex items-center justify-center px-4">
+    <div class="w-full max-w-lg">
+
+        {# ── CARD ── #}
+        <div class="bg-white rounded-2xl border border-gray-200 shadow-sm overflow-hidden">
+
+            {# Red top bar #}
+            <div class="h-1 bg-gradient-to-r from-red-400 via-rose-500 to-red-500"></div>
+
+            <div class="p-10">
+
+                {# ── HEADER ── #}
+                <div class="flex items-start gap-4 mb-8">
+
+                    {# Shield icon badge #}
+                    <div class="w-12 h-12 rounded-xl bg-red-50 border border-red-100 flex items-center justify-center flex-shrink-0 text-red-500">
+                        {{ ux_icon('lucide:shield-alert', {width: 22, height: 22}) }}
+                    </div>
+
+                    <div class="pt-0.5">
+                        <p class="text-xs font-bold text-red-400 uppercase tracking-[0.12em] mb-1">Error 403</p>
+                        <h1 class="text-2xl font-bold text-gray-900 leading-tight">Access Denied</h1>
+                    </div>
+
+                </div>
+
+                {# ── DIVIDER ── #}
+                <div class="border-t border-gray-100 mb-7"></div>
+
+                {# ── BODY ── #}
+                <div class="space-y-4 mb-8">
+
+                    {# Permission message #}
+                    <div class="flex items-start gap-3 p-4 bg-red-50 border border-red-100 rounded-xl">
+                        <span class="text-red-400 mt-0.5 flex-shrink-0">
+                            {{ ux_icon('lucide:circle-alert', {width: 16, height: 16}) }}
+                        </span>
+                        <p class="text-sm text-red-700 leading-relaxed">
+                            {{ message ?? 'You do not have permission to view this page.' }}
+                        </p>
+                    </div>
+
+                    {# Help hint #}
+                    <div class="flex items-start gap-3 p-4 bg-gray-50 border border-gray-100 rounded-xl">
+                        <span class="text-gray-400 mt-0.5 flex-shrink-0">
+                            {{ ux_icon('lucide:info', {width: 16, height: 16}) }}
+                        </span>
+                        <p class="text-sm text-gray-500 leading-relaxed">
+                            If you believe this is a mistake, ask your administrator to update your role permissions.
+                        </p>
+                    </div>
+
+                </div>
+
+                {# ── ACTIONS ── #}
+                <div class="flex items-center gap-3">
+                    <a href="{{ path('app_dashboard') }}"
+                       class="inline-flex items-center gap-2 h-10 px-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
+                        {{ ux_icon('lucide:layout-dashboard', {width: 15, height: 15}) }}
+                        Go to Dashboard
+                    </a>
+                    <button onclick="history.back()"
+                            class="inline-flex items-center gap-2 h-10 px-5 border border-gray-200 bg-white hover:bg-gray-50 active:bg-gray-100 text-gray-600 text-sm font-medium rounded-lg transition-colors">
+                        {{ ux_icon('lucide:arrow-left', {width: 15, height: 15}) }}
+                        Go Back
+                    </button>
+                </div>
+
+            </div>
+
+            {# ── FOOTER STRIP ── #}
+            <div class="px-10 py-3.5 bg-gray-50 border-t border-gray-100 flex items-center justify-between gap-4">
+
+                <div class="flex items-center gap-2 text-xs text-gray-400 min-w-0">
+                    {{ ux_icon('lucide:user', {width: 13, height: 13, class: 'flex-shrink-0'}) }}
+                    <span>Logged in as
+                        <span class="font-semibold text-gray-700">
+                            {% if session is defined and session.user is defined %}
+                                {{ session.user.name }}
+                            {% else %}
+                                Unknown
+                            {% endif %}
+                        </span>
+                    </span>
+                </div>
+
+                {% if session is defined and session.company is defined %}
+                <div class="flex items-center gap-1.5 text-xs text-gray-400 flex-shrink-0">
+                    {{ ux_icon('lucide:building-2', {width: 13, height: 13}) }}
+                    {{ session.company.name }}
+                </div>
+                {% endif %}
+
+            </div>
+
+        </div>
+
+        {# ── BELOW CARD ── #}
+        <div class="flex items-center justify-center gap-1.5 mt-5 text-xs text-gray-400">
+            {{ ux_icon('lucide:lock', {width: 12, height: 12}) }}
+            <span>This page is restricted. Contact your administrator for access.</span>
+        </div>
+
+    </div>
+</div>
+
+{% endblock %}

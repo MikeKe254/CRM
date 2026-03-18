@@ -97,6 +97,7 @@
         </table>
     </div>
 </div>
+
 {% endblock %}
 
 {% block admin_scripts %}
@@ -104,15 +105,18 @@
 liveFilter('terminal-search', 'terminals-table');
 
 function revokeTerminal(id, name) {
-    adminDelete(`/dashboard/admin/terminals/${id}/revoke`,
+    adminDelete(
+        `/dashboard/admin/terminals/${id}/revoke`,
         `Revoke "${name}"? Staff will no longer be able to PIN login on this device.`,
-        () => location.reload());
+        () => turboReload()
+    );
 }
 
 function reactivateTerminal(id, name) {
     if (!confirm(`Reactivate "${name}" for 30 days?`)) return;
     fetch(`/dashboard/admin/terminals/${id}/reactivate`, { method: 'POST' })
-        .then(r => r.json()).then(d => { if (d.success) location.reload(); else alert(d.message); });
+        .then(r => r.json())
+        .then(d => { if (d.success) turboReload(); else alert(d.message); });
 }
 </script>
 {% endblock %}

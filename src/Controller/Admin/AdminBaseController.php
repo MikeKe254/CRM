@@ -22,16 +22,10 @@ use Symfony\Component\HttpFoundation\Response;
  *   - Checking required permissions
  *   - Providing helpers for JSON responses
  *
- * Usage:
- *   class UserController extends AdminBaseController
- *   {
- *       public function index(Request $request): Response
- *       {
- *           $session = $this->requireAdmin($request, 'view_users');
- *           if ($session instanceof Response) return $session;
- *           ...
- *       }
- *   }
+ * Access denial behaviour:
+ *   - No token / expired session (401) → redirect to login
+ *   - Valid session, missing permission (403) → render in-layout 403 page
+ *   - Fetch/AJAX requests (any) → JSON error
  */
 abstract class AdminBaseController extends AbstractController
 {
@@ -74,7 +68,7 @@ abstract class AdminBaseController extends AbstractController
 
         // Check permission if required
         if ($permission !== null && !$this->can->check($session, $permission)) {
-            return $this->denyAccess($request, 'You do not have permission to access this.', 403);
+            return $this->denyAccess($request, 'You do not have permission to access this page.', 403, $session);
         }
 
         return $session;
@@ -92,7 +86,7 @@ abstract class AdminBaseController extends AbstractController
         }
 
         if (!$session->user->isSuperAdmin) {
-            return $this->denyAccess($request, 'Super admin access required.', 403);
+            return $this->denyAccess($request, 'Super admin access required.', 403, $session);
         }
 
         return $session;
@@ -130,22 +124,37 @@ abstract class AdminBaseController extends AbstractController
     // =========================================================================
 
     /**
-     * Deny access.
-     * Returns JSON for fetch/AJAX requests.
-     * Returns redirect to login for page requests.
+     * Deny access with context-aware response:
+     *
+     *   - Fetch/AJAX request       → JSON error (any status)
+     *   - 401 Unauthenticated      → redirect to login page
+     *   - 403 Forbidden            → render in-layout 403 page (sidebar stays visible)
      */
-    private function denyAccess(Request $request, string $message, int $status = 401): Response
+    private function denyAccess(Request $request, string $message, int $status = 401, ?object $session = null): Response
     {
-        // Detect fetch/AJAX request
+        // Fetch/AJAX — always return JSON regardless of status
         if (
             $request->isXmlHttpRequest() ||
             str_contains($request->headers->get('Accept', ''), 'application/json') ||
-            $request->headers->get('Content-Type') === 'application/x-www-form-urlencoded' && $request->isMethod('POST')
+            (
+                $request->headers->get('Content-Type') === 'application/x-www-form-urlencoded'
+                && $request->isMethod('POST')
+            )
         ) {
             return $this->json(['success' => false, 'message' => $message], $status);
         }
 
-        return $this->redirectToRoute('app_login');
+        // Not logged in / session expired → send to login
+        if ($status === 401) {
+            return $this->redirectToRoute('app_login');
+        }
+
+        // Logged in but no permission → in-layout 403 page
+        // Pass session so the template can display the logged-in user's name.
+        return $this->render('errors/403.html.twig', [
+            'message' => $message,
+            'session' => $session,
+        ], new Response('', Response::HTTP_FORBIDDEN));
     }
 
     private function resolveToken(Request $request): ?string

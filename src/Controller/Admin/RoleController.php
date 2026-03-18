@@ -123,7 +123,8 @@ class RoleController extends AdminBaseController
                     ON rpc.constraint_id = pc.constraint_id
                     AND rpc.role_permission_id = (
                         SELECT rp.id FROM role_permissions rp
-                        WHERE rp.role_id = ? AND rp.permission_id = pc.permission_id
+                        WHERE rp.role_id = ?
+                        AND rp.permission_id = pc.permission_id
                         LIMIT 1
                     )
                  WHERE pc.permission_id IN ($placeholders)
@@ -148,6 +149,16 @@ class RoleController extends AdminBaseController
             'SELECT * FROM constraints ORDER BY name'
         );
 
+        // Active MPesa shortcodes for this company — used by the allowed_shortcodes constraint UI
+        $mpesaShortcodes = $this->db->fetchAllAssociative(
+            'SELECT shortcode, account_name, type
+             FROM   mpesa_configs
+             WHERE  company_id = :company_id
+               AND  is_active  = 1
+             ORDER  BY account_name',
+            ['company_id' => $session->company->id],
+        );
+
         return $this->render('admin/roles/show.html.twig', [
             'session'           => $session,
             'role'              => $role,
@@ -158,6 +169,7 @@ class RoleController extends AdminBaseController
             'constraintData'    => $constraintData,
             'permissionNames'   => $permissionNames,
             'allConstraints'    => $allConstraints,
+            'mpesaShortcodes'   => $mpesaShortcodes,
             'can'               => [
                 'edit'   => $this->can->check($session, 'edit_roles'),
                 'assign' => $this->can->check($session, 'assign_permissions'),
@@ -192,9 +204,9 @@ class RoleController extends AdminBaseController
         }
 
         $this->db->insert('roles', [
-            'company_id'    => $session->company->id,
-            'name'          => $name,
-            'description'   => $description ?: null,
+            'company_id'     => $session->company->id,
+            'name'           => $name,
+            'description'    => $description ?: null,
             'is_system_role' => 0,
         ]);
 
@@ -204,11 +216,11 @@ class RoleController extends AdminBaseController
     }
 
     // =========================================================================
-    // POST /dashboard/admin/roles/{id}/edit — Edit (fetch)
+    // POST /dashboard/admin/roles/{id}/update — Update (fetch)
     // =========================================================================
 
-    #[Route('/{id}/edit', name: 'admin_roles_edit', methods: ['POST'])]
-    public function edit(int $id, Request $request): JsonResponse
+    #[Route('/{id}/update', name: 'admin_roles_update', methods: ['POST'])]
+    public function update(int $id, Request $request): JsonResponse
     {
         $session = $this->requireAdmin($request, 'edit_roles');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
@@ -219,15 +231,28 @@ class RoleController extends AdminBaseController
         );
 
         if (!$role) return $this->error('Role not found.', 404);
+        if ($role['is_system_role']) return $this->error('System roles cannot be edited.');
 
-        if ($role['is_system_role'] && !$session->user->isSuperAdmin) {
-            return $this->error('System roles cannot be modified.', 403);
+        $name        = trim((string) $request->request->get('name', ''));
+        $description = trim((string) $request->request->get('description', ''));
+
+        if ($name === '') {
+            return $this->error('Role name is required.');
+        }
+
+        $conflict = $this->db->fetchOne(
+            'SELECT id FROM roles WHERE name = :name AND company_id = :company_id AND id != :id',
+            ['name' => $name, 'company_id' => $session->company->id, 'id' => $id],
+        );
+
+        if ($conflict) {
+            return $this->error('Another role with this name already exists.');
         }
 
         $this->db->update('roles', [
-            'name'        => trim((string) $request->request->get('name', $role['name'])),
-            'description' => trim((string) $request->request->get('description', $role['description'] ?? '')),
-        ], ['id' => $id, 'company_id' => $session->company->id]);
+            'name'        => $name,
+            'description' => $description ?: null,
+        ], ['id' => $id]);
 
         return $this->success('Role updated successfully.');
     }

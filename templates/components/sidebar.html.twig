@@ -30,99 +30,147 @@
     {# ── NAV — SCROLLABLE ────────────────────────────────────────────────── #}
     <nav class="flex-1 overflow-y-auto overflow-x-hidden" style="padding:8px;">
 
+        {# ── MAIN ── #}
         <div class="sidebar-section-label">Main</div>
 
         <a href="{{ path('app_dashboard') }}"
            class="sidebar-link {% if app.request.attributes.get('_route') == 'app_dashboard' %}active{% endif %}"
            data-tooltip="Dashboard">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="7" height="7" rx="1"/>
+                <rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/>
+                <rect x="14" y="14" width="7" height="7" rx="1"/>
+            </svg>
             <span class="sidebar-label">Dashboard</span>
         </a>
 
-        <div class="sidebar-section-label" style="margin-top:8px;">Transactions</div>
-
-        <a href="{{ path('mpesa_dashboard') }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'mpesa_dashboard' %}active{% endif %}"
-           data-tooltip="POS Dashboard">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"/><line x1="2" y1="10" x2="22" y2="10"/></svg>
-            <span class="sidebar-label">POS Dashboard</span>
-        </a>
-
-        <a href="#" class="sidebar-link" data-tooltip="All Transactions">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="8" y1="6" x2="21" y2="6"/><line x1="8" y1="12" x2="21" y2="12"/><line x1="8" y1="18" x2="21" y2="18"/><line x1="3" y1="6" x2="3.01" y2="6"/><line x1="3" y1="12" x2="3.01" y2="12"/><line x1="3" y1="18" x2="3.01" y2="18"/></svg>
-            <span class="sidebar-label">All Transactions</span>
-        </a>
-
-        <a href="#" class="sidebar-link" data-tooltip="Advanced Search">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
-            <span class="sidebar-label">Advanced Search</span>
-        </a>
-
+        {# ── CUSTOMERS ── #}
         <div class="sidebar-section-label" style="margin-top:8px;">Customers</div>
 
+        {% if can('view_transactions') %}
         <a href="{{ path('app_customers') }}"
            class="sidebar-link {% if app.request.attributes.get('_route') == 'app_customers' %}active{% endif %}"
            data-tooltip="All Customers">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                <circle cx="9" cy="7" r="4"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
+                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+            </svg>
             <span class="sidebar-label">All Customers</span>
         </a>
+        {% endif %}
 
         <a href="#" class="sidebar-link" data-tooltip="Intelligence">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
+            </svg>
             <span class="sidebar-label">Intelligence</span>
         </a>
 
         <a href="#" class="sidebar-link" data-tooltip="Segments &amp; Tiers">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
             <span class="sidebar-label">Segments &amp; Tiers</span>
         </a>
 
+        {# ── ANALYTICS ── #}
         <div class="sidebar-section-label" style="margin-top:8px;">Analytics</div>
 
         <a href="#" class="sidebar-link" data-tooltip="Revenue Reports">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <line x1="18" y1="20" x2="18" y2="10"/>
+                <line x1="12" y1="20" x2="12" y2="4"/>
+                <line x1="6" y1="20" x2="6" y2="14"/>
+            </svg>
             <span class="sidebar-label">Revenue Reports</span>
         </a>
 
         <a href="#" class="sidebar-link" data-tooltip="Churn Analysis">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+            </svg>
             <span class="sidebar-label">Churn Analysis</span>
         </a>
 
         <a href="#" class="sidebar-link" data-tooltip="Visit Patterns">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4l3 3"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <path d="M12 8v4l3 3"/>
+            </svg>
             <span class="sidebar-label">Visit Patterns</span>
         </a>
 
+        {# ── ADMIN — only shown if user has at least one admin permission ── #}
+        {% if can('view_users') or can('view_roles') or can('view_permissions') or can('authorize_pos_terminal') or isSuperAdmin() %}
         <div class="sidebar-section-label" style="margin-top:8px;">Admin</div>
 
+        {% if can('view_users') %}
         <a href="{{ path('admin_users') }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_users' %}active{% endif %}"
            data-tooltip="Users">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
+                <circle cx="12" cy="7" r="4"/>
+            </svg>
             <span class="sidebar-label">Users</span>
         </a>
+        {% endif %}
 
+        {% if can('view_roles') %}
         <a href="{{ path('admin_roles') }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_roles' %}active{% endif %}"
            data-tooltip="Roles">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
             <span class="sidebar-label">Roles</span>
         </a>
+        {% endif %}
 
+        {% if can('view_permissions') or isSuperAdmin() %}
+        <a href="{{ path('admin_permissions') }}"
+           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_permissions' %}active{% endif %}"
+           data-tooltip="Permissions">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <rect x="3" y="11" width="18" height="11" rx="2"/>
+                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
+            </svg>
+            <span class="sidebar-label">Permissions</span>
+        </a>
+        {% endif %}
+
+        {% if can('authorize_pos_terminal') %}
         <a href="{{ path('admin_terminals') }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_terminals' %}active{% endif %}"
            data-tooltip="POS Terminals">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <rect x="2" y="3" width="20" height="14" rx="2"/>
+                <line x1="8" y1="21" x2="16" y2="21"/>
+                <line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
             <span class="sidebar-label">POS Terminals</span>
         </a>
+        {% endif %}
 
+        {% if isSuperAdmin() %}
         <a href="{{ path('admin_audit_logs') }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_audit' %}active{% endif %}"
            data-tooltip="Audit Logs">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
+                <polyline points="14 2 14 8 20 8"/>
+                <line x1="16" y1="13" x2="8" y2="13"/>
+                <line x1="16" y1="17" x2="8" y2="17"/>
+            </svg>
             <span class="sidebar-label">Audit Logs</span>
         </a>
+        {% endif %}
+
+        {% endif %}
+        {# /admin section #}
 
     </nav>
 

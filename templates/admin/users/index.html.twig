@@ -66,19 +66,19 @@
                     {% if user.is_super_admin %}
                         <span class="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-semibold">Super Admin</span>
                     {% elseif user.can_dashboard_login and user.can_pos_login %}
-                        <span class="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-semibold">Full</span>
+                        <span data-access-badge class="text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-semibold">Full</span>
                     {% elseif user.can_dashboard_login %}
-                        <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold">Dashboard</span>
+                        <span data-access-badge class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold">Dashboard</span>
                     {% elseif user.can_pos_login %}
-                        <span class="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-semibold">POS only</span>
+                        <span data-access-badge class="text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-semibold">POS only</span>
                     {% else %}
-                        <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-semibold">None</span>
+                        <span data-access-badge class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-semibold">None</span>
                     {% endif %}
                 </td>
                 <td class="px-4 py-3">
                     {% if can.edit %}
                     <label class="toggle-switch">
-                        <input type="checkbox" {{ user.can_dashboard_login ? 'checked' : '' }} onchange="toggleUserAccess({{ user.id }}, 'dashboard', this.checked)">
+                        <input type="checkbox" data-access-toggle="dashboard" {{ user.can_dashboard_login ? 'checked' : '' }} onchange="toggleUserAccess({{ user.id }}, 'dashboard', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
                     {% else %}{{ user.can_dashboard_login ? '✓' : '—' }}{% endif %}
@@ -86,7 +86,7 @@
                 <td class="px-4 py-3">
                     {% if can.edit %}
                     <label class="toggle-switch">
-                        <input type="checkbox" {{ user.can_pos_login ? 'checked' : '' }} onchange="toggleUserAccess({{ user.id }}, 'pos', this.checked)">
+                        <input type="checkbox" data-access-toggle="pos" {{ user.can_pos_login ? 'checked' : '' }} onchange="toggleUserAccess({{ user.id }}, 'pos', this.checked)">
                         <span class="toggle-slider"></span>
                     </label>
                     {% else %}{{ user.can_pos_login ? '✓' : '—' }}{% endif %}
@@ -170,32 +170,43 @@ function openEditUser(u)   { openDrawer('Edit User', userFormHtml(u), drawerFoot
 
 function submitCreateUser() {
     adminFetch('{{ path('admin_users_create') }}', {
-        name: document.getElementById('f-name').value, email: document.getElementById('f-email').value,
-        password: document.getElementById('f-password').value, pin: document.getElementById('f-pin').value,
-        role_id: document.getElementById('f-role').value,
-        can_dashboard_login: document.getElementById('f-dash').checked?1:0,
-        can_pos_login: document.getElementById('f-pos').checked?1:0,
-    }, () => location.reload());
+        name:                document.getElementById('f-name').value,
+        email:               document.getElementById('f-email').value,
+        password:            document.getElementById('f-password').value,
+        pin:                 document.getElementById('f-pin').value,
+        role_id:             document.getElementById('f-role').value,
+        can_dashboard_login: document.getElementById('f-dash').checked ? 1 : 0,
+        can_pos_login:       document.getElementById('f-pos').checked  ? 1 : 0,
+    }, () => turboReload());
 }
 
 function submitEditUser(id) {
     adminFetch(`/dashboard/admin/users/${id}/edit`, {
-        name: document.getElementById('f-name').value, email: document.getElementById('f-email').value,
-        password: document.getElementById('f-password').value, pin: document.getElementById('f-pin').value,
-        role_id: document.getElementById('f-role').value,
-        can_dashboard_login: document.getElementById('f-dash').checked?1:0,
-        can_pos_login: document.getElementById('f-pos').checked?1:0,
-    }, () => location.reload());
+        name:                document.getElementById('f-name').value,
+        email:               document.getElementById('f-email').value,
+        password:            document.getElementById('f-password').value,
+        pin:                 document.getElementById('f-pin').value,
+        role_id:             document.getElementById('f-role').value,
+        can_dashboard_login: document.getElementById('f-dash').checked ? 1 : 0,
+        can_pos_login:       document.getElementById('f-pos').checked  ? 1 : 0,
+    }, () => turboReload());
 }
 
 function deleteUser(id, name) {
-    adminDelete(`/dashboard/admin/users/${id}/delete`, `Delete "${name}"? This cannot be undone.`,
-        () => document.getElementById(`user-row-${id}`)?.remove());
+    adminDelete(
+        `/dashboard/admin/users/${id}/delete`,
+        `Delete "${name}"? This cannot be undone.`,
+        () => document.getElementById(`user-row-${id}`)?.remove()
+    );
 }
 
 function toggleUserAccess(id, type, enabled) {
-    const field = type==='dashboard'?'can_dashboard_login':'can_pos_login';
-    fetch(`/dashboard/admin/users/${id}/edit`, { method:'POST', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: new URLSearchParams({[field]: enabled?1:0}).toString() });
+    const field = type === 'dashboard' ? 'can_dashboard_login' : 'can_pos_login';
+    fetch(`/dashboard/admin/users/${id}/edit`, {
+        method:  'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body:    new URLSearchParams({ [field]: enabled ? 1 : 0 }).toString(),
+    }).then(() => updateUserAccessBadge(id));
 }
 </script>
 {% endblock %}

@@ -119,22 +119,24 @@ function openEditRole(r)   { openDrawer('Edit Role', roleFormHtml(r), drawerFoot
 
 function submitCreateRole() {
     adminFetch('{{ path('admin_roles_create') }}', {
-        name: document.getElementById('f-name').value,
+        name:        document.getElementById('f-name').value,
         description: document.getElementById('f-desc').value,
-    }, () => location.reload());
+    }, () => turboReload());
 }
 
 function submitEditRole(id) {
     adminFetch(`/dashboard/admin/roles/${id}/edit`, {
-        name: document.getElementById('f-name').value,
+        name:        document.getElementById('f-name').value,
         description: document.getElementById('f-desc').value,
-    }, () => location.reload());
+    }, () => turboReload());
 }
 
 function deleteRole(id, name) {
-    adminDelete(`/dashboard/admin/roles/${id}/delete`,
+    adminDelete(
+        `/dashboard/admin/roles/${id}/delete`,
         `Delete role "${name}"? All users with this role will lose it.`,
-        () => document.getElementById(`role-row-${id}`)?.remove());
+        () => document.getElementById(`role-row-${id}`)?.remove()
+    );
 }
 </script>
 {% endblock %}

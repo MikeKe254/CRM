@@ -36,7 +36,8 @@ class UserController extends AdminBaseController
         $users = $this->db->fetchAllAssociative(
             'SELECT u.id, u.name, u.email, u.can_dashboard_login, u.can_pos_login,
                     u.is_super_admin, u.created_at,
-                    GROUP_CONCAT(r.name ORDER BY r.name SEPARATOR ", ") AS roles
+                    MIN(ur.role_id)                                        AS role_id,
+                    GROUP_CONCAT(r.name ORDER BY r.name SEPARATOR ", ")    AS roles
              FROM   users u
              LEFT JOIN user_roles ur ON ur.user_id = u.id
              LEFT JOIN roles r ON r.id = ur.role_id
@@ -73,13 +74,13 @@ class UserController extends AdminBaseController
         $session = $this->requireAdmin($request, 'create_users');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $name    = trim((string) $request->request->get('name', ''));
-        $email   = trim((string) $request->request->get('email', ''));
+        $name     = trim((string) $request->request->get('name', ''));
+        $email    = trim((string) $request->request->get('email', ''));
         $password = (string) $request->request->get('password', '');
-        $pin     = (string) $request->request->get('pin', '');
-        $roleId  = (int) $request->request->get('role_id', 0);
-        $canDash = (bool) $request->request->get('can_dashboard_login', false);
-        $canPos  = (bool) $request->request->get('can_pos_login', false);
+        $pin      = (string) $request->request->get('pin', '');
+        $roleId   = (int) $request->request->get('role_id', 0);
+        $canDash  = (bool) $request->request->get('can_dashboard_login', false);
+        $canPos   = (bool) $request->request->get('can_pos_login', false);
 
         if ($name === '') {
             return $this->error('Name is required.');
@@ -148,10 +149,18 @@ class UserController extends AdminBaseController
         }
 
         $data = [
-            'name'                => trim((string) $request->request->get('name', $user['name'])),
-            'can_dashboard_login' => $request->request->has('can_dashboard_login') ? 1 : 0,
-            'can_pos_login'       => $request->request->has('can_pos_login') ? 1 : 0,
+            'name' => trim((string) $request->request->get('name', $user['name'])),
         ];
+
+        // Only update access flags when explicitly sent.
+        // toggleUserAccess sends only one field at a time — using has() on both
+        // would zero out the untouched field.
+        if ($request->request->has('can_dashboard_login')) {
+            $data['can_dashboard_login'] = (int) $request->request->get('can_dashboard_login');
+        }
+        if ($request->request->has('can_pos_login')) {
+            $data['can_pos_login'] = (int) $request->request->get('can_pos_login');
+        }
 
         $email = trim((string) $request->request->get('email', ''));
         if ($email !== '') $data['email'] = $email;

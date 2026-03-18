@@ -13,6 +13,7 @@ import './mpesa/index.js';
 import './sidebar.js';
 import './navbar.js';
 import './admin.js';
+import './updateUi.js';
 
 
 
