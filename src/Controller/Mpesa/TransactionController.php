@@ -21,7 +21,7 @@ use Symfony\Component\Routing\Attribute\Route;
  *   GET /mpesa/transactions         → fetch transactions (permission-gated)
  *   GET /mpesa/transactions/check   → check STK push status by checkout_request_id
  */
-#[Route('/mpesa')]
+#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class TransactionController extends AbstractController
 {
     public function __construct(

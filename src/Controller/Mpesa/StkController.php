@@ -23,7 +23,7 @@ use Symfony\Component\Routing\Attribute\Route;
  *   POST /mpesa/stk/push    → send STK push
  *   GET  /mpesa/stk/status  → check STK push status
  */
-#[Route('/mpesa/stk')]
+#[Route('/mpesa/stk', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class StkController extends AbstractController
 {
     // Safaricom API endpoints

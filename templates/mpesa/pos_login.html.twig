@@ -1,4 +1,6 @@
 {% extends 'layouts/auth.html.twig' %}
+{% set tenant_subdomain = app.request.attributes.get('subdomain') %}
+{% set tenant_domain = currentDomain() %}
 
 {% block auth_title %}POS Terminal Authorization | Koma Gardens & Resort{% endblock %}
 
@@ -12,6 +14,8 @@
 
     {# ── MESSAGES ─────────────────────────────────────────────────────────── #}
     <div id="pos-error" class="hidden mb-4 p-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded text-center"></div>
+
+    {% if has_company_subdomain|default(false) %}
 
     {# ══════════════════════════════════════════════════════════════════════ #}
     {# STEP 1 — Verify credentials                                           #}
@@ -153,7 +157,7 @@
                 password: document.getElementById('p-password').value,
             });
 
-            const res  = await fetch('{{ path('mpesa_login_verify_pos_auth') }}', {
+            const res  = await fetch('{{ path('mpesa_login_verify_pos_auth', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body:    body.toString(),
@@ -188,7 +192,7 @@
                 terminal_identifier: document.getElementById('p-terminal-id').value,
             });
 
-            const res  = await fetch('{{ path('mpesa_login_authorize_terminal') }}', {
+            const res  = await fetch('{{ path('mpesa_login_authorize_terminal', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', {
                 method:  'POST',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
                 body:    body.toString(),
@@ -215,5 +219,10 @@
         }
     });
     </script>
+    {% else %}
+    <div class="mb-4 p-4 bg-red-50 border border-red-200 text-red-700 text-sm rounded text-center">
+        {{ host_error_message ?? 'Wrong URL. Please use the POS setup link provided for your company.' }}
+    </div>
+    {% endif %}
 
 {% endblock %}

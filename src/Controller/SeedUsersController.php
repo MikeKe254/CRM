@@ -24,6 +24,7 @@ class SeedUsersController extends AbstractController
     public function seed(): JsonResponse
     {
         $companyId = 1;
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
 
         $users = [
             [
@@ -91,7 +92,7 @@ class SeedUsersController extends AbstractController
                 'can_dashboard_login' => $data['can_dashboard_login'],
                 'can_pos_login'       => $data['can_pos_login'],
                 'is_super_admin'      => $data['is_super_admin'],
-                'created_at'          => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'created_at'          => $now,
             ]);
 
             $userId = (int) $this->db->lastInsertId();
@@ -111,9 +112,88 @@ class SeedUsersController extends AbstractController
             ];
         }
 
+        $platformAdminResult = $this->seedPlatformAdmin(
+            name: 'Mike US',
+            email: 'mikenjagius@gmail.com',
+            password: 'Mike@132',
+            roleName: 'PlatformAdmin',
+            now: $now,
+        );
+
         return $this->json([
             'message' => 'Seed complete. Delete this controller when done.',
             'users'   => $results,
+            'platform_admin' => $platformAdminResult,
         ]);
+    }
+
+    private function seedPlatformAdmin(
+        string $name,
+        string $email,
+        string $password,
+        string $roleName,
+        string $now,
+    ): array {
+        $existing = $this->db->fetchAssociative(
+            'SELECT id, email, is_platform_owner FROM platform_admins WHERE email = :email LIMIT 1',
+            ['email' => $email],
+        );
+
+        if ($existing) {
+            $platformAdminId = (int) $existing['id'];
+        } else {
+            $this->db->insert('platform_admins', [
+                'name' => $name,
+                'email' => $email,
+                'password' => password_hash($password, PASSWORD_BCRYPT),
+                'status' => 'active',
+                'is_platform_owner' => 0,
+                'is_system_account' => 0,
+                'created_at' => $now,
+                'updated_at' => $now,
+            ]);
+
+            $platformAdminId = (int) $this->db->lastInsertId();
+        }
+
+        $roleId = $this->db->fetchOne(
+            'SELECT id FROM platform_roles WHERE name = :name LIMIT 1',
+            ['name' => $roleName],
+        );
+
+        if (!$roleId) {
+            return [
+                'status' => 'error',
+                'message' => sprintf('Platform role "%s" was not found.', $roleName),
+            ];
+        }
+
+        $roleExists = $this->db->fetchOne(
+            'SELECT id
+             FROM platform_admin_roles
+             WHERE platform_admin_id = :platform_admin_id
+               AND platform_role_id = :platform_role_id
+             LIMIT 1',
+            [
+                'platform_admin_id' => $platformAdminId,
+                'platform_role_id' => (int) $roleId,
+            ],
+        );
+
+        if (!$roleExists) {
+            $this->db->insert('platform_admin_roles', [
+                'platform_admin_id' => $platformAdminId,
+                'platform_role_id' => (int) $roleId,
+                'created_at' => $now,
+            ]);
+        }
+
+        return [
+            'name' => $name,
+            'email' => $email,
+            'id' => $platformAdminId,
+            'role' => $roleName,
+            'status' => $existing ? 'skipped - already exists' : 'created',
+        ];
     }
 }

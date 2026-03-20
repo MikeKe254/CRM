@@ -1,3 +1,5 @@
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
 <header id="app-navbar">
 
     {# ── HAMBURGER — mobile only, inside navbar ───────────────────────────── #}
@@ -12,31 +14,31 @@
     {# ── BREADCRUMB + PAGE TITLE ──────────────────────────────────────────── #}
     <div class="flex-1 min-w-0">
         <div id="navbar-breadcrumb" class="flex items-center gap-1 overflow-hidden flex-nowrap" style="font-size:11px;margin-bottom:1px;">
-            <a href="{{ path('app_dashboard') }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;transition:color 0.15s;">Angavu</a>
+            <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;transition:color 0.15s;">Angavu</a>
             {% set route = app.request.attributes.get('_route') %}
             {% if route starts with 'admin_users' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_users') }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Users</span>
             {% elseif route starts with 'admin_roles' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_roles') }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Roles</span>
             {% elseif route starts with 'admin_permissions' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_permissions') }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Permissions</span>
             {% elseif route starts with 'admin_terminals' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_terminals') }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">POS Terminals</span>
             {% elseif route starts with 'admin_audit' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_audit_logs') }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_audit_logs', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Audit Logs</span>
             {% elseif route == 'app_customers' %}
@@ -159,7 +161,7 @@
                 <div><div class="dropdown-item-title">Sessions</div><div class="dropdown-item-sub">Manage active devices</div></div>
             </a>
             <hr class="dropdown-divider">
-            <div class="dropdown-item" onclick="navbarLogout('{{ path('app_logout') }}', '{{ path('app_login') }}')" style="cursor:pointer;">
+            <div class="dropdown-item" onclick="navbarLogout('{{ path('app_logout', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', '{{ path('app_login', {subdomain: tenant_subdomain, domain: tenant_domain}) }}')" style="cursor:pointer;">
                 <svg width="15" height="15" fill="none" stroke="#ef4444" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;margin-top:1px;"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></svg>
                 <div><div class="dropdown-item-title" style="color:#ef4444;">Sign out</div><div class="dropdown-item-sub">End your session</div></div>
             </div>

@@ -1,3 +1,5 @@
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
 <div id="sidebar-overlay"></div>
 
 <aside id="sidebar">
@@ -33,7 +35,7 @@
         {# ── MAIN ── #}
         <div class="sidebar-section-label">Main</div>
 
-        <a href="{{ path('app_dashboard') }}"
+        <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
            class="sidebar-link {% if app.request.attributes.get('_route') == 'app_dashboard' %}active{% endif %}"
            data-tooltip="Dashboard">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -49,7 +51,7 @@
         <div class="sidebar-section-label" style="margin-top:8px;">Customers</div>
 
         {% if can('view_transactions') %}
-        <a href="{{ path('app_customers') }}"
+        <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
            class="sidebar-link {% if app.request.attributes.get('_route') == 'app_customers' %}active{% endif %}"
            data-tooltip="All Customers">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -104,11 +106,11 @@
         </a>
 
         {# ── ADMIN — only shown if user has at least one admin permission ── #}
-        {% if can('view_users') or can('view_roles') or can('view_permissions') or can('authorize_pos_terminal') or isSuperAdmin() %}
+        {% if can('view_users') or can('view_roles') or can('view_permissions') or can('authorize_pos_terminal') or can('view_user_activity') or isSuperAdmin() %}
         <div class="sidebar-section-label" style="margin-top:8px;">Admin</div>
 
         {% if can('view_users') %}
-        <a href="{{ path('admin_users') }}"
+        <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_users' %}active{% endif %}"
            data-tooltip="Users">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -120,7 +122,7 @@
         {% endif %}
 
         {% if can('view_roles') %}
-        <a href="{{ path('admin_roles') }}"
+        <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_roles' %}active{% endif %}"
            data-tooltip="Roles">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -131,7 +133,7 @@
         {% endif %}
 
         {% if can('view_permissions') or isSuperAdmin() %}
-        <a href="{{ path('admin_permissions') }}"
+        <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_permissions' %}active{% endif %}"
            data-tooltip="Permissions">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -143,7 +145,7 @@
         {% endif %}
 
         {% if can('authorize_pos_terminal') %}
-        <a href="{{ path('admin_terminals') }}"
+        <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
            class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_terminals' %}active{% endif %}"
            data-tooltip="POS Terminals">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
@@ -155,17 +157,16 @@
         </a>
         {% endif %}
 
-        {% if isSuperAdmin() %}
-        <a href="{{ path('admin_audit_logs') }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_audit' %}active{% endif %}"
-           data-tooltip="Audit Logs">
+
+        {% if can('view_user_activity') or isSuperAdmin() %}
+        <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
+           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_activity' %}active{% endif %}"
+           data-tooltip="Activity Logs">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
+                <path d="M12 20h9"/>
+                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
             </svg>
-            <span class="sidebar-label">Audit Logs</span>
+            <span class="sidebar-label">Activity Logs</span>
         </a>
         {% endif %}
 
@@ -194,7 +195,7 @@
         </div>
 
         <button class="sidebar-label sidebar-logout flex-shrink-0 flex items-center"
-                onclick="sidebarLogout('{{ path('app_logout') }}', '{{ path('app_login') }}')"
+                onclick="sidebarLogout('{{ path('app_logout', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', '{{ path('app_login', {subdomain: tenant_subdomain, domain: tenant_domain}) }}')"
                 title="Sign out"
                 style="background:none;border:none;cursor:pointer;color:rgba(255,255,255,0.35);padding:4px;border-radius:4px;transition:color 0.15s;"
                 onmouseover="this.style.color='#fff'"

@@ -7,6 +7,7 @@ namespace App\Controller;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\DTO\AuthResult;
 use App\Services\Auth\Exception\AuthException;
+use App\Services\Permission\PlatformCheckPermissionService;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -31,11 +32,12 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * ║   GET   /mpesa/stk/status            — Poll STK push result      ║
  * ╚══════════════════════════════════════════════════════════════════╝
  */
-#[Route('/mpesa')]
+#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
 final class MpesaController extends AbstractController
 {
     public function __construct(
         private readonly AuthService $auth,
+        private readonly PlatformCheckPermissionService $platformCan,
         private readonly Connection  $db,
         #[Autowire('%env(MPESA_PAYBILL_SHORTCODE)%')]
         private readonly string $paybillShortcode,
@@ -540,8 +542,11 @@ final class MpesaController extends AbstractController
      */
     private function isAdminSession(AuthResult $session): bool
     {
-        if ($session->user->isSuperAdmin) {
-            return true;
+        if ($this->platformCan->isPlatformAdminSession($session)) {
+            return $this->platformCan->check($session, 'view_all_company_transactions')
+                || $this->platformCan->check($session, 'view_company_analytics')
+                || $this->platformCan->check($session, 'view_sales_analytics')
+                || $this->platformCan->check($session, 'view_payment_analytics');
         }
 
         $adminRoles = ['Owner', 'Admin', 'Manager'];

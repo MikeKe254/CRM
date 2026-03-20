@@ -7,6 +7,7 @@ namespace App\Controller\Auth;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\Exception\AuthException;
 use App\Services\Permission\CheckPermissionService;
+use App\Support\DomainHelper;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Cookie;
@@ -17,40 +18,36 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Handles POS terminal authorization.
- * Completely separate from the main LoginController.
- *
- * Routes:
- *   GET  /mpesa/login                    → serve POS authorization page
- *   POST /mpesa/login/verify-pos-auth    → step 1: verify credentials + permission
- *   POST /mpesa/login/authorize-terminal → step 2: register terminal
  */
-#[Route('/mpesa')]
+#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class PosLoginController extends AbstractController
 {
-    /** Terminal authorization lifetime */
     private const TERMINAL_DAYS = 30;
 
     public function __construct(
-        private readonly AuthService            $auth,
+        private readonly AuthService $auth,
         private readonly CheckPermissionService $can,
-        private readonly Connection             $db,
+        private readonly Connection $db,
+        private readonly DomainHelper $domains,
     ) {}
 
-    // =========================================================================
-    // GET /mpesa/login — Serve POS authorization page
-    // =========================================================================
-
     #[Route('/login', name: 'mpesa_login_page', methods: ['GET'])]
-    public function loginPage(Request $request): Response
+    public function loginPage(Request $request, string $domain): Response
     {
-        // If terminal cookie exists and is valid → go straight to dashboard
         $terminal = $request->cookies->get('angavu_terminal', '');
         $subdomain = $this->resolveSubdomain($request);
+        $baseDomain = $this->domains->getBaseDomain($request);
+
+        if ($subdomain === null) {
+            return $this->render('mpesa/pos_login.html.twig', [
+                'has_company_subdomain' => false,
+                'host_error_message' => 'Wrong URL. Please use the POS setup link provided for your company.',
+            ]);
+        }
 
         if ($terminal !== '') {
-            // Check terminal is still valid in DB
             $company = $this->db->fetchAssociative(
-                'SELECT id FROM companies WHERE subdomain = :subdomain LIMIT 1',
+                'SELECT id FROM companies WHERE id <> 0 AND subdomain = :subdomain LIMIT 1',
                 ['subdomain' => $subdomain],
             );
 
@@ -66,24 +63,31 @@ class PosLoginController extends AbstractController
                 );
 
                 if ($valid) {
-                    return $this->redirectToRoute('mpesa_dashboard');
+                    return $this->redirectToRoute('mpesa_dashboard', ['subdomain' => $subdomain, 'domain' => $baseDomain]);
                 }
             }
         }
 
-        return $this->render('mpesa/pos_login.html.twig');
+        return $this->render('mpesa/pos_login.html.twig', [
+            'has_company_subdomain' => true,
+            'host_error_message' => null,
+        ]);
     }
-
-    // =========================================================================
-    // POST /mpesa/login/verify-pos-auth — Step 1: verify credentials + permission
-    // =========================================================================
 
     #[Route('/login/verify-pos-auth', name: 'mpesa_login_verify_pos_auth', methods: ['POST'])]
     public function verifyPosAuth(Request $request): JsonResponse
     {
         $subdomain = $this->resolveSubdomain($request);
-        $email     = trim((string) $request->request->get('email', ''));
-        $password  = (string) $request->request->get('password', '');
+
+        if ($subdomain === null) {
+            return $this->json([
+                'success' => false,
+                'message' => 'Wrong URL. Please use the POS setup link provided for your company.',
+            ], 400);
+        }
+
+        $email = trim((string) $request->request->get('email', ''));
+        $password = (string) $request->request->get('password', '');
 
         if ($email === '' || $password === '') {
             return $this->json(['success' => false, 'message' => 'Email and password are required.'], 400);
@@ -91,30 +95,29 @@ class PosLoginController extends AbstractController
 
         try {
             $result = $this->auth->loginDashboard(
-                subdomain:          $subdomain,
-                email:              $email,
-                password:           $password,
-                ipAddress:          $request->getClientIp() ?? '',
-                userAgent:          $request->headers->get('User-Agent') ?? '',
-                deviceName:         'POS Auth Verification',
+                subdomain: $subdomain,
+                email: $email,
+                password: $password,
+                ipAddress: $request->getClientIp() ?? '',
+                userAgent: $request->headers->get('User-Agent') ?? '',
+                deviceName: 'POS Auth Verification',
                 terminalIdentifier: '',
             );
 
-            // Check permission
             if (!$this->can->check($result, 'authorize_pos_terminal')) {
                 $this->auth->logout($result->token);
+
                 return $this->json([
                     'success' => false,
                     'message' => 'This account does not have permission to authorize POS terminals.',
                 ], 403);
             }
 
-            // Store temp token in short-lived cookie for step 2
             $response = $this->json([
                 'success' => true,
                 'message' => 'Credentials verified.',
-                'user'    => [
-                    'name'  => $result->user->name,
+                'user' => [
+                    'name' => $result->user->name,
                     'email' => $result->user->email,
                 ],
             ]);
@@ -122,27 +125,23 @@ class PosLoginController extends AbstractController
             $response->headers->setCookie(
                 Cookie::create('angavu_pos_auth_token')
                     ->withValue($result->token)
-                    ->withExpires(time() + 900) // 15 minutes
+                    ->withExpires(time() + 900)
                     ->withPath('/')
                     ->withHttpOnly(true)
                     ->withSameSite('lax'),
             );
 
             return $response;
-
         } catch (AuthException $e) {
             return $this->json(['success' => false, 'message' => $e->getMessage()], $e->getHttpStatus());
         }
     }
 
-    // =========================================================================
-    // POST /mpesa/login/authorize-terminal — Step 2: register terminal
-    // =========================================================================
-
     #[Route('/login/authorize-terminal', name: 'mpesa_login_authorize_terminal', methods: ['POST'])]
-    public function authorizeTerminal(Request $request): JsonResponse
+    public function authorizeTerminal(Request $request, string $domain): JsonResponse
     {
         $token = $request->cookies->get('angavu_pos_auth_token');
+        $baseDomain = $this->domains->getBaseDomain($request);
 
         if (!$token) {
             return $this->json([
@@ -165,7 +164,7 @@ class PosLoginController extends AbstractController
         }
 
         $terminalIdentifier = trim((string) $request->request->get('terminal_identifier', ''));
-        $deviceName         = trim((string) $request->request->get('device_name', ''));
+        $deviceName = trim((string) $request->request->get('device_name', ''));
 
         if ($terminalIdentifier === '') {
             return $this->json(['success' => false, 'message' => 'Terminal ID is required.'], 400);
@@ -178,8 +177,10 @@ class PosLoginController extends AbstractController
         $expiresAt = (new \DateTimeImmutable())
             ->modify('+' . self::TERMINAL_DAYS . ' days')
             ->format('Y-m-d H:i:s');
+        $authorizedById = $session->user->isSuperAdmin
+            ? -1 * $session->user->id
+            : $session->user->id;
 
-        // Upsert terminal
         $existing = $this->db->fetchAssociative(
             'SELECT id FROM pos_terminals
              WHERE company_id = :company_id AND terminal_identifier = :identifier LIMIT 1',
@@ -197,40 +198,38 @@ class PosLoginController extends AbstractController
                      revoked_at            = NULL
                  WHERE id = :id',
                 [
-                    'user_id'     => $session->user->id,
+                    'user_id' => $authorizedById,
                     'device_name' => $deviceName,
-                    'ip'          => $request->getClientIp(),
-                    'expires_at'  => $expiresAt,
-                    'id'          => $existing['id'],
+                    'ip' => $request->getClientIp(),
+                    'expires_at' => $expiresAt,
+                    'id' => $existing['id'],
                 ],
             );
         } else {
             $this->db->insert('pos_terminals', [
-                'company_id'            => $session->company->id,
-                'terminal_identifier'   => $terminalIdentifier,
-                'authorized_by_user_id' => $session->user->id,
-                'device_name'           => $deviceName,
-                'ip_address'            => $request->getClientIp(),
-                'authorized_at'         => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
-                'expires_at'            => $expiresAt,
+                'company_id' => $session->company->id,
+                'terminal_identifier' => $terminalIdentifier,
+                'authorized_by_user_id' => $authorizedById,
+                'device_name' => $deviceName,
+                'ip_address' => $request->getClientIp(),
+                'authorized_at' => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+                'expires_at' => $expiresAt,
             ]);
         }
 
-        // Revoke the temporary auth session — authorizer gets no dashboard access
         $this->auth->logout($token);
 
-        // Set angavu_terminal cookie — used by SessionController for PIN unlock
         $response = $this->json([
-            'success'  => true,
-            'message'  => "Terminal \"{$deviceName}\" authorized until " .
-                          (new \DateTimeImmutable())->modify('+' . self::TERMINAL_DAYS . ' days')->format('d M Y') . '.',
-            'redirect' => $this->generateUrl('mpesa_dashboard'),
+            'success' => true,
+            'message' => "Terminal \"{$deviceName}\" authorized until "
+                . (new \DateTimeImmutable())->modify('+' . self::TERMINAL_DAYS . ' days')->format('d M Y') . '.',
+            'redirect' => $this->generateUrl('mpesa_dashboard', [
+                'subdomain' => $session->company->subdomain,
+                'domain' => $baseDomain,
+            ]),
         ]);
 
-        // Clear temp auth cookie
         $response->headers->clearCookie('angavu_pos_auth_token', '/');
-
-        // Set permanent terminal cookie — HttpOnly, 30 days
         $response->headers->setCookie(
             Cookie::create('angavu_terminal')
                 ->withValue($terminalIdentifier)
@@ -243,19 +242,10 @@ class PosLoginController extends AbstractController
         return $response;
     }
 
-    // =========================================================================
-    // PRIVATE
-    // =========================================================================
-
-    private function resolveSubdomain(Request $request): string
+    private function resolveSubdomain(Request $request): ?string
     {
-        $host  = $request->getHost();
-        $parts = explode('.', $host);
-
-        if (count($parts) >= 3) {
-            return $parts[0];
-        }
-
-        return $_ENV['DEFAULT_SUBDOMAIN'] ?? 'koma';
+        // 2026-03-19: Route all subdomain parsing through DomainHelper so apex
+        // hosts like everify.co.ke never enter the tenant POS flow by mistake.
+        return $this->domains->getSubdomain($request);
     }
 }

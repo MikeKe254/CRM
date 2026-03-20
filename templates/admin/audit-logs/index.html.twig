@@ -1,4 +1,6 @@
 {% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
 {% block admin_title %}Audit Logs{% endblock %}
 {% block admin_subtitle %}Track all system activity — super admin only{% endblock %}
 
@@ -32,7 +34,8 @@
         </div>
         <button type="submit" class="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Filter</button>
         {% if filters|filter(v => v is not empty)|length > 0 %}
-        <a href="{{ path('admin_audit_logs') }}" class="h-9 px-4 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors inline-flex items-center">Clear</a>
+        {# 2026-03-19: Pass the current base domain so tenant admin links remain valid on both localhost and public hosts. #}
+        <a href="{{ path('admin_audit_logs', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" class="h-9 px-4 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors inline-flex items-center">Clear</a>
         {% endif %}
     </div>
 </form>

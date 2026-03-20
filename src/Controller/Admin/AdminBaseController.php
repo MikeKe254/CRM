@@ -8,6 +8,7 @@ use App\Services\Auth\AuthService;
 use App\Services\Auth\DTO\AuthResult;
 use App\Services\Auth\Exception\AuthException;
 use App\Services\Permission\CheckPermissionService;
+use App\Services\Permission\PlatformCheckPermissionService;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -32,6 +33,7 @@ abstract class AdminBaseController extends AbstractController
     public function __construct(
         protected readonly AuthService            $auth,
         protected readonly CheckPermissionService $can,
+        protected readonly PlatformCheckPermissionService $platformCan,
     ) {}
 
     // =========================================================================
@@ -66,8 +68,10 @@ abstract class AdminBaseController extends AbstractController
             return $this->denyAccess($request, 'POS sessions cannot access the admin panel.');
         }
 
-        // Check permission if required
-        if ($permission !== null && !$this->can->check($session, $permission)) {
+        // Check permission if required.
+        // Platform admins (isSuperAdmin) bypass tenant permission checks entirely —
+        // their access is governed by their platform-level permissions, not tenant roles.
+        if ($permission !== null && !$session->user->isSuperAdmin && !$this->can->check($session, $permission)) {
             return $this->denyAccess($request, 'You do not have permission to access this page.', 403, $session);
         }
 
@@ -85,7 +89,7 @@ abstract class AdminBaseController extends AbstractController
             return $session;
         }
 
-        if (!$session->user->isSuperAdmin) {
+        if (!$this->platformCan->isPlatformAdminSession($session)) {
             return $this->denyAccess($request, 'Super admin access required.', 403, $session);
         }
 
@@ -146,7 +150,10 @@ abstract class AdminBaseController extends AbstractController
 
         // Not logged in / session expired → send to login
         if ($status === 401) {
-            return $this->redirectToRoute('app_login');
+            return $this->redirectToRoute('app_login', [
+                'subdomain' => (string) $request->attributes->get('subdomain', ''),
+                'domain' => (string) $request->attributes->get('domain', ''),
+            ]);
         }
 
         // Logged in but no permission → in-layout 403 page

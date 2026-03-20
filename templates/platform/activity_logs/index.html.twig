@@ -1,0 +1,230 @@
+{% extends 'platform/layout.html.twig' %}
+
+{% block title %}Activity Logs · Platform · Angavu{% endblock %}
+{% block platform_title %}Activity Logs{% endblock %}
+{% block platform_subtitle %}A record of every action taken by platform admins{% endblock %}
+
+{% block platform_content %}
+
+{# ── FILTERS ─────────────────────────────────────────────────── #}
+<form method="GET" class="bg-white border border-slate-200 rounded-2xl shadow-sm p-4 mb-4">
+    <div class="flex flex-wrap items-end gap-3">
+
+        <div>
+            <label class="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Admin</label>
+            <select name="admin_id"
+                    class="h-9 px-3 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-44">
+                <option value="">All admins</option>
+                {% for a in admins %}
+                <option value="{{ a.id }}" {{ filters.admin_id == a.id ? 'selected' : '' }}>{{ a.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Company</label>
+            <select name="company_id"
+                    class="h-9 px-3 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-44">
+                <option value="">All companies</option>
+                {% for co in companies %}
+                <option value="{{ co.id }}" {{ filters.company_id == co.id ? 'selected' : '' }}>{{ co.name }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Action</label>
+            <select name="action"
+                    class="h-9 px-3 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-36">
+                <option value="">All actions</option>
+                {% for verb in actionVerbs %}
+                <option value="{{ verb }}" {{ filters.action == verb ? 'selected' : '' }}>{{ verb }}</option>
+                {% endfor %}
+            </select>
+        </div>
+
+        <div>
+            <label class="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wide mb-1">Search</label>
+            <input name="search" type="text" value="{{ filters.search ?? '' }}" placeholder="Search description…"
+                   class="h-9 px-3 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-52">
+        </div>
+
+        <div>
+            <label class="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wide mb-1">From</label>
+            <input name="date_from" type="date" value="{{ filters.date_from ?? '' }}"
+                   class="h-9 px-3 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-40">
+        </div>
+
+        <div>
+            <label class="block text-[10.5px] font-semibold text-slate-400 uppercase tracking-wide mb-1">To</label>
+            <input name="date_to" type="date" value="{{ filters.date_to ?? '' }}"
+                   class="h-9 px-3 border border-slate-200 rounded-lg text-sm text-slate-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 w-40">
+        </div>
+
+        <button type="submit"
+                class="h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+            Filter
+        </button>
+
+        {% if filters|filter(v => v is not empty)|length > 0 %}
+        <a href="{{ path('platform_activity_logs', {domain: currentDomain()}) }}"
+           class="h-9 px-4 border border-slate-200 text-slate-600 hover:bg-slate-50 text-sm font-medium rounded-lg transition-colors inline-flex items-center">
+            Clear
+        </a>
+        {% endif %}
+
+    </div>
+</form>
+
+{# ── TABLE ───────────────────────────────────────────────────── #}
+<div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+
+    <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100">
+        <span class="text-xs text-slate-400">
+            {{ total }} event{{ total != 1 ? 's' : '' }}
+            {% if filters|filter(v => v is not empty)|length > 0 %}<span class="ml-1 text-indigo-400">(filtered)</span>{% endif %}
+        </span>
+        {% if pages > 1 %}
+        <span class="text-xs text-slate-400">Page {{ page }} of {{ pages }}</span>
+        {% endif %}
+    </div>
+
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="bg-slate-50 border-b border-slate-100 text-left">
+                    <th class="px-5 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 w-28">Time</th>
+                    <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 w-40 hidden sm:table-cell">Admin</th>
+                    <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 w-24">Action</th>
+                    <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Description</th>
+                    <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 w-36 hidden md:table-cell">Company</th>
+                    <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 w-28 hidden lg:table-cell">IP</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for log in logs %}
+            <tr class="border-b border-slate-50 last:border-0 hover:bg-slate-50/70 transition-colors align-top">
+
+                {# Time #}
+                <td class="px-5 py-4 whitespace-nowrap">
+                    <div class="text-xs font-medium text-slate-700">{{ log.created_at|date('d M Y') }}</div>
+                    <div class="text-[11px] text-slate-400 mt-0.5">{{ log.created_at|date('H:i:s') }}</div>
+                </td>
+
+                {# Admin #}
+                <td class="px-4 py-4 hidden sm:table-cell">
+                    {% if log.admin_name %}
+                    <div class="flex items-center gap-2">
+                        <div class="w-7 h-7 rounded-lg flex items-center justify-center text-xs font-bold text-white flex-shrink-0"
+                             style="background:linear-gradient(135deg,#4f46e5,#7c3aed);">
+                            {{ log.admin_name|first|upper }}
+                        </div>
+                        <div>
+                            <div class="flex items-center gap-1">
+                                <span class="text-xs font-semibold text-slate-800 truncate max-w-[6rem]">{{ log.admin_name }}</span>
+                                {% if log.admin_is_owner %}
+                                <span class="text-[9px] font-bold uppercase tracking-wide text-amber-600 bg-amber-50 px-1 py-0.5 rounded">Owner</span>
+                                {% endif %}
+                            </div>
+                            <div class="text-[11px] text-slate-400 truncate max-w-[7rem]">{{ log.admin_email ?: '—' }}</div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <span class="text-xs text-slate-400 italic">System</span>
+                    {% endif %}
+                </td>
+
+                {# Action badge #}
+                <td class="px-4 py-4">
+                    {% set verb = log.action|upper %}
+                    {% if verb == 'CREATE' %}
+                        {% set badgeCls = 'bg-emerald-50 text-emerald-700' %}
+                    {% elseif verb == 'UPDATE' %}
+                        {% set badgeCls = 'bg-blue-50 text-blue-700' %}
+                    {% elseif verb == 'DELETE' %}
+                        {% set badgeCls = 'bg-red-50 text-red-600' %}
+                    {% elseif verb == 'VIEW' %}
+                        {% set badgeCls = 'bg-slate-100 text-slate-500' %}
+                    {% elseif verb == 'LOGIN' %}
+                        {% set badgeCls = 'bg-teal-50 text-teal-700' %}
+                    {% elseif verb == 'LOGOUT' %}
+                        {% set badgeCls = 'bg-slate-100 text-slate-600' %}
+                    {% elseif verb == 'ASSIGN' %}
+                        {% set badgeCls = 'bg-amber-50 text-amber-700' %}
+                    {% elseif verb == 'REVOKE' %}
+                        {% set badgeCls = 'bg-rose-50 text-rose-700' %}
+                    {% elseif verb == 'ENABLE' %}
+                        {% set badgeCls = 'bg-emerald-50 text-emerald-700' %}
+                    {% elseif verb == 'DISABLE' %}
+                        {% set badgeCls = 'bg-orange-50 text-orange-700' %}
+                    {% else %}
+                        {% set badgeCls = 'bg-slate-100 text-slate-500' %}
+                    {% endif %}
+                    <span class="inline-block rounded-md px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide {{ badgeCls }}">
+                        {{ log.action }}
+                    </span>
+                </td>
+
+                {# Description #}
+                <td class="px-4 py-4 text-sm text-slate-700">
+                    {{ log.description }}
+                    {% if log.subject_type and log.subject_id %}
+                    <span class="ml-1 text-xs text-slate-400">#{{ log.subject_id }}</span>
+                    {% endif %}
+                </td>
+
+                {# Company #}
+                <td class="px-4 py-4 hidden md:table-cell">
+                    {% if log.company_name %}
+                    <div class="flex items-center gap-1.5">
+                        {{ ux_icon('lucide:building-2', {width: 11, height: 11, class: 'text-slate-400 flex-shrink-0'}) }}
+                        <span class="text-xs text-slate-600">{{ log.company_name }}</span>
+                    </div>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 px-2 py-0.5 rounded-md">
+                        {{ ux_icon('lucide:layers', {width: 10, height: 10}) }} Platform-wide
+                    </span>
+                    {% endif %}
+                </td>
+
+                {# IP #}
+                <td class="px-4 py-4 hidden lg:table-cell">
+                    {% if log.ip_address %}
+                    <span class="font-mono text-xs text-slate-400">{{ log.ip_address }}</span>
+                    {% else %}
+                    <span class="text-xs text-slate-300">—</span>
+                    {% endif %}
+                </td>
+
+            </tr>
+            {% else %}
+            <tr>
+                <td colspan="6" class="px-5 py-16 text-center">
+                    <div class="flex flex-col items-center gap-3 text-slate-400">
+                        {{ ux_icon('lucide:scroll-text', {width: 36, height: 36, class: 'opacity-25'}) }}
+                        <p class="text-sm font-medium text-slate-500">No activity recorded yet</p>
+                        <p class="text-xs text-slate-300">Platform admin actions will appear here.</p>
+                    </div>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+
+    {# Pagination #}
+    {% if pages > 1 %}
+    <div class="flex items-center justify-center gap-1 px-5 py-3 border-t border-slate-100">
+        {% for p in 1..pages %}
+        <a href="?{{ app.request.query.all|merge({page: p})|url_encode }}"
+           class="w-8 h-8 flex items-center justify-center rounded-lg text-sm transition-colors
+                  {{ p == page ? 'bg-indigo-600 text-white font-semibold' : 'text-slate-600 hover:bg-slate-100' }}">
+            {{ p }}
+        </a>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+
+{% endblock %}

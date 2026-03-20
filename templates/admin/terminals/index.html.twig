@@ -1,9 +1,11 @@
 {% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
 {% block admin_title %}POS Terminals{% endblock %}
 {% block admin_subtitle %}View and manage authorized POS devices{% endblock %}
 
 {% block admin_actions %}
-<a href="{{ path('mpesa_login_page') }}"
+<a href="{{ path('mpesa_login_page', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
    class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors inline-flex items-center">
     + Authorize Terminal
 </a>
@@ -105,8 +107,10 @@
 liveFilter('terminal-search', 'terminals-table');
 
 function revokeTerminal(id, name) {
+    // 2026-03-19: Generate the revoke URL from Symfony so terminal actions stay
+    // valid across dynamic tenant domains.
     adminDelete(
-        `/dashboard/admin/terminals/${id}/revoke`,
+        `{{ path('admin_terminals_revoke', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__TERMINAL_ID__'}) }}`.replace('__TERMINAL_ID__', id),
         `Revoke "${name}"? Staff will no longer be able to PIN login on this device.`,
         () => turboReload()
     );
@@ -114,7 +118,9 @@ function revokeTerminal(id, name) {
 
 function reactivateTerminal(id, name) {
     if (!confirm(`Reactivate "${name}" for 30 days?`)) return;
-    fetch(`/dashboard/admin/terminals/${id}/reactivate`, { method: 'POST' })
+    // 2026-03-19: Generate the reactivate URL from Symfony so terminal actions
+    // do not depend on hardcoded admin paths.
+    fetch(`{{ path('admin_terminals_reactivate', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__TERMINAL_ID__'}) }}`.replace('__TERMINAL_ID__', id), { method: 'POST' })
         .then(r => r.json())
         .then(d => { if (d.success) turboReload(); else alert(d.message); });
 }

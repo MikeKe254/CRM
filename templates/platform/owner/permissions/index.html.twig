@@ -1,0 +1,250 @@
+{% extends 'platform/layout.html.twig' %}
+{% set platform_domain = currentDomain() %}
+
+{% block title %}Permissions · Owner · Angavu{% endblock %}
+{% block platform_title %}Permissions{% endblock %}
+{% block platform_subtitle %}Company-level action keys used in tenant role assignments{% endblock %}
+
+{% block platform_content %}
+
+{# ── Action bar ── #}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex flex-wrap items-center gap-2">
+        <div class="relative">
+            <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="perm-search" type="text" placeholder="Search permissions…"
+                   class="h-9 w-56 rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+        </div>
+        <button data-cat="" onclick="filterCat(this)"
+                class="cat-btn h-8 rounded-lg border border-indigo-300 bg-indigo-50 px-3 text-xs font-medium text-indigo-700 transition-colors">All</button>
+        {% for cat in grouped|keys %}
+            <button data-cat="{{ cat }}" onclick="filterCat(this)"
+                    class="cat-btn h-8 rounded-lg border border-gray-200 bg-white px-3 text-xs font-medium text-gray-600 transition-colors hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700">
+                {{ cat }}
+            </button>
+        {% endfor %}
+    </div>
+    <button onclick="openAddDrawer()"
+            class="h-9 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+        + Add Permission
+    </button>
+</div>
+
+{# ── Category-grouped cards ── #}
+<div id="perm-sections" class="space-y-4">
+    {% for category, items in grouped %}
+        <div class="perm-section overflow-hidden rounded-xl border border-gray-200 bg-white" data-category="{{ category }}">
+            <div class="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+                <span class="text-sm font-semibold text-gray-900">{{ category }}</span>
+                <span class="rounded bg-blue-50 px-2 py-0.5 text-xs font-semibold text-blue-700">{{ items|length }}</span>
+            </div>
+            <div class="divide-y divide-gray-50">
+                {% for p in items %}
+                    <div class="perm-row flex items-center justify-between gap-4 px-5 py-3.5 transition-colors hover:bg-gray-50"
+                         id="perm-row-{{ p.id }}">
+                        <div class="min-w-0 flex-1">
+                            <div class="text-sm font-medium text-gray-900">{{ p.name }}</div>
+                            <div class="mt-0.5 font-mono text-xs text-indigo-600">{{ p.action_key }}</div>
+                            {% if p.description %}
+                                <div class="mt-0.5 text-xs text-gray-400">{{ p.description }}</div>
+                            {% endif %}
+                        </div>
+                        <div class="flex shrink-0 items-center gap-1">
+                            <span class="mr-2 text-xs text-gray-400">{{ p.created_at|date('M j, Y') }}</span>
+                            <button onclick="openEditDrawer({{ p|json_encode|e('html_attr') }})"
+                                    class="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50">
+                                Edit
+                            </button>
+                            <button onclick="deletePerm({{ p.id }}, '{{ p.name|e('js') }}', this)"
+                                    class="rounded border border-red-200 bg-white px-2.5 py-1 text-xs text-red-600 transition-colors hover:bg-red-50">
+                                Delete
+                            </button>
+                        </div>
+                    </div>
+                {% endfor %}
+            </div>
+        </div>
+    {% else %}
+        <div class="rounded-xl border border-gray-200 bg-white px-5 py-14 text-center text-sm text-gray-400">
+            No permissions yet. Add your first one.
+        </div>
+    {% endfor %}
+</div>
+
+{# ── Drawer overlay ── #}
+<div id="drawer-overlay" class="hidden fixed inset-0 z-[300] bg-black/30 backdrop-blur-sm" onclick="closeDrawer()"></div>
+
+{# ── Drawer ── #}
+<div id="drawer" class="fixed top-0 right-0 z-[301] flex h-screen w-[420px] max-w-[95vw] flex-col bg-white shadow-2xl"
+     style="transform:translateX(100%);transition:transform 0.25s cubic-bezier(.4,0,.2,1);">
+    <div class="flex flex-shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4">
+        <span id="drawer-title" class="text-base font-semibold text-gray-900">Add Permission</span>
+        <button onclick="closeDrawer()" class="rounded p-1 text-gray-400 transition-colors hover:text-gray-700">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5">
+        <form id="perm-form" method="post" action="{{ path('platform_owner_permissions_create', {domain: platform_domain}) }}" class="space-y-4">
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Name <span class="text-red-400">*</span></label>
+                <input id="f-name" name="name" type="text" required placeholder="view_company_analytics"
+                       class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Category <span class="text-red-400">*</span></label>
+                <input id="f-category" name="category" type="text" required placeholder="analytics"
+                       class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Action Key <span class="text-red-400">*</span></label>
+                <input id="f-action-key" name="action_key" type="text" required placeholder="VIEW_COMPANY_ANALYTICS"
+                       class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 font-mono text-sm uppercase focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <p class="mt-1 text-xs text-gray-400">Stored in uppercase automatically.</p>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Description <span class="font-normal text-gray-400">(optional)</span></label>
+                <textarea id="f-description" name="description" rows="3" placeholder="What this permission allows…"
+                          class="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+            </div>
+        </form>
+    </div>
+    <div class="flex flex-shrink-0 gap-3 border-t border-gray-100 px-5 py-4">
+        <button onclick="closeDrawer()"
+                class="h-9 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50">
+            Cancel
+        </button>
+        <button id="drawer-submit" onclick="submitForm()"
+                class="h-9 flex-1 rounded-lg bg-indigo-600 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+            Add Permission
+        </button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+(function () {
+    const CREATE_URL = '{{ path('platform_owner_permissions_create', {domain: platform_domain}) }}';
+
+    /* ── spinner keyframes (injected once) ── */
+    if (!document.getElementById('_spin-kf')) {
+        const s = document.createElement('style');
+        s.id = '_spin-kf';
+        s.textContent = '@keyframes _spin{to{transform:rotate(360deg)}}';
+        document.head.appendChild(s);
+    }
+    const SPINNER = '<svg style="display:inline-block;vertical-align:-2px;margin-right:5px;animation:_spin .7s linear infinite" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M12 3a9 9 0 109 9"/></svg>';
+
+    /* ── drawer helpers ── */
+    function slideOpen() {
+        document.getElementById('drawer').style.transform = 'translateX(0)';
+        document.getElementById('drawer-overlay').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    function slideClose() {
+        document.getElementById('drawer').style.transform = 'translateX(100%)';
+        document.getElementById('drawer-overlay').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    window.openAddDrawer = function () {
+        const btn = document.getElementById('drawer-submit');
+        btn.disabled = false;
+        btn.textContent = 'Add Permission';
+        document.getElementById('drawer-title').textContent = 'Add Permission';
+        document.getElementById('perm-form').action = CREATE_URL;
+        document.getElementById('f-name').value = '';
+        document.getElementById('f-category').value = '';
+        document.getElementById('f-action-key').value = '';
+        document.getElementById('f-description').value = '';
+        slideOpen();
+        document.getElementById('f-name').focus();
+    };
+
+    window.openEditDrawer = function (p) {
+        const btn = document.getElementById('drawer-submit');
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+        document.getElementById('drawer-title').textContent = 'Edit Permission';
+        // 2026-03-19: Generate owner config URLs from Symfony so platform
+        // actions stay correct on any current admin domain.
+        document.getElementById('perm-form').action = `{{ path('platform_owner_permissions_edit', {domain: platform_domain, id: '__PERM_ID__'}) }}`.replace('__PERM_ID__', p.id);
+        document.getElementById('f-name').value = p.name;
+        document.getElementById('f-category').value = p.category;
+        document.getElementById('f-action-key').value = p.action_key;
+        document.getElementById('f-description').value = p.description ?? '';
+        slideOpen();
+        document.getElementById('f-name').focus();
+    };
+
+    window.closeDrawer = function () { slideClose(); };
+    window.submitForm = function () {
+        const btn = document.getElementById('drawer-submit');
+        btn.disabled = true;
+        btn.innerHTML = SPINNER + 'Saving…';
+        document.getElementById('perm-form').requestSubmit();
+    };
+
+    window.deletePerm = function (id, name, btn) {
+        platformConfirm({
+            title:       'Delete permission?',
+            message:     'Delete "' + name + '"? This cannot be undone.',
+            confirmText: 'Delete',
+            onConfirm: function () {
+                const orig = btn.textContent;
+                btn.disabled = true;
+                btn.innerHTML = SPINNER + 'Deleting…';
+                fetch(`{{ path('platform_owner_permissions_delete', {domain: platform_domain, id: '__PERM_ID__'}) }}`.replace('__PERM_ID__', id), { method: 'POST' })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.ok) {
+                            const row = document.getElementById(`perm-row-${id}`);
+                            if (row) {
+                                const section = row.closest('.perm-section');
+                                row.remove();
+                                if (section && section.querySelectorAll('.perm-row').length === 0) section.remove();
+                            }
+                        } else {
+                            btn.disabled = false;
+                            btn.textContent = orig;
+                            platformAlert({ message: d.error ?? 'Could not delete.' });
+                        }
+                    })
+                    .catch(() => {
+                        btn.disabled = false;
+                        btn.textContent = orig;
+                        platformAlert({ message: 'Request failed. Please try again.' });
+                    });
+            },
+        });
+    };
+
+    window.filterCat = function (btn) {
+        const cat = btn.dataset.cat;
+        document.querySelectorAll('.perm-section').forEach(s => {
+            s.style.display = (!cat || s.dataset.category === cat) ? '' : 'none';
+        });
+        document.querySelectorAll('.cat-btn').forEach(b => {
+            const on = b === btn;
+            b.className = `cat-btn h-8 rounded-lg border px-3 text-xs font-medium transition-colors ${on
+                ? 'border-indigo-300 bg-indigo-50 text-indigo-700'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-300 hover:bg-indigo-50 hover:text-indigo-700'}`;
+        });
+    };
+
+    document.getElementById('perm-search').oninput = function () {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('.perm-row').forEach(r => {
+            r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+        document.querySelectorAll('.perm-section').forEach(s => {
+            s.style.display = [...s.querySelectorAll('.perm-row')].some(r => r.style.display !== 'none') ? '' : 'none';
+        });
+    };
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') slideClose(); });
+}());
+</script>
+{% endblock %}

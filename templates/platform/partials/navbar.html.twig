@@ -1,0 +1,89 @@
+{% set platform_domain = currentDomain() %}
+<header id="app-navbar" style="border-bottom:1px solid rgba(0,0,0,0.06);">
+    <button id="navbar-hamburger" onclick="openMobileSidebar()" aria-label="Open menu">
+        {{ ux_icon('lucide:menu', {width: 17, height: 17}) }}
+    </button>
+
+    <div class="min-w-0 flex-1">
+        <div id="navbar-breadcrumb" class="flex items-center gap-1 overflow-hidden flex-nowrap" style="font-size:11px;margin-bottom:1px;">
+            <span style="display:inline-flex;align-items:center;gap:4px;color:#9ca3af;">
+                {{ ux_icon('lucide:layers', {width: 10, height: 10}) }}
+                <a href="{{ path('platform_dashboard', {domain: platform_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;transition:color 0.15s;" onmouseover="this.style.color='#4f46e5'" onmouseout="this.style.color='#9ca3af'">Platform</a>
+            </span>
+            <span style="color:#d1d5db;">/</span>
+            <span style="color:#374151;white-space:nowrap;font-weight:500;">{{ platform_title|default('Console') }}</span>
+        </div>
+        {% if platform_subtitle is not empty %}
+            <p class="truncate" style="font-size:12px;color:#6b7280;margin-top:1px;max-width:420px;">{{ platform_subtitle }}</p>
+        {% endif %}
+    </div>
+
+    <div id="navbar-search-wrap">
+        <span id="navbar-search-icon" style="position:absolute;left:9px;pointer-events:none;z-index:1;color:#9ca3af;">
+            {{ ux_icon('lucide:search', {width: 13, height: 13}) }}
+        </span>
+        <input type="text"
+               id="navbar-search-input"
+               placeholder="Search platform..."
+               autocomplete="off"
+               spellcheck="false">
+        <kbd id="navbar-search-kbd" style="position:absolute;right:8px;font-size:10px;color:#9ca3af;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:4px;padding:1px 5px;font-family:inherit;pointer-events:none;">⌘K</kbd>
+    </div>
+
+    <div style="display:flex;align-items:center;gap:3px;padding:3px 8px;background:#eef2ff;border-radius:6px;flex-shrink:0;">
+        <span style="width:6px;height:6px;border-radius:50%;background:#4f46e5;display:inline-block;flex-shrink:0;"></span>
+        <span style="font-size:11px;font-weight:600;color:#4f46e5;white-space:nowrap;">Platform Portal</span>
+    </div>
+
+    <div class="relative flex-shrink-0">
+        <button class="navbar-icon-btn"
+                id="profile-btn"
+                onclick="toggleDropdown('profile-dropdown')"
+                title="Profile"
+                style="border:1px solid #e5e7eb;border-radius:8px;padding:0 8px;gap:6px;">
+            <div class="flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                 style="background:linear-gradient(135deg,#4f46e5,#7c3aed);">
+                {% if session is defined and session.user is defined %}{{ session.user.name|first|upper }}{% else %}P{% endif %}
+            </div>
+            <span style="font-size:12px;color:#374151;font-weight:500;max-width:80px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;display:none;">
+                {% if session is defined and session.user is defined %}{{ session.user.name|split(' ')|first }}{% endif %}
+            </span>
+            {{ ux_icon('lucide:chevron-down', {width: 11, height: 11, class: 'flex-shrink-0 text-slate-400'}) }}
+        </button>
+
+        <div id="profile-dropdown" class="navbar-dropdown" style="min-width:260px;">
+            <div style="padding:14px 14px 10px;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:10px;">
+                    <div class="flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full text-sm font-bold text-white"
+                         style="background:linear-gradient(135deg,#4f46e5,#7c3aed);">
+                        {% if session is defined and session.user is defined %}{{ session.user.name|first|upper }}{% else %}P{% endif %}
+                    </div>
+                    <div style="min-width:0;">
+                        <div style="font-size:13px;font-weight:600;color:#111827;">
+                            {% if session is defined and session.user is defined %}{{ session.user.name }}{% else %}Platform Admin{% endif %}
+                        </div>
+                        <div style="font-size:12px;color:#9ca3af;margin-top:1px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                            {% if session is defined and session.user is defined %}{{ session.user.email }}{% endif %}
+                        </div>
+                    </div>
+                </div>
+                <div style="display:inline-flex;align-items:center;gap:4px;background:#eef2ff;padding:3px 8px;border-radius:5px;">
+                    {{ ux_icon('lucide:shield-check', {width: 11, height: 11, style: 'color:#4f46e5'}) }}
+                    <span style="font-size:11px;font-weight:600;color:#4f46e5;">Platform Admin</span>
+                </div>
+            </div>
+            <hr class="dropdown-divider">
+            <div class="dropdown-item"
+                 onclick="navbarLogout('{{ path('platform_logout', {domain: platform_domain}) }}', '{{ path('platform_login', {domain: platform_domain}) }}')"
+                 style="cursor:pointer;">
+                <span style="color:#ef4444;display:flex;flex-shrink:0;margin-top:1px;">
+                    {{ ux_icon('lucide:log-out', {width: 14, height: 14}) }}
+                </span>
+                <div>
+                    <div class="dropdown-item-title" style="color:#ef4444;">Sign out</div>
+                    <div class="dropdown-item-sub">End your platform session</div>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>

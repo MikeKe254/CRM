@@ -1,0 +1,271 @@
+{% extends 'platform/layout.html.twig' %}
+
+{% block title %}{{ plan.name }} Features · Plans · Angavu{% endblock %}
+{% block platform_title %}{{ plan.name }} — Features{% endblock %}
+{% block platform_subtitle %}Choose which features this plan includes{% endblock %}
+
+{% block platform_content %}
+
+{# ── FLASH ────────────────────────────────────────────────────── #}
+{% for msg in app.flashes('success') %}
+<div class="mb-4 flex items-center gap-2 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+    {{ ux_icon('lucide:circle-check', {width:15,height:15}) }} {{ msg }}
+</div>
+{% endfor %}
+{% for msg in app.flashes('error') %}
+<div class="mb-4 flex items-center gap-2 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+    {{ ux_icon('lucide:circle-x', {width:15,height:15}) }} {{ msg }}
+</div>
+{% endfor %}
+
+{# ── TOP BAR ──────────────────────────────────────────────────── #}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+    <div class="flex items-center gap-3">
+        <a href="{{ path('platform_plans', {domain: app.request.attributes.get('domain')}) }}"
+           class="flex items-center gap-1 text-xs text-slate-400 hover:text-slate-600 transition-colors">
+            {{ ux_icon('lucide:arrow-left', {width:12,height:12}) }} Plans
+        </a>
+        <span class="text-slate-200">/</span>
+        <span class="text-xs font-semibold text-slate-600">{{ plan.name }}</span>
+    </div>
+
+    <div class="flex items-center gap-2 flex-wrap">
+        <span class="text-xs text-slate-400">
+            <span class="font-semibold text-indigo-600">{{ enabled_count }}</span> / {{ total_features }} features enabled
+        </span>
+        <button onclick="selectAll(true)"
+                class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            Select all
+        </button>
+        <button onclick="selectAll(false)"
+                class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+            Clear all
+        </button>
+        <button form="features-form" type="submit" id="save-btn"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-1.5 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors">
+            {{ ux_icon('lucide:save', {width:12,height:12}) }} Save Changes
+        </button>
+    </div>
+</div>
+
+{# ── PLAN SUMMARY CARD ────────────────────────────────────────── #}
+<div class="mb-5 grid grid-cols-2 sm:grid-cols-4 gap-3">
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Monthly</div>
+        <div class="text-sm font-bold text-slate-800">
+            {% if plan.monthly_price == 0 %}Free
+            {% else %}{{ plan.currency }} {{ plan.monthly_price|number_format(0,'.', ',') }}{% endif %}
+        </div>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Annual</div>
+        <div class="text-sm font-bold text-slate-800">
+            {% if plan.annual_price == 0 %}—
+            {% else %}{{ plan.currency }} {{ plan.annual_price|number_format(0,'.', ',') }}{% endif %}
+        </div>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Trial</div>
+        <div class="text-sm font-bold text-slate-800">
+            {% if plan.trial_days > 0 %}{{ plan.trial_days }} days{% else %}None{% endif %}
+        </div>
+    </div>
+    <div class="bg-white border border-slate-200 rounded-xl px-4 py-3">
+        <div class="text-[10px] font-semibold uppercase tracking-wider text-slate-400 mb-1">Visibility</div>
+        <div class="text-sm font-bold text-slate-800">
+            {% if plan.is_public %}Public{% else %}Internal{% endif %}
+        </div>
+    </div>
+</div>
+
+{# ── LIMITS CARD ──────────────────────────────────────────────── #}
+<div class="mb-5 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+    <div class="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50 cursor-pointer select-none"
+         onclick="toggleLimits()">
+        <div class="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            {{ ux_icon('lucide:gauge', {width:14,height:14}) }}
+            Plan Limits
+            <span class="text-[10px] font-normal text-slate-400">(click to edit)</span>
+        </div>
+        <span id="limits-chevron" style="transition:transform 0.2s;">
+            {{ ux_icon('lucide:chevron-down', {width:14,height:14,class:'text-slate-400'}) }}
+        </span>
+    </div>
+
+    <div id="limits-body" style="display:none;">
+        <form action="{{ path('platform_plan_limits_save', {id: plan.id, domain: app.request.attributes.get('domain')}) }}" method="POST">
+            <div class="grid grid-cols-2 sm:grid-cols-3 gap-4 p-5">
+                {% set limit_labels = {
+                    'max_users':           'Max Users',
+                    'max_branches':        'Max Branches',
+                    'max_products':        'Max Products',
+                    'sms_per_month':       'SMS / Month',
+                    'api_calls_per_month': 'API Calls / Month',
+                    'data_retention_days': 'Data Retention (days)'
+                } %}
+                {% for key, label in limit_labels %}
+                <div>
+                    <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:5px;">{{ label }}</label>
+                    <input name="limits[{{ key }}]" type="number" min="-1"
+                           value="{{ limits[key] is defined ? limits[key] : 0 }}"
+                           placeholder="-1 = unlimited"
+                           style="width:100%;height:36px;border:1px solid #e2e8f0;border-radius:8px;padding:0 10px;font-size:13px;outline:none;transition:border-color 0.15s;"
+                           onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                    <div style="font-size:10px;color:#94a3b8;margin-top:2px;">-1 = unlimited</div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="px-5 pb-4">
+                <button type="submit"
+                        class="inline-flex items-center gap-1.5 rounded-lg bg-slate-700 px-4 py-2 text-xs font-semibold text-white hover:bg-slate-800 transition-colors">
+                    {{ ux_icon('lucide:save', {width:11,height:11}) }} Save Limits
+                </button>
+            </div>
+        </form>
+    </div>
+</div>
+
+{# ── FEATURE MATRIX ───────────────────────────────────────────── #}
+<form id="features-form"
+      action="{{ path('platform_plan_features_save', {id: plan.id, domain: app.request.attributes.get('domain')}) }}"
+      method="POST">
+
+    {% for module in modules %}
+    <div class="mb-4 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+
+        {# Module header #}
+        <div class="flex items-center justify-between px-5 py-3.5 bg-slate-50 border-b border-slate-100">
+            <div class="flex items-center gap-2.5">
+                <div class="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-50">
+                    {% if module.icon %}
+                        {{ ux_icon(module.icon, {width:13,height:13,class:'text-indigo-500'}) }}
+                    {% else %}
+                        {{ ux_icon('lucide:box', {width:13,height:13,class:'text-indigo-500'}) }}
+                    {% endif %}
+                </div>
+                <span class="text-sm font-bold text-slate-800">{{ module.name }}</span>
+                <span class="text-[10px] text-slate-400">
+                    {{ module.enabled_count }}/{{ module.total_count }} enabled
+                </span>
+            </div>
+            <label class="flex items-center gap-1.5 cursor-pointer text-[10.5px] font-medium text-slate-500 hover:text-slate-700 transition-colors select-none"
+                   onclick="toggleModule({{ module.id }}, this)">
+                <input type="checkbox"
+                       id="module-toggle-{{ module.id }}"
+                       class="module-master"
+                       style="width:13px;height:13px;accent-color:#6366f1;cursor:pointer;"
+                       {% if module.enabled_count == module.total_count and module.total_count > 0 %}checked{% endif %}>
+                Select all
+            </label>
+        </div>
+
+        {# Submodules #}
+        <div class="divide-y divide-slate-50">
+            {% for submodule in module.submodules %}
+            <div class="px-5 py-3">
+                <div class="flex items-center gap-2 mb-2.5">
+                    <span class="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">{{ submodule.name }}</span>
+                    <span class="text-[10px] text-slate-300">{{ submodule.enabled_count }}/{{ submodule.total_count }}</span>
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2">
+                    {% for feature in submodule.features %}
+                    <label class="feature-item flex items-center gap-2.5 rounded-lg border cursor-pointer select-none px-3 py-2 transition-colors
+                                  {% if feature.is_enabled %}border-indigo-200 bg-indigo-50/60{% else %}border-slate-100 bg-slate-50/50 hover:border-slate-200{% endif %}"
+                           data-module="{{ module.id }}"
+                           id="feature-label-{{ feature.id }}"
+                           onclick="updateLabel({{ feature.id }}, {{ module.id }})">
+                        <input type="checkbox"
+                               name="features[]"
+                               value="{{ feature.id }}"
+                               id="feature-{{ feature.id }}"
+                               class="module-{{ module.id }}-feature"
+                               style="width:13px;height:13px;accent-color:#6366f1;cursor:pointer;flex-shrink:0;"
+                               {% if feature.is_enabled %}checked{% endif %}>
+                        <span class="text-xs text-slate-700 leading-tight">{{ feature.name }}</span>
+                    </label>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+
+    </div>
+    {% endfor %}
+
+    {# Sticky save bar #}
+    <div class="sticky bottom-0 left-0 right-0 flex items-center justify-between gap-3 border-t border-slate-200 bg-white/95 px-4 py-3 backdrop-blur-sm rounded-xl shadow-lg mt-2">
+        <span class="text-xs text-slate-500" id="counter-label">{{ enabled_count }} features selected</span>
+        <div class="flex gap-2">
+            <a href="{{ path('platform_plans', {domain: app.request.attributes.get('domain')}) }}"
+               class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                Cancel
+            </a>
+            <button type="submit" id="save-btn-bottom"
+                    class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors"
+                    onclick="this.disabled=true;this.textContent='Saving…';document.getElementById('features-form').requestSubmit();">
+                {{ ux_icon('lucide:save', {width:12,height:12}) }} Save Changes
+            </button>
+        </div>
+    </div>
+
+</form>
+
+{% endblock %}
+
+{% block javascripts %}{{ parent() }}
+<script>
+(function () {
+    function updateCounter() {
+        const count = document.querySelectorAll('input[name="features[]"]:checked').length;
+        const el = document.getElementById('counter-label');
+        if (el) el.textContent = count + ' feature' + (count !== 1 ? 's' : '') + ' selected';
+    }
+
+    window.updateLabel = function (featureId, moduleId) {
+        setTimeout(function () {
+            const cb    = document.getElementById('feature-' + featureId);
+            const label = document.getElementById('feature-label-' + featureId);
+            if (!cb || !label) return;
+            if (cb.checked) {
+                label.classList.remove('border-slate-100', 'bg-slate-50/50', 'hover:border-slate-200');
+                label.classList.add('border-indigo-200', 'bg-indigo-50/60');
+            } else {
+                label.classList.remove('border-indigo-200', 'bg-indigo-50/60');
+                label.classList.add('border-slate-100', 'bg-slate-50/50', 'hover:border-slate-200');
+            }
+            updateCounter();
+        }, 0);
+    };
+
+    window.toggleModule = function (moduleId, masterEl) {
+        setTimeout(function () {
+            const checked = document.getElementById('module-toggle-' + moduleId).checked;
+            document.querySelectorAll('.module-' + moduleId + '-feature').forEach(function (cb) {
+                cb.checked = checked;
+                updateLabel(cb.value, moduleId);
+            });
+            updateCounter();
+        }, 0);
+    };
+
+    window.selectAll = function (state) {
+        document.querySelectorAll('input[name="features[]"]').forEach(function (cb) {
+            cb.checked = state;
+            updateLabel(cb.value, cb.closest('[data-module]')?.dataset.module);
+        });
+        updateCounter();
+    };
+
+    window.toggleLimits = function () {
+        const body    = document.getElementById('limits-body');
+        const chevron = document.getElementById('limits-chevron');
+        const open    = body.style.display === 'block';
+        body.style.display    = open ? 'none' : 'block';
+        chevron.style.transform = open ? '' : 'rotate(180deg)';
+    };
+
+    document.addEventListener('turbo:load', updateCounter);
+    document.addEventListener('DOMContentLoaded', updateCounter);
+}());
+</script>
+{% endblock %}

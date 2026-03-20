@@ -42,6 +42,7 @@ final class AuthService
 
     public function __construct(
         private readonly Connection $db,
+        private readonly PlatformAuthService $platformAuth,
         #[Autowire('%kernel.secret%')]
         private readonly string $appSecret,
     ) {}
@@ -71,37 +72,57 @@ final class AuthService
         string $terminalIdentifier = '',
     ): AuthResult {
         $company = $this->resolveCompany($subdomain);
-        $user    = $this->findUserByEmail($email, (int) $company['id']);
+        $tenantUser = $this->findUserByEmailOrNull($email, (int) $company['id']);
 
-        if (!$this->safeBool($user['can_dashboard_login'])) {
-            throw AuthException::dashboardLoginNotAllowed();
+        if (
+            $tenantUser
+            && $this->safeBool($tenantUser['can_dashboard_login'])
+            && !empty($tenantUser['password'])
+            && password_verify($password, $tenantUser['password'])
+        ) {
+            $result = $this->createSession(
+                user:       $tenantUser,
+                company:    $company,
+                deviceType: 'dashboard',
+                ipAddress:  $ipAddress,
+                userAgent:  $userAgent,
+                deviceName: $deviceName ?: 'Dashboard',
+            );
+
+            if ($terminalIdentifier !== '') {
+                $this->authorizeTerminal(
+                    companyId:            (int) $company['id'],
+                    terminalIdentifier:   $terminalIdentifier,
+                    authorizedByUserId:   $this->getSessionUserId($tenantUser),
+                    deviceName:           $deviceName ?: 'Dashboard',
+                    ipAddress:            $ipAddress,
+                );
+            }
+
+            return $result;
         }
 
-        if (empty($user['password']) || !password_verify($password, $user['password'])) {
-            throw AuthException::invalidCredentials();
-        }
+        $platformAdmin = $this->platformAuth->findActivePlatformAdminByEmailOrNull($email);
 
-        $result = $this->createSession(
-            user:       $user,
-            company:    $company,
-            deviceType: 'dashboard',
-            ipAddress:  $ipAddress,
-            userAgent:  $userAgent,
-            deviceName: $deviceName ?: 'Dashboard',
-        );
-
-        // Auto-authorize this device as a POS terminal for the tenant
-        if ($terminalIdentifier !== '') {
-            $this->authorizeTerminal(
-                companyId:            (int) $company['id'],
-                terminalIdentifier:   $terminalIdentifier,
-                authorizedByUserId:   (int) $user['id'],
-                deviceName:           $deviceName ?: 'Dashboard',
-                ipAddress:            $ipAddress,
+        if ($platformAdmin && $this->platformAuth->passwordMatches($platformAdmin, $password)) {
+            return $this->platformAuth->createCompanyContextSession(
+                admin:      $platformAdmin,
+                company:    $company,
+                ipAddress:  $ipAddress,
+                userAgent:  $userAgent,
+                deviceName: $deviceName ?: 'Dashboard',
             );
         }
 
-        return $result;
+        if ($tenantUser && !$this->safeBool($tenantUser['can_dashboard_login'])) {
+            throw AuthException::dashboardLoginNotAllowed();
+        }
+
+        if ($tenantUser || $platformAdmin) {
+            throw AuthException::invalidCredentials();
+        }
+
+        throw AuthException::accountNotFound();
     }
 
     /**
@@ -157,25 +178,9 @@ final class AuthService
         string $userAgent  = '',
         string $deviceName = '',
     ): AuthResult {
-        $user = $this->db->fetchAssociative(
-            'SELECT * FROM users WHERE email = :email AND is_super_admin = 1 LIMIT 1',
-            ['email' => $email],
-        );
-
-        if (!$user) {
-            throw AuthException::superAdminNotFound();
-        }
-
-        if (empty($user['password']) || !password_verify($password, $user['password'])) {
-            throw AuthException::invalidCredentials();
-        }
-
-        $company = $this->syntheticSuperAdminCompany();
-
-        return $this->createSession(
-            user:       $user,
-            company:    $company,
-            deviceType: 'dashboard',
+        return $this->platformAuth->login(
+            email:      $email,
+            password:   $password,
             ipAddress:  $ipAddress,
             userAgent:  $userAgent,
             deviceName: $deviceName ?: 'Super Admin',
@@ -213,6 +218,10 @@ final class AuthService
             'UPDATE user_sessions SET last_active_at = NOW() WHERE id = :id',
             ['id' => $session['id']],
         );
+
+        if ((int) $session['user_id'] < 0) {
+            return $this->platformAuth->buildAuthResultFromSession($session, $rawToken);
+        }
 
         $user    = $this->findUserById((int) $session['user_id'], (int) $session['company_id']);
         $company = $this->resolveCompanyById((int) $session['company_id']);
@@ -284,6 +293,10 @@ final class AuthService
             ['expires_at' => $newExpiry->format('Y-m-d H:i:s'), 'id' => $session['id']],
         );
 
+        if ((int) $session['user_id'] < 0) {
+            return $this->platformAuth->buildAuthResultFromSession($session, $rawToken);
+        }
+
         $user    = $this->findUserById((int) $session['user_id'], (int) $session['company_id']);
         $company = $this->resolveCompanyById((int) $session['company_id']);
 
@@ -339,9 +352,14 @@ final class AuthService
         return $this->db->fetchAllAssociative(
             'SELECT pt.id, pt.terminal_identifier, pt.device_name,
                     pt.ip_address, pt.authorized_at,
-                    u.name AS authorized_by
+                    COALESCE(u.name, pa.name, \'Platform Admin\') AS authorized_by
              FROM   pos_terminals pt
-             JOIN   users u ON u.id = pt.authorized_by_user_id
+             LEFT JOIN users u
+                    ON pt.authorized_by_user_id > 0
+                   AND u.id = pt.authorized_by_user_id
+             LEFT JOIN platform_admins pa
+                    ON pt.authorized_by_user_id < 0
+                   AND pa.id = ABS(pt.authorized_by_user_id)
              WHERE  pt.company_id = :company_id
                AND  pt.revoked_at IS NULL
              ORDER  BY pt.authorized_at DESC',
@@ -372,7 +390,7 @@ final class AuthService
 
         $this->db->insert('user_sessions', [
             'company_id'     => $company['id'],
-            'user_id'        => $user['id'],
+            'user_id'        => $this->getSessionUserId($user),
             'token_hash'     => $tokenHash,
             'device_name'    => $deviceName,
             'device_type'    => $deviceType,
@@ -402,7 +420,10 @@ final class AuthService
         \DateTimeImmutable $expiresAt,
         string             $deviceType,
     ): AuthResult {
-        $roles = $this->getUserRoles((int) $user['id'], (int) $company['id']);
+        $isPlatformAdmin = $this->isPlatformAdmin($user);
+        $roles = $isPlatformAdmin
+            ? ['PlatformAdmin']
+            : $this->getUserRoles((int) $user['id'], (int) $company['id']);
 
         return new AuthResult(
             token:      $rawToken,
@@ -412,9 +433,9 @@ final class AuthService
                 id:                (int)  $user['id'],
                 name:                     $user['name'],
                 email:                    $user['email']  ?? null,
-                isSuperAdmin:      (bool) $user['is_super_admin'],
-                canDashboardLogin:        $this->safeBool($user['can_dashboard_login']),
-                canPosLogin:              $this->safeBool($user['can_pos_login']),
+                isSuperAdmin:             $isPlatformAdmin,
+                canDashboardLogin:        $isPlatformAdmin ? true : $this->safeBool($user['can_dashboard_login']),
+                canPosLogin:              $isPlatformAdmin ? false : $this->safeBool($user['can_pos_login']),
                 roles:                    $roles,
             ),
             company: new AuthCompany(
@@ -518,7 +539,7 @@ final class AuthService
     private function resolveCompany(string $subdomain): array
     {
         $company = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE subdomain = :subdomain LIMIT 1',
+            'SELECT * FROM companies WHERE id <> 0 AND subdomain = :subdomain LIMIT 1',
             ['subdomain' => $subdomain],
         );
 
@@ -547,19 +568,12 @@ final class AuthService
         return $company;
     }
 
-    /** @throws AuthException */
-    private function findUserByEmail(string $email, int $companyId): array
+    private function findUserByEmailOrNull(string $email, int $companyId): array|false
     {
-        $user = $this->db->fetchAssociative(
+        return $this->db->fetchAssociative(
             'SELECT * FROM users WHERE email = :email AND company_id = :company_id LIMIT 1',
             ['email' => $email, 'company_id' => $companyId],
         );
-
-        if (!$user) {
-            throw AuthException::accountNotFound();
-        }
-
-        return $user;
     }
 
     /**
@@ -592,10 +606,7 @@ final class AuthService
     private function findUserById(int $userId, int $companyId): array
     {
         if ($companyId === 0) {
-            $user = $this->db->fetchAssociative(
-                'SELECT * FROM users WHERE id = :id AND is_super_admin = 1 LIMIT 1',
-                ['id' => $userId],
-            );
+            $user = false;
         } else {
             $user = $this->db->fetchAssociative(
                 'SELECT * FROM users WHERE id = :id AND company_id = :company_id LIMIT 1',
@@ -626,6 +637,20 @@ final class AuthService
         );
 
         return array_column($rows, 'name');
+    }
+
+    private function isPlatformAdmin(array $user): bool
+    {
+        return ($user['__auth_source'] ?? null) === 'platform_admin';
+    }
+
+    private function getSessionUserId(array $user): int
+    {
+        if ($this->isPlatformAdmin($user)) {
+            return -1 * (int) $user['id'];
+        }
+
+        return (int) $user['id'];
     }
 
     // =========================================================================
@@ -660,8 +685,4 @@ final class AuthService
         return $value !== null && (bool) $value;
     }
 
-    private function syntheticSuperAdminCompany(): array
-    {
-        return ['id' => 0, 'name' => 'Angavu Platform', 'subdomain' => '__super__'];
-    }
 }

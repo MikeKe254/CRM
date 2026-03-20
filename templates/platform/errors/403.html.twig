@@ -1,0 +1,66 @@
+{% extends 'platform/layout.html.twig' %}
+{% set platform_domain = currentDomain() %}
+
+{% block title %}Access Denied · Platform · Angavu{% endblock %}
+{% block platform_title %}Access Denied{% endblock %}
+{% block platform_subtitle %}This platform action is outside your assigned permissions{% endblock %}
+
+{% block platform_content %}
+<div class="flex items-center justify-center min-h-[70vh] px-4 py-10">
+    <div class="w-full max-w-lg">
+
+        <div class="bg-white border border-red-200 rounded-2xl overflow-hidden shadow-sm"
+             style="box-shadow:0 4px 20px rgba(239,68,68,0.07);">
+            <div class="h-1 w-full" style="background:linear-gradient(90deg,#ef4444,#dc2626,#991b1b);"></div>
+
+            <div class="p-8 sm:p-10">
+                <div class="flex items-start gap-4 mb-6">
+                    <div class="w-14 h-14 rounded-2xl bg-red-50 border border-red-100 flex items-center justify-center text-red-500 flex-shrink-0">
+                        {{ ux_icon('lucide:shield-alert', {width: 24, height: 24}) }}
+                    </div>
+                    <div>
+                        <p class="text-[10.5px] font-extrabold uppercase tracking-widest text-red-400 mb-1">Error 403 · Forbidden</p>
+                        <h1 class="text-xl font-extrabold text-slate-900 leading-tight tracking-tight">
+                            You don't have access to this area.
+                        </h1>
+                    </div>
+                </div>
+
+                <div class="space-y-3 mb-8">
+                    <div class="flex items-start gap-2.5 p-4 bg-red-50 border border-red-100 rounded-xl text-sm text-red-700 leading-relaxed">
+                        {{ ux_icon('lucide:info', {width: 14, height: 14, class: 'flex-shrink-0 mt-0.5'}) }}
+                        {{ message ?? 'You do not have permission to access this platform area.' }}
+                    </div>
+                    <div class="p-4 bg-slate-50 border border-slate-100 rounded-xl text-xs text-slate-500 leading-relaxed">
+                        If you believe this is incorrect, ask a platform owner to review the role and permission mappings for your account.
+                        All access changes are recorded in the platform audit log.
+                    </div>
+                </div>
+
+                <div class="flex flex-wrap items-center gap-2.5">
+                    <a href="{{ path('platform_dashboard', {domain: platform_domain}) }}"
+                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-bold text-white transition hover:opacity-90"
+                       style="background:linear-gradient(135deg,#4f46e5,#7c3aed);box-shadow:0 2px 8px rgba(79,70,229,0.3);">
+                        {{ ux_icon('lucide:layout-dashboard', {width: 14, height: 14}) }}
+                        Back to Dashboard
+                    </a>
+                    <button onclick="history.back()"
+                            class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 hover:border-slate-300 transition cursor-pointer">
+                        {{ ux_icon('lucide:arrow-left', {width: 14, height: 14}) }}
+                        Go Back
+                    </button>
+                    <a href="{{ path('platform_activity_logs', {domain: platform_domain}) }}"
+                       class="inline-flex items-center gap-2 px-5 py-2.5 rounded-xl text-sm font-semibold text-slate-600 bg-white border border-slate-200 hover:bg-slate-50 transition">
+                        {{ ux_icon('lucide:scroll-text', {width: 14, height: 14}) }}
+                        Audit Logs
+                    </a>
+                </div>
+            </div>
+        </div>
+
+        <p class="text-center text-xs text-slate-400 mt-4">
+            Session: {% if session is defined and session.user is defined %}{{ session.user.email }}{% else %}Unknown{% endif %}
+        </p>
+    </div>
+</div>
+{% endblock %}

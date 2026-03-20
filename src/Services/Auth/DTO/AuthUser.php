@@ -16,7 +16,8 @@ final class AuthUser
         public readonly bool   $isSuperAdmin,
         public readonly bool   $canDashboardLogin,
         public readonly bool   $canPosLogin,
-        public readonly array  $roles,          // ['Admin', 'Manager', ...]
+        public readonly array  $roles,           // ['Admin', 'Manager', ...]
+        public readonly bool   $isPlatformOwner = false,  // platform_admins.is_platform_owner
     ) {}
 
     public function toArray(): array
@@ -29,6 +30,7 @@ final class AuthUser
             'can_dashboard_login' => $this->canDashboardLogin,
             'can_pos_login'       => $this->canPosLogin,
             'roles'               => $this->roles,
+            'is_platform_owner'   => $this->isPlatformOwner,
         ];
     }
 }

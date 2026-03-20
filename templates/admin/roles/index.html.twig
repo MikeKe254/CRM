@@ -1,4 +1,6 @@
 {% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
 {% block admin_title %}Roles{% endblock %}
 {% block admin_subtitle %}Manage roles and their permission sets{% endblock %}
 
@@ -42,7 +44,7 @@
                         <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
                             <svg width="14" height="14" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                         </div>
-                        <a href="{{ path('admin_roles_show', {id: role.id}) }}"
+                        <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}"
                            class="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors">
                             {{ role.name }}
                         </a>
@@ -63,7 +65,7 @@
                 </td>
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-1">
-                        <a href="{{ path('admin_roles_show', {id: role.id}) }}"
+                        <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}"
                            class="text-xs text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 px-2.5 py-1 rounded transition-colors">
                             Permissions
                         </a>
@@ -118,22 +120,26 @@ function openCreateRole() { openDrawer('Add Role', roleFormHtml(), drawerFooter(
 function openEditRole(r)   { openDrawer('Edit Role', roleFormHtml(r), drawerFooter(`submitEditRole(${r.id})`)); }
 
 function submitCreateRole() {
-    adminFetch('{{ path('admin_roles_create') }}', {
+    adminFetch('{{ path('admin_roles_create', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', {
         name:        document.getElementById('f-name').value,
         description: document.getElementById('f-desc').value,
     }, () => turboReload());
 }
 
 function submitEditRole(id) {
-    adminFetch(`/dashboard/admin/roles/${id}/edit`, {
+    // 2026-03-19: Use the real Symfony route path. The role update endpoint is
+    // "/update", not "/edit", and generated URLs keep the tenant host/domain correct.
+    adminFetch(`{{ path('admin_roles_update', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__ROLE_ID__'}) }}`.replace('__ROLE_ID__', id), {
         name:        document.getElementById('f-name').value,
         description: document.getElementById('f-desc').value,
     }, () => turboReload());
 }
 
 function deleteRole(id, name) {
+    // 2026-03-19: Generate the delete URL from Symfony so role actions stay valid
+    // across dynamic tenant domains and route naming changes.
     adminDelete(
-        `/dashboard/admin/roles/${id}/delete`,
+        `{{ path('admin_roles_delete', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__ROLE_ID__'}) }}`.replace('__ROLE_ID__', id),
         `Delete role "${name}"? All users with this role will lose it.`,
         () => document.getElementById(`role-row-${id}`)?.remove()
     );

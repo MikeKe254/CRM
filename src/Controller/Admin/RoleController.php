@@ -4,25 +4,29 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Services\ActivityLog\UserActivityLogService;
 use App\Services\Auth\AuthService;
 use App\Services\Permission\CheckPermissionService;
 use App\Services\Permission\PermissionService;
+use App\Services\Permission\PlatformCheckPermissionService;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/dashboard/admin/roles')]
+#[Route('/dashboard/admin/roles', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class RoleController extends AdminBaseController
 {
     public function __construct(
         AuthService                      $auth,
         CheckPermissionService           $can,
+        PlatformCheckPermissionService   $platformCan,
         private readonly Connection      $db,
         private readonly PermissionService $permissions,
+        private readonly UserActivityLogService $activityLog,
     ) {
-        parent::__construct($auth, $can);
+        parent::__construct($auth, $can, $platformCan);
     }
 
     // =========================================================================
@@ -45,6 +49,8 @@ class RoleController extends AdminBaseController
              ORDER  BY r.is_system_role DESC, r.name',
             ['company_id' => $session->company->id],
         );
+
+        $this->activityLog->record($session, 'role.view', request: $request);
 
         return $this->render('admin/roles/index.html.twig', [
             'session' => $session,
@@ -159,6 +165,11 @@ class RoleController extends AdminBaseController
             ['company_id' => $session->company->id],
         );
 
+        $this->activityLog->record($session, 'role.show',
+            ['name' => $role['name']],
+            subjectType: 'role', subjectId: $id, request: $request,
+        );
+
         return $this->render('admin/roles/show.html.twig', [
             'session'           => $session,
             'role'              => $role,
@@ -212,6 +223,11 @@ class RoleController extends AdminBaseController
 
         $roleId = (int) $this->db->lastInsertId();
 
+        $this->activityLog->record($session, 'role.create',
+            ['name' => $name],
+            permission: 'create_roles', subjectType: 'role', subjectId: $roleId, request: $request,
+        );
+
         return $this->success('Role created successfully.', ['id' => $roleId]);
     }
 
@@ -254,6 +270,11 @@ class RoleController extends AdminBaseController
             'description' => $description ?: null,
         ], ['id' => $id]);
 
+        $this->activityLog->record($session, 'role.update',
+            ['name' => $name],
+            permission: 'edit_roles', subjectType: 'role', subjectId: $id, request: $request,
+        );
+
         return $this->success('Role updated successfully.');
     }
 
@@ -287,6 +308,11 @@ class RoleController extends AdminBaseController
             ['id' => $id, 'company_id' => $session->company->id],
         );
 
+        $this->activityLog->record($session, 'role.delete',
+            ['name' => $role['name']],
+            permission: 'delete_roles', subjectType: 'role', subjectId: $id, request: $request,
+        );
+
         return $this->success('Role deleted successfully.');
     }
 
@@ -303,11 +329,26 @@ class RoleController extends AdminBaseController
         $permissionId = (int) $request->request->get('permission_id', 0);
         if ($permissionId === 0) return $this->error('Permission ID is required.');
 
+        $roleName = (string) $this->db->fetchOne(
+            'SELECT name FROM roles WHERE id = :id AND company_id = :company_id',
+            ['id' => $id, 'company_id' => $session->company->id],
+        );
+        $permName = (string) $this->db->fetchOne(
+            'SELECT name FROM permissions WHERE id = :id',
+            ['id' => $permissionId],
+        );
+
         $result = $this->permissions->assignPermission($session, $id, $permissionId, $session->company->id);
 
-        return $result->success
-            ? $this->success($result->reason, $result->data)
-            : $this->error($result->reason);
+        if ($result->success) {
+            $this->activityLog->record($session, 'user.permission.grant',
+                ['role' => $roleName ?: "role #$id", 'permission' => $permName ?: "permission #$permissionId"],
+                permission: 'assign_permissions', subjectType: 'role', subjectId: $id, request: $request,
+            );
+            return $this->success($result->reason, $result->data);
+        }
+
+        return $this->error($result->reason);
     }
 
     // =========================================================================
@@ -323,11 +364,26 @@ class RoleController extends AdminBaseController
         $permissionId = (int) $request->request->get('permission_id', 0);
         if ($permissionId === 0) return $this->error('Permission ID is required.');
 
+        $roleName = (string) $this->db->fetchOne(
+            'SELECT name FROM roles WHERE id = :id AND company_id = :company_id',
+            ['id' => $id, 'company_id' => $session->company->id],
+        );
+        $permName = (string) $this->db->fetchOne(
+            'SELECT name FROM permissions WHERE id = :id',
+            ['id' => $permissionId],
+        );
+
         $result = $this->permissions->revokePermission($session, $id, $permissionId, $session->company->id);
 
-        return $result->success
-            ? $this->success($result->reason)
-            : $this->error($result->reason);
+        if ($result->success) {
+            $this->activityLog->record($session, 'user.permission.revoke',
+                ['role' => $roleName ?: "role #$id", 'permission' => $permName ?: "permission #$permissionId"],
+                permission: 'assign_permissions', subjectType: 'role', subjectId: $id, request: $request,
+            );
+            return $this->success($result->reason);
+        }
+
+        return $this->error($result->reason);
     }
 
     // =========================================================================
@@ -347,11 +403,39 @@ class RoleController extends AdminBaseController
         if ($rolePermissionId === 0) return $this->error('Role permission ID is required.');
         if ($key === '') return $this->error('Constraint key is required.');
 
+        $meta = $this->db->fetchAssociative(
+            'SELECT r.name AS role_name, p.name AS permission_name, rp.role_id
+               FROM role_permissions rp
+               JOIN roles r       ON r.id = rp.role_id
+               JOIN permissions p ON p.id = rp.permission_id
+              WHERE rp.id = :rp_id AND r.company_id = :company_id',
+            ['rp_id' => $rolePermissionId, 'company_id' => $session->company->id],
+        );
+
+        $constraintName = (string) $this->db->fetchOne(
+            'SELECT name FROM constraints WHERE id = :key OR constraint_key = :key LIMIT 1',
+            ['key' => $key],
+        );
+
         $result = $this->permissions->setConstraint($session, $rolePermissionId, $key, $value, $session->company->id);
 
-        return $result->success
-            ? $this->success($result->reason, $result->data)
-            : $this->error($result->reason);
+        if ($result->success) {
+            $this->activityLog->record($session, 'role.constraint.set',
+                [
+                    'role'       => $meta ? $meta['role_name']      : "role_permission #$rolePermissionId",
+                    'permission' => $meta ? $meta['permission_name'] : '',
+                    'constraint' => $constraintName ?: $key,
+                    'value'      => $value !== '' ? $value : '(cleared)',
+                ],
+                permission: 'assign_permissions',
+                subjectType: 'role',
+                subjectId: $meta ? (int) $meta['role_id'] : $id,
+                request: $request,
+            );
+            return $this->success($result->reason, $result->data);
+        }
+
+        return $this->error($result->reason);
     }
 
     // =========================================================================
@@ -370,10 +454,37 @@ class RoleController extends AdminBaseController
         if ($rolePermissionId === 0) return $this->error('Role permission ID is required.');
         if ($key === '') return $this->error('Constraint key is required.');
 
+        $meta = $this->db->fetchAssociative(
+            'SELECT r.name AS role_name, p.name AS permission_name, rp.role_id
+               FROM role_permissions rp
+               JOIN roles r       ON r.id = rp.role_id
+               JOIN permissions p ON p.id = rp.permission_id
+              WHERE rp.id = :rp_id AND r.company_id = :company_id',
+            ['rp_id' => $rolePermissionId, 'company_id' => $session->company->id],
+        );
+
+        $constraintName = (string) $this->db->fetchOne(
+            'SELECT name FROM constraints WHERE id = :key OR constraint_key = :key LIMIT 1',
+            ['key' => $key],
+        );
+
         $result = $this->permissions->removeConstraint($session, $rolePermissionId, $key, $session->company->id);
 
-        return $result->success
-            ? $this->success($result->reason)
-            : $this->error($result->reason);
+        if ($result->success) {
+            $this->activityLog->record($session, 'role.constraint.remove',
+                [
+                    'role'       => $meta ? $meta['role_name']      : "role_permission #$rolePermissionId",
+                    'permission' => $meta ? $meta['permission_name'] : '',
+                    'constraint' => $constraintName ?: $key,
+                ],
+                permission: 'assign_permissions',
+                subjectType: 'role',
+                subjectId: $meta ? (int) $meta['role_id'] : $id,
+                request: $request,
+            );
+            return $this->success($result->reason);
+        }
+
+        return $this->error($result->reason);
     }
 }

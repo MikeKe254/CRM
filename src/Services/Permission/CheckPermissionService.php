@@ -42,7 +42,10 @@ final class CheckPermissionService
      */
     private array $cache = [];
 
-    public function __construct(private readonly Connection $db) {}
+    public function __construct(
+        private readonly Connection $db,
+        private readonly PlatformCheckPermissionService $platformCan,
+    ) {}
 
     // =========================================================================
     // PUBLIC API
@@ -57,9 +60,8 @@ final class CheckPermissionService
      */
     public function check(AuthResult $session, string $permission): bool
     {
-        // Super admins always pass
-        if ($session->user->isSuperAdmin) {
-            return true;
+        if ($this->platformCan->isPlatformAdminSession($session)) {
+            return $this->platformCan->check($session, $permission);
         }
 
         $resolved = $this->resolve($session, $permission);
@@ -118,7 +120,7 @@ final class CheckPermissionService
         string     $constraintKey,
         mixed      $default = null,
     ): mixed {
-        if ($session->user->isSuperAdmin) {
+        if ($this->platformCan->isPlatformAdminSession($session)) {
             return $default;
         }
 
@@ -139,7 +141,7 @@ final class CheckPermissionService
      */
     public function constraints(AuthResult $session, string $permission): array
     {
-        if ($session->user->isSuperAdmin) {
+        if ($this->platformCan->isPlatformAdminSession($session)) {
             return [];
         }
 
@@ -155,7 +157,7 @@ final class CheckPermissionService
      */
     public function getUserPermissionReport(AuthResult $session): array
     {
-        if ($session->user->isSuperAdmin) {
+        if ($this->platformCan->isPlatformAdminSession($session)) {
             return ['super_admin' => true, 'permissions' => []];
         }
 

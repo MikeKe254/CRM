@@ -4,22 +4,26 @@ declare(strict_types=1);
 
 namespace App\Controller\Admin;
 
+use App\Services\ActivityLog\UserActivityLogService;
 use App\Services\Auth\AuthService;
 use App\Services\Permission\CheckPermissionService;
 use App\Services\Permission\PermissionService;
+use App\Services\Permission\PlatformCheckPermissionService;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/dashboard/admin/permissions')]
+#[Route('/dashboard/admin/permissions', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class PermissionController extends AdminBaseController
 {
     public function __construct(
         AuthService                        $auth,
         CheckPermissionService             $can,
+        PlatformCheckPermissionService     $platformCan,
         private readonly PermissionService $permissions,
+        private readonly UserActivityLogService $activityLog,
     ) {
-        parent::__construct($auth, $can);
+        parent::__construct($auth, $can, $platformCan);
     }
 
     // =========================================================================
@@ -38,6 +42,8 @@ class PermissionController extends AdminBaseController
         }
 
         $categories = $this->permissions->listCategories();
+
+        $this->activityLog->record($session, 'permission.view', request: $request);
 
         return $this->render('admin/permissions/index.html.twig', [
             'session'    => $session,

@@ -1,0 +1,189 @@
+{# ═══════════════════════════════════════════════════════════════════════════
+   PLATFORM MODAL — shared confirm + alert dialogs
+   JS API (globally available on every platform page):
+
+     platformConfirm({
+       title:       'Delete plan?',
+       message:     'This cannot be undone.',
+       confirmText: 'Delete',          // default 'Confirm'
+       cancelText:  'Cancel',          // default 'Cancel'
+       danger:      true,              // default true  → red confirm button
+       onConfirm:   () => { ... },     // required
+     });
+
+     platformAlert({
+       title:   'Error',               // optional, default 'Error'
+       message: 'Something went wrong.',
+       type:    'error',               // 'error' | 'success' | 'info'
+     });
+═══════════════════════════════════════════════════════════════════════════ #}
+
+{# ── Backdrop ──────────────────────────────────────────────────────────── #}
+<div id="platform-modal-backdrop"
+     style="display:none;position:fixed;inset:0;z-index:2000;
+            background:rgba(15,15,30,0.45);backdrop-filter:blur(3px);
+            align-items:center;justify-content:center;padding:20px;">
+
+    {# ── Card ─────────────────────────────────────────────────────────── #}
+    <div id="platform-modal-card"
+         style="background:#fff;border-radius:18px;padding:28px 28px 22px;
+                max-width:400px;width:100%;box-shadow:0 24px 64px rgba(0,0,0,0.18);
+                transform:scale(0.94);opacity:0;
+                transition:transform 0.18s cubic-bezier(.34,1.56,.64,1), opacity 0.15s ease;">
+
+        {# Icon ring #}
+        <div id="platform-modal-icon-wrap"
+             style="display:flex;justify-content:center;margin-bottom:16px;">
+            <div id="platform-modal-icon"
+                 style="display:flex;align-items:center;justify-content:center;
+                        width:48px;height:48px;border-radius:50%;"></div>
+        </div>
+
+        {# Title #}
+        <div id="platform-modal-title"
+             style="font-size:15px;font-weight:700;color:#0f172a;
+                    text-align:center;margin-bottom:6px;line-height:1.3;"></div>
+
+        {# Message #}
+        <div id="platform-modal-message"
+             style="font-size:13px;color:#64748b;text-align:center;
+                    line-height:1.55;margin-bottom:22px;"></div>
+
+        {# Buttons #}
+        <div id="platform-modal-buttons" style="display:flex;gap:10px;">
+            <button id="platform-modal-cancel"
+                    onclick="platformModalClose()"
+                    style="flex:1;height:38px;background:#f8fafc;color:#475569;
+                           border:1px solid #e2e8f0;border-radius:10px;
+                           font-size:13px;font-weight:500;cursor:pointer;
+                           transition:background 0.15s;"
+                    onmouseover="this.style.background='#f1f5f9'"
+                    onmouseout="this.style.background='#f8fafc'">
+                Cancel
+            </button>
+            <button id="platform-modal-confirm"
+                    style="flex:1;height:38px;color:#fff;border:none;border-radius:10px;
+                           font-size:13px;font-weight:600;cursor:pointer;
+                           transition:filter 0.15s;"
+                    onmouseover="this.style.filter='brightness(0.9)'"
+                    onmouseout="this.style.filter=''">
+                Confirm
+            </button>
+        </div>
+    </div>
+</div>
+
+<script>
+(function () {
+    let _confirmCallback = null;
+
+    function modalOpen() {
+        const bd = document.getElementById('platform-modal-backdrop');
+        bd.style.display = 'flex';
+        requestAnimationFrame(() => {
+            const card = document.getElementById('platform-modal-card');
+            card.style.transform = 'scale(1)';
+            card.style.opacity   = '1';
+        });
+        document.body.style.overflow = 'hidden';
+    }
+
+    window.platformModalClose = function () {
+        const bd   = document.getElementById('platform-modal-backdrop');
+        const card = document.getElementById('platform-modal-card');
+        card.style.transform = 'scale(0.94)';
+        card.style.opacity   = '0';
+        setTimeout(function () {
+            bd.style.display = 'none';
+            document.body.style.overflow = '';
+            _confirmCallback = null;
+        }, 160);
+    };
+
+    // ── confirm ───────────────────────────────────────────────────────────
+    window.platformConfirm = function (opts) {
+        const title       = opts.title       || 'Are you sure?';
+        const message     = opts.message     || '';
+        const confirmText = opts.confirmText || 'Confirm';
+        const cancelText  = opts.cancelText  || 'Cancel';
+        const danger      = opts.danger !== false;
+
+        _confirmCallback = opts.onConfirm || null;
+
+        // icon — warning triangle
+        const iconEl = document.getElementById('platform-modal-icon');
+        iconEl.style.background = danger ? '#fef2f2' : '#eff6ff';
+        iconEl.innerHTML = danger
+            ? '<svg width="22" height="22" fill="none" stroke="#ef4444" stroke-width="1.8" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>'
+            : '<svg width="22" height="22" fill="none" stroke="#3b82f6" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/></svg>';
+
+        document.getElementById('platform-modal-title').textContent   = title;
+        document.getElementById('platform-modal-message').textContent = message;
+
+        const cancelBtn  = document.getElementById('platform-modal-cancel');
+        const confirmBtn = document.getElementById('platform-modal-confirm');
+        cancelBtn.textContent                  = cancelText;
+        cancelBtn.style.display                = 'block';
+        confirmBtn.textContent                 = confirmText;
+        confirmBtn.style.background            = danger ? '#ef4444' : '#4f46e5';
+        confirmBtn.onclick = function () {
+            platformModalClose();
+            if (_confirmCallback) _confirmCallback();
+        };
+
+        modalOpen();
+    };
+
+    // ── alert ─────────────────────────────────────────────────────────────
+    window.platformAlert = function (opts) {
+        const type    = opts.type    || 'error';
+        const title   = opts.title   || (type === 'error' ? 'Error' : type === 'success' ? 'Success' : 'Notice');
+        const message = opts.message || '';
+
+        const colours = {
+            error:   { bg: '#fef2f2', stroke: '#ef4444' },
+            success: { bg: '#f0fdf4', stroke: '#22c55e' },
+            info:    { bg: '#eff6ff', stroke: '#3b82f6' },
+        };
+        const c = colours[type] || colours.error;
+
+        const icons = {
+            error:   '<svg width="22" height="22" fill="none" stroke="'+c.stroke+'" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12" stroke-linecap="round"/><line x1="12" y1="16" x2="12.01" y2="16" stroke-linecap="round" stroke-width="2.5"/></svg>',
+            success: '<svg width="22" height="22" fill="none" stroke="'+c.stroke+'" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" stroke-linejoin="round" d="M9 12l2 2 4-4"/></svg>',
+            info:    '<svg width="22" height="22" fill="none" stroke="'+c.stroke+'" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path stroke-linecap="round" d="M12 8v4m0 4h.01"/></svg>',
+        };
+
+        const iconEl = document.getElementById('platform-modal-icon');
+        iconEl.style.background = c.bg;
+        iconEl.innerHTML = icons[type] || icons.error;
+
+        document.getElementById('platform-modal-title').textContent   = title;
+        document.getElementById('platform-modal-message').textContent = message;
+
+        const cancelBtn  = document.getElementById('platform-modal-cancel');
+        const confirmBtn = document.getElementById('platform-modal-confirm');
+        cancelBtn.style.display     = 'none';
+        confirmBtn.textContent      = 'OK';
+        confirmBtn.style.background = '#4f46e5';
+        confirmBtn.onclick = platformModalClose;
+
+        modalOpen();
+    };
+
+    // close on backdrop click
+    document.getElementById('platform-modal-backdrop').addEventListener('click', function (e) {
+        if (e.target === this) platformModalClose();
+    });
+
+    // close on Escape — runs alongside any page-level keydown listener
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape') {
+            const bd = document.getElementById('platform-modal-backdrop');
+            if (bd && bd.style.display !== 'none') {
+                platformModalClose();
+                e.stopImmediatePropagation();
+            }
+        }
+    }, true); // capture phase so it fires before page handlers
+}());
+</script>

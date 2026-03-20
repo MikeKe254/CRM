@@ -1,0 +1,144 @@
+<div id="sidebar-overlay"></div>
+
+{% set platform_domain = currentDomain() %}
+{% set current_route = app.request.attributes.get('_route') %}
+{% set platform_sidebar_sections = [
+    {
+        label: 'Overview',
+        items: [
+            { route: 'platform_dashboard', label: 'Dashboard', icon: 'lucide:layout-dashboard', href: path('platform_dashboard', {domain: platform_domain}), active_prefix: 'platform_dashboard', permission: 'view_companies' },
+            { route: 'platform_companies', label: 'Companies', icon: 'lucide:building-2', href: path('platform_companies', {domain: platform_domain}), active_prefix: 'platform_companies', permission: 'view_companies' },
+            { route: null, label: 'Analytics', icon: 'lucide:chart-column-big', href: '#', active_prefix: null, permission: 'view_company_analytics' },
+            { route: null, label: 'Transactions', icon: 'lucide:receipt-text', href: '#', active_prefix: null, permission: 'view_all_company_transactions' },
+            { route: null, label: 'Customers', icon: 'lucide:users-round', href: '#', active_prefix: null, permission: 'view_company_users' }
+        ]
+    },
+    {
+        label: 'Operations',
+        items: [
+            { route: null, label: 'Payments', icon: 'lucide:credit-card', href: '#', active_prefix: null, permission: 'view_payment_configs' },
+            { route: null, label: 'Terminals', icon: 'lucide:monitor-smartphone', href: '#', active_prefix: null, permission: 'view_terminals' },
+            { route: null, label: 'Billing', icon: 'lucide:wallet-cards', href: '#', active_prefix: null, permission: 'view_billing' },
+            { route: null, label: 'Subscriptions', icon: 'lucide:badge-dollar-sign', href: '#', active_prefix: null, permission: 'view_subscriptions' },
+            { route: null, label: 'Integrations', icon: 'lucide:plug-zap', href: '#', active_prefix: null, permission: 'manage_integrations' }
+        ]
+    },
+    {
+        label: 'Governance',
+        items: [
+            { route: 'platform_admins', label: 'Platform Admins', icon: 'lucide:shield-check', href: path('platform_admins', {domain: platform_domain}), active_prefix: 'platform_admins', permission: 'view_platform_admins' },
+            { route: 'platform_access', label: 'Access Control', icon: 'lucide:user-cog', href: path('platform_access', {domain: platform_domain}), active_prefix: 'platform_access', permission: 'view_users' },
+            { route: 'platform_activity_logs', label: 'Activity Logs', icon: 'lucide:scroll-text', href: path('platform_activity_logs', {domain: platform_domain}), active_prefix: 'platform_activity_logs', permission: 'view_superadmin_activity_logs' },
+            { route: null, label: 'Security Events', icon: 'lucide:shield-alert', href: '#', active_prefix: null, permission: 'view_security_events' },
+            { route: null, label: 'Active Sessions', icon: 'lucide:scan-eye', href: '#', active_prefix: null, permission: 'view_active_sessions' },
+            { route: null, label: 'Feature Flags', icon: 'lucide:sliders-horizontal', href: '#', active_prefix: null, permission: 'manage_feature_flags' }
+        ]
+    },
+    {
+        label: 'Configuration',
+        items: [
+            { route: null, label: 'Platform Settings', icon: 'lucide:sliders-vertical', href: '#', active_prefix: null, permission: 'view_platform_settings' },
+            { route: null, label: 'Notifications', icon: 'lucide:bell-ring', href: '#', active_prefix: null, permission: 'view_platform_settings' },
+            { route: null, label: 'Support Tools', icon: 'lucide:wrench', href: '#', active_prefix: null, permission: 'perform_company_support_actions' }
+        ]
+    },
+    {
+        label: 'Plans & Features',
+        owner_only: true,
+        items: [
+            { route: 'platform_plans',   label: 'Plans',              icon: 'lucide:layers',       href: path('platform_plans',   {domain: platform_domain}), active_prefix: 'platform_plans',   permission: 'view_plans' },
+            { route: 'platform_modules', label: 'Modules & Features', icon: 'lucide:boxes',        href: path('platform_modules', {domain: platform_domain}), active_prefix: 'platform_modules', permission: 'manage_modules' }
+        ]
+    },
+    {
+        label: 'Owner Configs',
+        owner_only: true,
+        items: [
+            { route: 'platform_owner_permissions', label: 'Permissions', icon: 'lucide:key', href: path('platform_owner_permissions', {domain: platform_domain}), active_prefix: 'platform_owner_permissions', permission: 'edit_platform_core_settings' },
+            { route: 'platform_owner_payment_methods', label: 'Payment Methods', icon: 'lucide:credit-card', href: path('platform_owner_payment_methods', {domain: platform_domain}), active_prefix: 'platform_owner_payment_methods', permission: 'edit_platform_core_settings' },
+            { route: 'platform_owner_platform_permissions', label: 'Platform Permissions', icon: 'lucide:shield-check', href: path('platform_owner_platform_permissions', {domain: platform_domain}), active_prefix: 'platform_owner_platform_permissions', permission: 'edit_platform_core_settings' },
+            { route: 'platform_owner_features', label: 'Features', icon: 'lucide:shapes', href: path('platform_owner_features', {domain: platform_domain}), active_prefix: 'platform_owner_features', permission: 'edit_platform_core_settings' }
+        ]
+    }
+] %}
+
+<aside id="sidebar" style="background:#0e0f1a;border-right:1px solid rgba(99,102,241,0.12);">
+    <div id="sidebar-logo-row" style="border-bottom:1px solid rgba(99,102,241,0.12);">
+        <div id="sidebar-logo-icon"
+             onclick="logoIconClick()"
+             title="Expand sidebar"
+             style="background:linear-gradient(135deg,#4f46e5 0%,#7c3aed 100%);border-radius:8px;font-size:12px;font-weight:700;letter-spacing:-0.5px;">
+            AP
+        </div>
+
+        <div id="sidebar-logo-text">
+            <div style="font-weight:700;font-size:13px;color:#fff;line-height:1.2;letter-spacing:-0.2px;">Angavu</div>
+            <div style="font-size:10px;color:rgba(165,180,252,0.5);letter-spacing:0.06em;text-transform:uppercase;font-weight:500;">Platform Console</div>
+        </div>
+
+        <button id="collapse-btn" onclick="toggleSidebar()" title="Collapse sidebar">
+            {{ ux_icon('lucide:panel-left-close', {width: 15, height: 15}) }}
+        </button>
+    </div>
+
+    <nav class="flex-1 overflow-y-auto overflow-x-hidden" style="padding:10px 8px;">
+        {% for section in platform_sidebar_sections %}
+            {% set visible_items = [] %}
+            {% for item in section.items %}
+                {% if item.permission is empty or can(item.permission) %}
+                    {% set visible_items = visible_items|merge([item]) %}
+                {% endif %}
+            {% endfor %}
+
+            {% if visible_items is not empty %}
+            <div class="sidebar-section-label" style="color:rgba(165,180,252,0.35);font-size:9.5px;letter-spacing:0.1em;{% if not loop.first %}margin-top:10px;{% endif %}display:flex;align-items:center;gap:4px;">
+                {% if section.owner_only is defined and section.owner_only %}
+                    {{ ux_icon('lucide:crown', { width: 8, height: 8 }) }}
+                {% endif %}
+                {{ section.label }}
+            </div>
+
+            {% for item in visible_items %}
+                {% set is_active = item.active_prefix and current_route starts with item.active_prefix %}
+                <a href="{{ item.href }}"
+                   class="sidebar-link {% if is_active %}active{% endif %}"
+                   data-tooltip="{{ item.label }}"
+                   style="{% if is_active %}background:rgba(99,102,241,0.2);color:#a5b4fc;{% endif %}">
+                    {{ ux_icon(item.icon, {width: 15, height: 15}) }}
+                    <span class="sidebar-label">{{ item.label }}</span>
+                </a>
+            {% endfor %}
+            {% endif %}
+        {% endfor %}
+
+    </nav>
+
+    <div id="sidebar-user-footer" style="border-top:1px solid rgba(99,102,241,0.12);">
+        <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+             style="background:linear-gradient(135deg,#4f46e5,#7c3aed);flex-shrink:0;">
+            {% if session is defined and session.user is defined %}
+                {{ session.user.name|first|upper }}
+            {% else %}
+                P
+            {% endif %}
+        </div>
+
+        <div class="sidebar-label sidebar-user-info flex-1 min-w-0 overflow-hidden">
+            <div class="truncate text-white" style="font-size:12px;font-weight:600;">
+                {% if session is defined and session.user is defined %}{{ session.user.name }}{% else %}Platform Admin{% endif %}
+            </div>
+            <div class="truncate" style="font-size:10px;color:rgba(165,180,252,0.45);">
+                Platform access
+            </div>
+        </div>
+
+        <button class="sidebar-label sidebar-logout flex-shrink-0"
+                onclick="sidebarLogout('{{ path('platform_logout', {domain: platform_domain}) }}', '{{ path('platform_login', {domain: platform_domain}) }}')"
+                title="Sign out"
+                style="background:none;border:none;cursor:pointer;color:rgba(165,180,252,0.35);padding:5px;border-radius:5px;transition:color 0.15s,background 0.15s;display:flex;align-items:center;"
+                onmouseover="this.style.color='#a5b4fc';this.style.background='rgba(99,102,241,0.15)'"
+                onmouseout="this.style.color='rgba(165,180,252,0.35)';this.style.background='none'">
+            {{ ux_icon('lucide:log-out', {width: 15, height: 15}) }}
+        </button>
+    </div>
+</aside>

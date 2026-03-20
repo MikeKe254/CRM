@@ -1,10 +1,12 @@
 {% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
 
 {% block admin_title %}{{ role.name }}{% endblock %}
 {% block admin_subtitle %}Manage permissions and constraints for this role{% endblock %}
 
 {% block admin_actions %}
-    <a href="{{ path('admin_roles') }}"
+    <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
        class="inline-flex items-center gap-1.5 h-9 px-4 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">
         <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
         Back to Roles
@@ -71,7 +73,7 @@
                class="h-9 pl-8 pr-3 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 w-56">
     </div>
     <span class="text-xs text-gray-400 ml-auto">
-        {{ assignedIds|length }} of {{ all|reduce((carry, perms) => carry + perms|length, 0) }} assigned
+        <span id="assigned-count-label">{{ assignedIds|length }}</span> of {{ all|reduce((carry, perms) => carry + perms|length, 0) }} assigned
     </span>
 </div>
 
@@ -342,9 +344,11 @@ async function togglePermission(roleId, permId, permName, checkbox) {
     const isChecked = checkbox.checked;
     checkbox.disabled = true;
 
+    // 2026-03-19: Use generated role action URLs so permission toggles follow
+    // the current Symfony routes and dynamic tenant domain handling.
     const url = isChecked
-        ? `/dashboard/admin/roles/${roleId}/assign-permission`
-        : `/dashboard/admin/roles/${roleId}/revoke-permission`;
+        ? `{{ path('admin_roles_assign_permission', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__ROLE_ID__'}) }}`.replace('__ROLE_ID__', roleId)
+        : `{{ path('admin_roles_revoke_permission', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__ROLE_ID__'}) }}`.replace('__ROLE_ID__', roleId);
 
     try {
         const res  = await fetch(url, {
@@ -356,7 +360,8 @@ async function togglePermission(roleId, permId, permName, checkbox) {
 
         if (data.success) {
             assignedCount += isChecked ? 1 : -1;
-            document.getElementById('assigned-count').textContent = assignedCount;
+            window.updatePermissionAssignedCount?.(assignedCount);
+            window.updateCategoryCount?.(permId);
 
             const panel = document.getElementById(`constraints-${permId}`);
             if (panel) {
@@ -389,7 +394,9 @@ async function saveConstraint(rolePermissionId, constraintId, value, input) {
     if (indEl) indEl.innerHTML = '<span class="text-gray-300">…</span>';
 
     try {
-        const res  = await fetch(`/dashboard/admin/roles/${roleId}/set-constraint`, {
+        // 2026-03-19: Generate the constraint endpoint from Symfony so this page
+        // does not depend on hardcoded tenant paths.
+        const res  = await fetch(`{{ path('admin_roles_set_constraint', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
             body: new URLSearchParams({

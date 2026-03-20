@@ -1,0 +1,257 @@
+{% extends 'platform/layout.html.twig' %}
+{% set platform_domain = currentDomain() %}
+
+{% block title %}Payment Methods · Owner · Angavu{% endblock %}
+{% block platform_title %}Payment Methods{% endblock %}
+{% block platform_subtitle %}Core payment rails available for tenant configuration{% endblock %}
+
+{% block platform_content %}
+
+{# ── Action bar ── #}
+<div class="mb-5 flex flex-wrap items-center justify-between gap-3">
+    <div class="flex items-center gap-3">
+        <div class="relative">
+            <svg class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input id="method-search" type="text" placeholder="Search methods…"
+                   class="h-9 w-56 rounded-lg border border-gray-300 bg-white pl-8 pr-3 text-sm text-gray-700 focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+        </div>
+        <span class="text-sm text-gray-500">
+            {{ payment_methods|length }} method{{ payment_methods|length != 1 ? 's' : '' }}
+            {% set active = payment_methods|filter(m => m.is_active)|length %}
+            {% if active > 0 %}<span class="ml-1 text-green-600">· {{ active }} active</span>{% endif %}
+        </span>
+    </div>
+    <button onclick="openAddDrawer()"
+            class="h-9 rounded-lg bg-indigo-600 px-4 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+        + Add Method
+    </button>
+</div>
+
+{# ── Table ── #}
+<div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div class="overflow-x-auto">
+        <table class="w-full" id="methods-table">
+            <thead>
+                <tr class="border-b border-gray-100">
+                    <th class="px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500">Method</th>
+                    <th class="hidden px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-gray-500 sm:table-cell">Description</th>
+                    <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Status</th>
+                    <th class="px-5 py-3 text-center text-xs font-semibold uppercase tracking-wide text-gray-500">Sort</th>
+                    <th class="px-5 py-3 text-right text-xs font-semibold uppercase tracking-wide text-gray-500">Added</th>
+                    <th class="px-5 py-3 w-28"></th>
+                </tr>
+            </thead>
+            <tbody>
+                {% for m in payment_methods %}
+                    <tr class="border-b border-gray-50 transition-colors hover:bg-gray-50" id="method-row-{{ m.id }}">
+                        <td class="px-5 py-3.5">
+                            <div class="flex items-center gap-2.5">
+                                <span class="inline-block h-2 w-2 shrink-0 rounded-full {{ m.is_active ? 'bg-green-500' : 'bg-gray-300' }}"></span>
+                                <span class="text-sm font-medium text-gray-900">{{ m.name }}</span>
+                                <span class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-[11px] text-gray-500">{{ m.method_key }}</span>
+                            </div>
+                        </td>
+                        <td class="hidden px-5 py-3.5 text-sm text-gray-500 sm:table-cell">{{ m.description ?? '—' }}</td>
+                        <td class="px-5 py-3.5 text-center">
+                            {% if m.is_active %}
+                                <span class="rounded bg-green-50 px-2 py-0.5 text-xs font-semibold text-green-700">Active</span>
+                            {% else %}
+                                <span class="rounded bg-gray-100 px-2 py-0.5 text-xs font-semibold text-gray-500">Inactive</span>
+                            {% endif %}
+                        </td>
+                        <td class="px-5 py-3.5 text-center text-sm text-gray-500">{{ m.sort_order }}</td>
+                        <td class="px-5 py-3.5 text-right text-xs text-gray-400">{{ m.created_at|date('M j, Y') }}</td>
+                        <td class="px-5 py-3.5">
+                            <div class="flex items-center justify-end gap-1">
+                                <button onclick="openEditDrawer({{ m|json_encode|e('html_attr') }})"
+                                        class="rounded border border-gray-200 bg-white px-2.5 py-1 text-xs text-gray-600 transition-colors hover:bg-gray-50">
+                                    Edit
+                                </button>
+                                <button onclick="deleteMethod({{ m.id }}, '{{ m.name|e('js') }}', this)"
+                                        class="rounded border border-red-200 bg-white px-2.5 py-1 text-xs text-red-600 transition-colors hover:bg-red-50">
+                                    Delete
+                                </button>
+                            </div>
+                        </td>
+                    </tr>
+                {% else %}
+                    <tr>
+                        <td colspan="6" class="px-5 py-14 text-center text-sm text-gray-400">
+                            No payment methods yet. Add your first one.
+                        </td>
+                    </tr>
+                {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{# ── Drawer overlay ── #}
+<div id="drawer-overlay" class="hidden fixed inset-0 z-[300] bg-black/30 backdrop-blur-sm" onclick="closeMethodDrawer()"></div>
+
+{# ── Drawer ── #}
+<div id="drawer" class="fixed top-0 right-0 z-[301] flex h-screen w-[420px] max-w-[95vw] flex-col bg-white shadow-2xl"
+     style="transform:translateX(100%);transition:transform 0.25s cubic-bezier(.4,0,.2,1);">
+    <div class="flex flex-shrink-0 items-center justify-between border-b border-gray-100 px-5 py-4">
+        <span id="drawer-title" class="text-base font-semibold text-gray-900">Add Payment Method</span>
+        <button onclick="closeMethodDrawer()" class="rounded p-1 text-gray-400 transition-colors hover:text-gray-700">
+            <svg width="18" height="18" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5">
+        <form id="method-form" method="post" action="{{ path('platform_owner_payment_methods_create', {domain: platform_domain}) }}" class="space-y-4">
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Name <span class="text-red-400">*</span></label>
+                <input id="f-name" name="name" type="text" required placeholder="M-Pesa"
+                       class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Method Key <span class="text-red-400">*</span></label>
+                <input id="f-key" name="method_key" type="text" required placeholder="mpesa"
+                       class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 font-mono text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <p class="mt-1 text-xs text-gray-400">Lowercase slug used in tenant config references.</p>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Description <span class="font-normal text-gray-400">(optional)</span></label>
+                <textarea id="f-description" name="description" rows="2" placeholder="Mobile money via Safaricom…"
+                          class="w-full resize-none rounded-lg border border-gray-300 bg-white px-3 py-2 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300"></textarea>
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Logo URL <span class="font-normal text-gray-400">(optional)</span></label>
+                <input id="f-logo" name="logo_url" type="url" placeholder="https://…"
+                       class="h-9 w-full rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            </div>
+            <div>
+                <label class="mb-1 block text-sm font-medium text-gray-700">Sort Order</label>
+                <input id="f-sort" name="sort_order" type="number" min="0" value="0"
+                       class="h-9 w-32 rounded-lg border border-gray-300 bg-white px-3 text-sm focus:border-indigo-400 focus:outline-none focus:ring-2 focus:ring-indigo-300">
+            </div>
+            <label class="flex cursor-pointer items-center gap-3">
+                <input id="f-active" type="checkbox" name="is_active" checked
+                       class="h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-300">
+                <span class="text-sm text-gray-700">Active</span>
+            </label>
+        </form>
+    </div>
+    <div class="flex flex-shrink-0 gap-3 border-t border-gray-100 px-5 py-4">
+        <button onclick="closeMethodDrawer()"
+                class="h-9 rounded-lg border border-gray-200 px-4 text-sm font-medium text-gray-600 transition-colors hover:bg-gray-50">
+            Cancel
+        </button>
+        <button id="drawer-submit" onclick="submitForm()"
+                class="h-9 flex-1 rounded-lg bg-indigo-600 text-sm font-semibold text-white transition-colors hover:bg-indigo-700">
+            Add Method
+        </button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block javascripts %}
+{{ parent() }}
+<script>
+(function () {
+    const CREATE_URL = '{{ path('platform_owner_payment_methods_create', {domain: platform_domain}) }}';
+
+    function slideOpen() {
+        document.getElementById('drawer').style.transform = 'translateX(0)';
+        document.getElementById('drawer-overlay').classList.remove('hidden');
+        document.body.style.overflow = 'hidden';
+    }
+    function slideClose() {
+        document.getElementById('drawer').style.transform = 'translateX(100%)';
+        document.getElementById('drawer-overlay').classList.add('hidden');
+        document.body.style.overflow = '';
+    }
+
+    window.openAddDrawer = function () {
+        const btn = document.getElementById('drawer-submit');
+        btn.disabled = false;
+        btn.textContent = 'Add Method';
+        document.getElementById('drawer-title').textContent = 'Add Payment Method';
+        document.getElementById('method-form').action = CREATE_URL;
+        document.getElementById('f-name').value = '';
+        document.getElementById('f-key').value = '';
+        document.getElementById('f-description').value = '';
+        document.getElementById('f-logo').value = '';
+        document.getElementById('f-sort').value = '0';
+        document.getElementById('f-active').checked = true;
+        slideOpen();
+        document.getElementById('f-name').focus();
+    };
+
+    window.openEditDrawer = function (m) {
+        const btn = document.getElementById('drawer-submit');
+        btn.disabled = false;
+        btn.textContent = 'Save Changes';
+        document.getElementById('drawer-title').textContent = 'Edit Payment Method';
+        // 2026-03-19: Generate owner config URLs from Symfony so platform
+        // actions stay correct on any current admin domain.
+        document.getElementById('method-form').action = `{{ path('platform_owner_payment_methods_edit', {domain: platform_domain, id: '__METHOD_ID__'}) }}`.replace('__METHOD_ID__', m.id);
+        document.getElementById('f-name').value = m.name;
+        document.getElementById('f-key').value = m.method_key;
+        document.getElementById('f-description').value = m.description ?? '';
+        document.getElementById('f-logo').value = m.logo_url ?? '';
+        document.getElementById('f-sort').value = m.sort_order;
+        document.getElementById('f-active').checked = !!m.is_active;
+        slideOpen();
+        document.getElementById('f-name').focus();
+    };
+
+    /* ── spinner keyframes (injected once) ── */
+    if (!document.getElementById('_spin-kf')) {
+        const s = document.createElement('style');
+        s.id = '_spin-kf';
+        s.textContent = '@keyframes _spin{to{transform:rotate(360deg)}}';
+        document.head.appendChild(s);
+    }
+    const SPINNER = '<svg style="display:inline-block;vertical-align:-2px;margin-right:5px;animation:_spin .7s linear infinite" width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path stroke-linecap="round" d="M12 3a9 9 0 109 9"/></svg>';
+
+    window.closeMethodDrawer = function () { slideClose(); };
+    window.submitForm = function () {
+        const btn = document.getElementById('drawer-submit');
+        btn.disabled = true;
+        btn.innerHTML = SPINNER + 'Saving…';
+        document.getElementById('method-form').requestSubmit();
+    };
+
+    window.deleteMethod = function (id, name, btn) {
+        platformConfirm({
+            title:       'Delete payment method?',
+            message:     'Delete "' + name + '"? This cannot be undone.',
+            confirmText: 'Delete',
+            onConfirm: function () {
+                const orig = btn.textContent;
+                btn.disabled = true;
+                btn.innerHTML = SPINNER + 'Deleting…';
+                fetch(`{{ path('platform_owner_payment_methods_delete', {domain: platform_domain, id: '__METHOD_ID__'}) }}`.replace('__METHOD_ID__', id), { method: 'POST' })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.ok) {
+                            document.getElementById(`method-row-${id}`)?.remove();
+                        } else {
+                            btn.disabled = false;
+                            btn.textContent = orig;
+                            platformAlert({ message: d.error ?? 'Could not delete.' });
+                        }
+                    })
+                    .catch(() => {
+                        btn.disabled = false;
+                        btn.textContent = orig;
+                        platformAlert({ message: 'Request failed. Please try again.' });
+                    });
+            },
+        });
+    };
+
+    document.getElementById('method-search').oninput = function () {
+        const q = this.value.toLowerCase();
+        document.querySelectorAll('#methods-table tbody tr').forEach(r => {
+            r.style.display = r.textContent.toLowerCase().includes(q) ? '' : 'none';
+        });
+    };
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') slideClose(); });
+}());
+</script>
+{% endblock %}

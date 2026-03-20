@@ -6,21 +6,23 @@ namespace App\Controller\Admin;
 
 use App\Services\Auth\AuthService;
 use App\Services\Permission\CheckPermissionService;
+use App\Services\Permission\PlatformCheckPermissionService;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-#[Route('/dashboard/admin/terminals')]
+#[Route('/dashboard/admin/terminals', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class TerminalController extends AdminBaseController
 {
     public function __construct(
         AuthService            $auth,
         CheckPermissionService $can,
+        PlatformCheckPermissionService $platformCan,
         private readonly Connection $db,
     ) {
-        parent::__construct($auth, $can);
+        parent::__construct($auth, $can, $platformCan);
     }
 
     // =========================================================================
@@ -36,9 +38,14 @@ class TerminalController extends AdminBaseController
         $terminals = $this->db->fetchAllAssociative(
             'SELECT pt.id, pt.terminal_identifier, pt.device_name,
                     pt.ip_address, pt.authorized_at, pt.expires_at, pt.revoked_at,
-                    u.name AS authorized_by
+                    COALESCE(u.name, pa.name, \'Platform Admin\') AS authorized_by
              FROM   pos_terminals pt
-             JOIN   users u ON u.id = pt.authorized_by_user_id
+             LEFT JOIN users u
+                    ON pt.authorized_by_user_id > 0
+                   AND u.id = pt.authorized_by_user_id
+             LEFT JOIN platform_admins pa
+                    ON pt.authorized_by_user_id < 0
+                   AND pa.id = ABS(pt.authorized_by_user_id)
              WHERE  pt.company_id = :company_id
              ORDER  BY pt.authorized_at DESC',
             ['company_id' => $session->company->id],
@@ -94,6 +101,9 @@ class TerminalController extends AdminBaseController
         if (!$terminal) return $this->error('Terminal not found.', 404);
 
         $expiresAt = (new \DateTimeImmutable())->modify('+30 days')->format('Y-m-d H:i:s');
+        $authorizedById = $session->user->isSuperAdmin
+            ? -1 * $session->user->id
+            : $session->user->id;
 
         $this->db->executeStatement(
             'UPDATE pos_terminals
@@ -104,7 +114,7 @@ class TerminalController extends AdminBaseController
              WHERE id = :id',
             [
                 'expires_at' => $expiresAt,
-                'user_id'    => $session->user->id,
+                'user_id'    => $authorizedById,
                 'id'         => $id,
             ],
         );

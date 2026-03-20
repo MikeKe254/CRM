@@ -1,4 +1,6 @@
 {% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
 {% block admin_title %}Users{% endblock %}
 {% block admin_subtitle %}Manage staff accounts and their roles{% endblock %}
 
@@ -169,7 +171,7 @@ function openCreateUser() { openDrawer('Add User', userFormHtml(), drawerFooter(
 function openEditUser(u)   { openDrawer('Edit User', userFormHtml(u), drawerFooter(`submitEditUser(${u.id})`)); }
 
 function submitCreateUser() {
-    adminFetch('{{ path('admin_users_create') }}', {
+    adminFetch('{{ path('admin_users_create', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', {
         name:                document.getElementById('f-name').value,
         email:               document.getElementById('f-email').value,
         password:            document.getElementById('f-password').value,
@@ -181,7 +183,9 @@ function submitCreateUser() {
 }
 
 function submitEditUser(id) {
-    adminFetch(`/dashboard/admin/users/${id}/edit`, {
+    // 2026-03-19: Generate the edit URL from Symfony so user updates follow the
+    // current tenant route host and do not depend on hardcoded admin paths.
+    adminFetch(`{{ path('admin_users_edit', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__USER_ID__'}) }}`.replace('__USER_ID__', id), {
         name:                document.getElementById('f-name').value,
         email:               document.getElementById('f-email').value,
         password:            document.getElementById('f-password').value,
@@ -193,8 +197,10 @@ function submitEditUser(id) {
 }
 
 function deleteUser(id, name) {
+    // 2026-03-19: Generate the delete URL from Symfony so tenant user actions
+    // remain correct across dynamic domains.
     adminDelete(
-        `/dashboard/admin/users/${id}/delete`,
+        `{{ path('admin_users_delete', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__USER_ID__'}) }}`.replace('__USER_ID__', id),
         `Delete "${name}"? This cannot be undone.`,
         () => document.getElementById(`user-row-${id}`)?.remove()
     );
@@ -202,7 +208,9 @@ function deleteUser(id, name) {
 
 function toggleUserAccess(id, type, enabled) {
     const field = type === 'dashboard' ? 'can_dashboard_login' : 'can_pos_login';
-    fetch(`/dashboard/admin/users/${id}/edit`, {
+    // 2026-03-19: Use the generated edit endpoint so access toggles stay aligned
+    // with the tenant route definition.
+    fetch(`{{ path('admin_users_edit', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__USER_ID__'}) }}`.replace('__USER_ID__', id), {
         method:  'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body:    new URLSearchParams({ [field]: enabled ? 1 : 0 }).toString(),

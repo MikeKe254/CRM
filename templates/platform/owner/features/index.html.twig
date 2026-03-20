@@ -1,0 +1,47 @@
+{% extends 'platform/layout.html.twig' %}
+
+{% block title %}Features · Owner · Angavu{% endblock %}
+{% block platform_title %}Features{% endblock %}
+{% block platform_subtitle %}Tenant plan feature switches{% endblock %}
+
+{% block platform_content %}
+
+<div class="overflow-hidden rounded-xl border border-gray-200 bg-white">
+    <div class="flex items-center justify-between border-b border-gray-100 px-5 py-3">
+        <span class="text-sm font-semibold text-gray-900">Features</span>
+        <span class="rounded bg-amber-50 px-2 py-0.5 text-xs font-semibold text-amber-700">Not implemented</span>
+    </div>
+
+    <div class="px-5 py-12 text-center">
+        <svg class="mx-auto mb-4 text-gray-200" width="40" height="40" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M2 6l10.5-1L22 6M2 12l10.5-1L22 12M2 18l10.5-1L22 18"/></svg>
+        <p class="text-sm font-medium text-gray-700">No storage table yet</p>
+        <p class="mt-1 text-sm text-gray-400">
+            Create a <code class="rounded bg-gray-100 px-1.5 py-0.5 font-mono text-xs text-gray-700">features</code> table first, then this page will be wired up.
+        </p>
+    </div>
+
+    <div class="border-t border-gray-100">
+        <div class="border-b border-gray-100 px-5 py-2.5">
+            <span class="text-xs font-semibold uppercase tracking-wide text-gray-400">Planned schema</span>
+        </div>
+        {% set cols = [
+            { col: 'id',          type: 'int unsigned',  note: 'auto_increment · pk' },
+            { col: 'name',        type: 'varchar(120)',  note: 'display name' },
+            { col: 'feature_key', type: 'varchar(80)',   note: 'unique slug' },
+            { col: 'description', type: 'text',          note: 'optional' },
+            { col: 'is_active',   type: 'tinyint(1)',    note: 'global on/off toggle' },
+            { col: 'created_at',  type: 'datetime',      note: 'default current_timestamp()' },
+        ] %}
+        <div class="divide-y divide-gray-50">
+            {% for c in cols %}
+                <div class="flex items-center gap-4 px-5 py-3 hover:bg-gray-50">
+                    <span class="w-28 shrink-0 font-mono text-sm font-medium text-gray-800">{{ c.col }}</span>
+                    <span class="font-mono text-sm text-indigo-600">{{ c.type }}</span>
+                    <span class="ml-auto text-xs text-gray-400">{{ c.note }}</span>
+                </div>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+
+{% endblock %}

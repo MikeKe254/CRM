@@ -1,14 +1,30 @@
 {% extends 'base.html.twig' %}
 
 {% block body %}
+{% set is_platform_shell = session is defined
+    and session.user is defined
+    and session.user.isSuperAdmin
+    and (isAdminHost() or session.company.subdomain|default('') == '__platform__')
+%}
 
 <div style="display: flex; min-height: 100vh;">
 
-    {% include 'components/sidebar.html.twig' %}
+    {% if is_platform_shell %}
+        {% include 'platform/partials/sidebar.html.twig' %}
+    {% else %}
+        {% include 'components/sidebar.html.twig' %}
+    {% endif %}
 
     <div id="main-content" style="flex: 1; min-width: 0; transition: margin-left 0.2s ease;">
 
-        {% include 'components/navbar.html.twig' %}
+        {% if is_platform_shell %}
+            {% include 'platform/partials/navbar.html.twig' with {
+                platform_title: 'Platform',
+                platform_subtitle: 'Cross-company operations and governance'
+            } %}
+        {% else %}
+            {% include 'components/navbar.html.twig' %}
+        {% endif %}
 
         <main class="p-6">
             {% block content %}{% endblock %}

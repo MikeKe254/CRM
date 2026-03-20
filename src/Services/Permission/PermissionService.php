@@ -34,7 +34,10 @@ use Doctrine\DBAL\Connection;
  */
 final class PermissionService
 {
-    public function __construct(private readonly Connection $db) {}
+    public function __construct(
+        private readonly Connection $db,
+        private readonly PlatformCheckPermissionService $platformCan,
+    ) {}
 
     // =========================================================================
     // LIST
@@ -157,7 +160,7 @@ final class PermissionService
         }
 
         // ── System role guard ─────────────────────────────────────────────────
-        if ($this->isSystemRole($role) && !$actor->user->isSuperAdmin) {
+        if ($this->isSystemRole($role) && !$this->platformCan->isPlatformAdminSession($actor)) {
             return PermissionResult::fail(
                 "System role '{$role['name']}' cannot be modified by tenant users.",
                 403,
@@ -172,7 +175,10 @@ final class PermissionService
 
         // ── Ownership check — cannot assign a permission you don't have ───────
         // Super admins bypass this; regular users can only delegate what they own.
-        if (!$actor->user->isSuperAdmin && !$this->actorHasPermission($actor, $permissionId, $companyId)) {
+        if (
+            !$this->platformCan->isPlatformAdminSession($actor)
+            && !$this->actorHasPermission($actor, $permissionId, $companyId)
+        ) {
             return PermissionResult::fail(
                 "You cannot assign the '{$permission['name']}' permission because you don't have it yourself.",
                 403,
@@ -266,7 +272,7 @@ final class PermissionService
             return PermissionResult::fail('Role not found in this company.', 404);
         }
 
-        if ($this->isSystemRole($role) && !$actor->user->isSuperAdmin) {
+        if ($this->isSystemRole($role) && !$this->platformCan->isPlatformAdminSession($actor)) {
             return PermissionResult::fail(
                 "System role '{$role['name']}' cannot be modified by tenant users.",
                 403,
@@ -290,11 +296,30 @@ final class PermissionService
         }
 
         // ── Ownership check — cannot revoke a permission you don't have ───────
-        if (!$actor->user->isSuperAdmin && !$this->actorHasPermission($actor, $permissionId, $companyId)) {
+        if (
+            !$this->platformCan->isPlatformAdminSession($actor)
+            && !$this->actorHasPermission($actor, $permissionId, $companyId)
+        ) {
             return PermissionResult::fail(
                 "You cannot revoke the '{$rolePermission['permission_name']}' permission because you don't have it yourself.",
                 403,
             );
+        }
+
+        // ── Own-role unassignment guard ───────────────────────────────────────
+        // You cannot remove a permission from a role you are a member of —
+        // you would lose it and cannot reassign it to yourself (self-role-assignment is blocked).
+        if (!$this->platformCan->isPlatformAdminSession($actor)) {
+            $actorInRole = (bool) $this->db->fetchOne(
+                'SELECT 1 FROM user_roles WHERE user_id = :user_id AND role_id = :role_id LIMIT 1',
+                ['user_id' => $actor->user->id, 'role_id' => $roleId],
+            );
+            if ($actorInRole) {
+                return PermissionResult::fail(
+                    'You cannot remove a permission from a role you are a member of.',
+                    403,
+                );
+            }
         }
 
         $rolePermissionId = (int) $rolePermission['id'];
@@ -345,11 +370,25 @@ final class PermissionService
             return PermissionResult::fail('Role not found in this company.', 404);
         }
 
-        if ($this->isSystemRole($role) && !$actor->user->isSuperAdmin) {
+        if ($this->isSystemRole($role) && !$this->platformCan->isPlatformAdminSession($actor)) {
             return PermissionResult::fail(
                 "System role '{$role['name']}' cannot be modified by tenant users.",
                 403,
             );
+        }
+
+        // Own-role unassignment guard: cannot wipe permissions from a role you are in
+        if (!$this->platformCan->isPlatformAdminSession($actor)) {
+            $actorInRole = (bool) $this->db->fetchOne(
+                'SELECT 1 FROM user_roles WHERE user_id = :user_id AND role_id = :role_id LIMIT 1',
+                ['user_id' => $actor->user->id, 'role_id' => $roleId],
+            );
+            if ($actorInRole) {
+                return PermissionResult::fail(
+                    'You cannot remove permissions from a role you are a member of.',
+                    403,
+                );
+            }
         }
 
         // Delete all constraints for this role's permissions first
@@ -421,7 +460,10 @@ final class PermissionService
             return PermissionResult::fail('Role permission not found in this company.', 404);
         }
 
-        if ((bool) $rolePermission['is_system_role'] && !$actor->user->isSuperAdmin) {
+        if (
+            (bool) $rolePermission['is_system_role']
+            && !$this->platformCan->isPlatformAdminSession($actor)
+        ) {
             return PermissionResult::fail(
                 "Cannot set constraints on system role '{$rolePermission['role_name']}'.",
                 403,
@@ -584,8 +626,13 @@ final class PermissionService
      */
     private function assertCanManage(AuthResult $actor, int $companyId): PermissionResult
     {
-        if ($actor->user->isSuperAdmin) {
-            return PermissionResult::ok();
+        if ($this->platformCan->isPlatformAdminSession($actor)) {
+            return $this->platformCan->check($actor, 'assign_permissions')
+                ? PermissionResult::ok()
+                : PermissionResult::fail(
+                    'You do not have permission to manage role permissions.',
+                    403,
+                );
         }
 
         $hasPermission = $this->db->fetchOne(

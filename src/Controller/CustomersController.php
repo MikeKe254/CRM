@@ -8,7 +8,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 final class CustomersController extends AbstractController
 {
-    #[Route('/customers', name: 'app_customers')]
+    #[Route('/customers', name: 'app_customers', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
     public function index(): Response
     {
         return $this->render('customers/index.html.twig', [

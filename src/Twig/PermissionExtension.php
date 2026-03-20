@@ -7,6 +7,7 @@ namespace App\Twig;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\Exception\AuthException;
 use App\Services\Permission\CheckPermissionService;
+use App\Services\Permission\PlatformCheckPermissionService;
 use Symfony\Component\HttpFoundation\RequestStack;
 use Twig\Extension\AbstractExtension;
 use Twig\Extension\GlobalsInterface;
@@ -30,6 +31,7 @@ final class PermissionExtension extends AbstractExtension implements GlobalsInte
     public function __construct(
         private readonly AuthService            $auth,
         private readonly CheckPermissionService $can,
+        private readonly PlatformCheckPermissionService $platformCan,
         private readonly RequestStack           $requestStack,
     ) {}
 
@@ -63,7 +65,7 @@ final class PermissionExtension extends AbstractExtension implements GlobalsInte
             return false;
         }
 
-        return $session->user->isSuperAdmin;
+        return $this->platformCan->isPlatformAdminSession($session);
     }
 
     // ── Resolve once per request ──────────────────────────────────────────────

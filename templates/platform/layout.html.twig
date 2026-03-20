@@ -1,0 +1,36 @@
+{% extends 'base.html.twig' %}
+
+{% block body %}
+<div class="flex min-h-screen bg-slate-50">
+    {% include 'platform/partials/sidebar.html.twig' %}
+
+    <div id="main-content" class="flex-1 min-w-0" style="transition:margin-left 0.22s cubic-bezier(0.4,0,0.2,1);">
+        {% include 'platform/partials/navbar.html.twig' with {
+            platform_title: block('platform_title'),
+            platform_subtitle: block('platform_subtitle')
+        } %}
+
+        <main class="p-4 sm:p-6 lg:p-7">
+            {% for message in app.flashes('success') %}
+                <div class="mb-4 flex items-center gap-2.5 rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+                    {{ ux_icon('lucide:check-circle-2', {width: 15, height: 15, class: 'flex-shrink-0'}) }}
+                    {{ message }}
+                </div>
+            {% endfor %}
+            {% for message in app.flashes('error') %}
+                <div class="mb-4 flex items-center gap-2.5 rounded-xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
+                    {{ ux_icon('lucide:alert-circle', {width: 15, height: 15, class: 'flex-shrink-0'}) }}
+                    {{ message }}
+                </div>
+            {% endfor %}
+
+            {% block platform_content %}{% endblock %}
+        </main>
+    </div>
+</div>
+
+{% include 'platform/partials/modal.html.twig' %}
+{% endblock %}
+
+{% block platform_title %}Platform{% endblock %}
+{% block platform_subtitle %}Cross-company operations and governance{% endblock %}

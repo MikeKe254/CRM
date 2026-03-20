@@ -1,0 +1,405 @@
+{% extends 'platform/layout.html.twig' %}
+
+{% block title %}Modules & Features · Platform · Angavu{% endblock %}
+{% block platform_title %}Modules & Features{% endblock %}
+{% block platform_subtitle %}Manage the full module → submodule → feature hierarchy{% endblock %}
+
+{% block platform_content %}
+
+{# ── HEADER ───────────────────────────────────────────────────── #}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-5">
+    <div>
+        <h1 class="text-lg font-extrabold text-slate-900 tracking-tight">
+            {{ modules|length }}
+            <span class="font-normal text-slate-500">module{{ modules|length != 1 ? 's' : '' }}</span>
+        </h1>
+        <p class="text-xs text-slate-400 mt-0.5">Changes here affect all plan feature matrices immediately</p>
+    </div>
+    <button onclick="openModuleDrawer()"
+            class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors">
+        {{ ux_icon('lucide:plus', {width:13,height:13}) }} Add Module
+    </button>
+</div>
+
+{# ── MODULE TREE ──────────────────────────────────────────────── #}
+{% for module in modules %}
+<div class="mb-3 bg-white border border-slate-200 rounded-2xl overflow-hidden" id="module-{{ module.id }}">
+
+    {# Module row #}
+    <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 flex-shrink-0">
+            {% if module.icon %}
+                {{ ux_icon(module.icon, {width:14,height:14,class:'text-indigo-500'}) }}
+            {% else %}
+                {{ ux_icon('lucide:box', {width:14,height:14,class:'text-indigo-500'}) }}
+            {% endif %}
+        </div>
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2">
+                <span class="text-sm font-bold text-slate-800">{{ module.name }}</span>
+                <span class="font-mono text-[10px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{{ module.slug }}</span>
+            </div>
+            {% if module.description %}
+            <div class="text-[10.5px] text-slate-400 mt-0.5 truncate">{{ module.description }}</div>
+            {% endif %}
+        </div>
+        <div class="flex items-center gap-1.5 flex-shrink-0">
+            <span class="text-[10px] text-slate-400 hidden sm:inline">
+                {{ module.submodules|length }} submodule{{ module.submodules|length != 1 ? 's' : '' }}
+            </span>
+            <button onclick="openSubmoduleDrawer({{ module.id }}, '{{ module.name|e('js') }}')"
+                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10.5px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
+                    title="Add submodule">
+                {{ ux_icon('lucide:plus', {width:10,height:10}) }} Submodule
+            </button>
+            <button onclick="openEditModuleDrawer({{ module|json_encode|e('html_attr') }})"
+                    class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10.5px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                {{ ux_icon('lucide:pencil', {width:10,height:10}) }}
+            </button>
+            <button onclick="deleteItem('module', {{ module.id }}, '{{ module.name|e('js') }}')"
+                    class="inline-flex items-center gap-1 rounded-lg border border-red-100 bg-red-50 px-2.5 py-1 text-[10.5px] font-medium text-red-500 hover:bg-red-100 transition-colors">
+                {{ ux_icon('lucide:trash-2', {width:10,height:10}) }}
+            </button>
+        </div>
+    </div>
+
+    {# Submodules #}
+    {% if module.submodules is empty %}
+    <div class="px-5 py-4 text-xs text-slate-300 italic">No submodules yet</div>
+    {% else %}
+    <div class="divide-y divide-slate-50">
+        {% for submodule in module.submodules %}
+        <div id="submodule-{{ submodule.id }}">
+            {# Submodule row #}
+            <div class="flex items-center gap-3 px-5 py-3 pl-12 border-b border-slate-50">
+                <div class="flex h-6 w-6 items-center justify-center rounded bg-slate-100 flex-shrink-0">
+                    {{ ux_icon('lucide:layers', {width:10,height:10,class:'text-slate-400'}) }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-center gap-2">
+                        <span class="text-xs font-semibold text-slate-700">{{ submodule.name }}</span>
+                        <span class="font-mono text-[9.5px] text-slate-400 bg-slate-100 rounded px-1.5 py-0.5">{{ submodule.slug }}</span>
+                    </div>
+                </div>
+                <div class="flex items-center gap-1.5 flex-shrink-0">
+                    <span class="text-[10px] text-slate-400 hidden sm:inline">
+                        {{ submodule.features|length }} feature{{ submodule.features|length != 1 ? 's' : '' }}
+                    </span>
+                    <button onclick="openFeatureDrawer({{ submodule.id }}, '{{ submodule.name|e('js') }}')"
+                            class="inline-flex items-center gap-1 rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                        {{ ux_icon('lucide:plus', {width:9,height:9}) }} Feature
+                    </button>
+                    <button onclick="openEditSubmoduleDrawer({{ submodule|json_encode|e('html_attr') }})"
+                            class="inline-flex items-center rounded border border-slate-200 bg-white px-2 py-0.5 text-[10px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                        {{ ux_icon('lucide:pencil', {width:9,height:9}) }}
+                    </button>
+                    <button onclick="deleteItem('submodule', {{ submodule.id }}, '{{ submodule.name|e('js') }}')"
+                            class="inline-flex items-center rounded border border-red-100 bg-red-50 px-2 py-0.5 text-[10px] font-medium text-red-400 hover:bg-red-100 transition-colors">
+                        {{ ux_icon('lucide:trash-2', {width:9,height:9}) }}
+                    </button>
+                </div>
+            </div>
+
+            {# Features #}
+            {% if submodule.features is not empty %}
+            <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 px-5 py-3 pl-20 bg-slate-50/30">
+                {% for feature in submodule.features %}
+                <div id="feature-{{ feature.id }}"
+                     class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
+                    <div class="min-w-0">
+                        <div class="text-xs font-medium text-slate-700 truncate">{{ feature.name }}</div>
+                        <div class="font-mono text-[9.5px] text-slate-400">{{ feature.slug }}</div>
+                    </div>
+                    <div class="flex gap-1 flex-shrink-0">
+                        <button onclick="openEditFeatureDrawer({{ feature|json_encode|e('html_attr') }})"
+                                class="text-slate-400 hover:text-indigo-500 transition-colors p-0.5">
+                            {{ ux_icon('lucide:pencil', {width:10,height:10}) }}
+                        </button>
+                        <button onclick="deleteItem('feature', {{ feature.id }}, '{{ feature.name|e('js') }}')"
+                                class="text-slate-300 hover:text-red-400 transition-colors p-0.5">
+                            {{ ux_icon('lucide:trash-2', {width:10,height:10}) }}
+                        </button>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>
+{% else %}
+<div class="rounded-2xl border border-dashed border-slate-200 bg-white py-16 text-center text-sm text-slate-400">
+    No modules yet. Add your first module to get started.
+</div>
+{% endfor %}
+
+
+{# ═══════════════════════════════════════════════════════════════ #}
+{# SHARED DRAWER                                                    #}
+{# ═══════════════════════════════════════════════════════════════ #}
+<div id="drawer-backdrop"
+     onclick="closeModuleDrawer()"
+     style="display:none;position:fixed;inset:0;background:rgba(15,15,30,0.35);z-index:40;backdrop-filter:blur(2px);"></div>
+
+<div id="drawer"
+     style="position:fixed;top:0;right:0;height:100vh;width:400px;max-width:100vw;background:#fff;z-index:50;
+            box-shadow:-8px 0 40px rgba(0,0,0,0.12);transform:translateX(100%);transition:transform 0.25s ease;
+            display:flex;flex-direction:column;overflow:hidden;">
+
+    <div style="padding:18px 20px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div>
+            <div id="drawer-title" style="font-size:14px;font-weight:700;color:#0f172a;"></div>
+            <div id="drawer-subtitle" style="font-size:11px;color:#94a3b8;margin-top:2px;"></div>
+        </div>
+        <button onclick="closeModuleDrawer()" style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px;border-radius:6px;"
+                onmouseover="this.style.color='#475569'" onmouseout="this.style.color='#94a3b8'">
+            {{ ux_icon('lucide:x', {width:16,height:16}) }}
+        </button>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:20px;">
+        <form id="drawer-form" method="POST">
+            {# Name #}
+            <div style="margin-bottom:14px;">
+                <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:5px;">Name <span style="color:#ef4444">*</span></label>
+                <input name="name" id="f-name" type="text" required placeholder="e.g. Customer CRM"
+                       style="width:100%;height:38px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:13px;outline:none;transition:border-color 0.15s;"
+                       onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+
+            {# Slug (hidden on edit) #}
+            <div id="slug-field" style="margin-bottom:14px;">
+                <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:5px;">Slug <span style="color:#ef4444">*</span></label>
+                <input name="slug" id="f-slug" type="text" required placeholder="e.g. customer_crm"
+                       style="width:100%;height:38px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:13px;font-family:monospace;outline:none;transition:border-color 0.15s;"
+                       onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+                <div style="font-size:10px;color:#94a3b8;margin-top:3px;">Cannot be changed after creation.</div>
+            </div>
+
+            {# Icon (module only) #}
+            <div id="icon-field" style="margin-bottom:14px;">
+                <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:5px;">Lucide Icon</label>
+                <input name="icon" id="f-icon" type="text" placeholder="e.g. lucide:users"
+                       style="width:100%;height:38px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:13px;font-family:monospace;outline:none;transition:border-color 0.15s;"
+                       onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+
+            {# Description #}
+            <div style="margin-bottom:14px;">
+                <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:5px;">Description</label>
+                <input name="description" id="f-desc" type="text" placeholder="Short description"
+                       style="width:100%;height:38px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:13px;outline:none;transition:border-color 0.15s;"
+                       onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+
+            {# Sort order #}
+            <div>
+                <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:5px;">Sort Order</label>
+                <input name="sort_order" id="f-order" type="number" min="0" placeholder="0"
+                       style="width:100%;height:38px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:13px;outline:none;transition:border-color 0.15s;"
+                       onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">
+            </div>
+        </form>
+    </div>
+
+    <div id="drawer-error" style="display:none;margin:0 20px 0;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#dc2626;"></div>
+
+    <div style="padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;gap:10px;flex-shrink:0;">
+        <button onclick="submitDrawer()" id="drawer-submit"
+                style="flex:1;height:38px;background:#4f46e5;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">Save</button>
+        <button onclick="closeModuleDrawer()"
+                style="height:38px;padding:0 16px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;font-size:13px;font-weight:500;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">Cancel</button>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block javascripts %}{{ parent() }}
+<script>
+(function () {
+    const DOMAIN = '{{ app.request.attributes.get('domain') }}';
+    let currentAction = null;
+    let currentType   = null;
+    let currentId     = null;
+
+    function slideOpen() {
+        document.getElementById('drawer').style.transform = 'translateX(0)';
+        document.getElementById('drawer-backdrop').style.display = 'block';
+        hideError();
+    }
+    function slideClose() {
+        document.getElementById('drawer').style.transform = 'translateX(100%)';
+        document.getElementById('drawer-backdrop').style.display = 'none';
+    }
+    function hideError() {
+        const el = document.getElementById('drawer-error');
+        el.style.display = 'none';
+        el.textContent = '';
+    }
+    function showError(msg) {
+        const el = document.getElementById('drawer-error');
+        el.textContent = msg;
+        el.style.display = 'block';
+    }
+    function reset(title, subtitle, showSlug, showIcon) {
+        document.getElementById('drawer-title').textContent    = title;
+        document.getElementById('drawer-subtitle').textContent = subtitle;
+        document.getElementById('slug-field').style.display    = showSlug ? 'block' : 'none';
+        document.getElementById('icon-field').style.display    = showIcon ? 'block' : 'none';
+        document.getElementById('f-name').value  = '';
+        document.getElementById('f-slug').value  = '';
+        document.getElementById('f-icon').value  = '';
+        document.getElementById('f-desc').value  = '';
+        document.getElementById('f-order').value = '0';
+        document.getElementById('drawer-submit').textContent = 'Save';
+        document.getElementById('drawer-submit').disabled    = false;
+    }
+
+    // ── MODULE ───────────────────────────────────────────────────
+    window.openModuleDrawer = function () {
+        currentType   = 'module';
+        currentAction = 'create';
+        currentId     = null;
+        reset('Add Module', 'Add a new top-level module', true, true);
+        slideOpen();
+    };
+    window.openEditModuleDrawer = function (m) {
+        currentType   = 'module';
+        currentAction = 'edit';
+        currentId     = m.id;
+        reset('Edit Module', m.name, false, true);
+        document.getElementById('f-name').value  = m.name        || '';
+        document.getElementById('f-icon').value  = m.icon        || '';
+        document.getElementById('f-desc').value  = m.description || '';
+        document.getElementById('f-order').value = m.sort_order  || 0;
+        document.getElementById('drawer-submit').textContent = 'Save Changes';
+        slideOpen();
+    };
+
+    // ── SUBMODULE ────────────────────────────────────────────────
+    window.openSubmoduleDrawer = function (moduleId, moduleName) {
+        currentType   = 'submodule';
+        currentAction = 'create';
+        currentId     = moduleId;
+        reset('Add Submodule', 'Inside ' + moduleName, true, false);
+        slideOpen();
+    };
+    window.openEditSubmoduleDrawer = function (sm) {
+        currentType   = 'submodule';
+        currentAction = 'edit';
+        currentId     = sm.id;
+        reset('Edit Submodule', sm.name, false, false);
+        document.getElementById('f-name').value  = sm.name        || '';
+        document.getElementById('f-desc').value  = sm.description || '';
+        document.getElementById('f-order').value = sm.sort_order  || 0;
+        document.getElementById('drawer-submit').textContent = 'Save Changes';
+        slideOpen();
+    };
+
+    // ── FEATURE ──────────────────────────────────────────────────
+    window.openFeatureDrawer = function (submoduleId, submoduleName) {
+        currentType   = 'feature';
+        currentAction = 'create';
+        currentId     = submoduleId;
+        reset('Add Feature', 'Inside ' + submoduleName, true, false);
+        slideOpen();
+    };
+    window.openEditFeatureDrawer = function (f) {
+        currentType   = 'feature';
+        currentAction = 'edit';
+        currentId     = f.id;
+        reset('Edit Feature', f.name, false, false);
+        document.getElementById('f-name').value  = f.name        || '';
+        document.getElementById('f-desc').value  = f.description || '';
+        document.getElementById('f-order').value = f.sort_order  || 0;
+        document.getElementById('drawer-submit').textContent = 'Save Changes';
+        slideOpen();
+    };
+
+    window.closeModuleDrawer = function () { slideClose(); };
+
+    // ── SUBMIT ───────────────────────────────────────────────────
+    window.submitDrawer = function () {
+        hideError();
+        const btn = document.getElementById('drawer-submit');
+        btn.disabled    = true;
+        btn.textContent = 'Saving…';
+
+        const name  = document.getElementById('f-name').value.trim();
+        const slug  = document.getElementById('f-slug').value.trim();
+        const icon  = document.getElementById('f-icon').value.trim();
+        const desc  = document.getElementById('f-desc').value.trim();
+        const order = document.getElementById('f-order').value;
+
+        const body = new URLSearchParams({ name, slug, icon, description: desc, sort_order: order });
+
+        let url;
+        if (currentType === 'module') {
+            url = currentAction === 'create'
+                ? '/platform/modules/create'
+                : '/platform/modules/' + currentId + '/edit';
+        } else if (currentType === 'submodule') {
+            url = currentAction === 'create'
+                ? '/platform/modules/' + currentId + '/submodules/create'
+                : '/platform/modules/submodules/' + currentId + '/edit';
+        } else {
+            url = currentAction === 'create'
+                ? '/platform/modules/submodules/' + currentId + '/features/create'
+                : '/platform/modules/features/' + currentId + '/edit';
+        }
+
+        fetch(url, { method: 'POST', body, headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+            .then(r => r.json())
+            .then(d => {
+                if (d.ok) {
+                    slideClose();
+                    Turbo.visit(window.location.href, { action: 'replace' });
+                } else {
+                    showError(d.error || 'An error occurred.');
+                    btn.disabled    = false;
+                    btn.textContent = 'Save';
+                }
+            })
+            .catch(() => {
+                showError('Request failed. Please try again.');
+                btn.disabled    = false;
+                btn.textContent = 'Save';
+            });
+    };
+
+    // ── DELETE ───────────────────────────────────────────────────
+    window.deleteItem = function (type, id, name) {
+        platformConfirm({
+            title:       'Delete ' + type + '?',
+            message:     'Delete "' + name + '"? All nested items will also be deleted.',
+            confirmText: 'Delete',
+            onConfirm: function () {
+                const urls = {
+                    module:    '/platform/modules/' + id + '/delete',
+                    submodule: '/platform/modules/submodules/' + id + '/delete',
+                    feature:   '/platform/modules/features/' + id + '/delete',
+                };
+                fetch(urls[type], { method: 'POST' })
+                    .then(r => r.json())
+                    .then(d => {
+                        if (d.ok) {
+                            const el = document.getElementById(type + '-' + id);
+                            if (el) el.remove();
+                        } else {
+                            platformAlert({ message: d.error || 'Could not delete.' });
+                        }
+                    })
+                    .catch(() => platformAlert({ message: 'Request failed. Please try again.' }));
+            },
+        });
+    };
+
+    document.addEventListener('keydown', e => { if (e.key === 'Escape') slideClose(); });
+}());
+</script>
+{% endblock %}

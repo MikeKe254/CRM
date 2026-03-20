@@ -1,0 +1,717 @@
+{% extends 'platform/layout.html.twig' %}
+
+{% block title %}Access Control · Platform · Angavu{% endblock %}
+{% block platform_title %}Access Control{% endblock %}
+{% block platform_subtitle %}Manage platform users, roles and permissions{% endblock %}
+
+{% block platform_content %}
+
+{# ── TAB BAR ──────────────────────────────────────────────────────────────── #}
+<div class="flex gap-1 mb-5 border-b border-slate-200 -mt-1">
+    {% if canViewUsers %}
+    <button id="tab-btn-users"
+            onclick="switchTab('users')"
+            class="tab-btn px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors">
+        {{ ux_icon('lucide:users', {width:13,height:13,class:'inline mr-1.5'}) }}Users
+        <span class="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">{{ users|length }}</span>
+    </button>
+    {% endif %}
+    {% if canViewRoles %}
+    <button id="tab-btn-roles"
+            onclick="switchTab('roles')"
+            class="tab-btn px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors">
+        {{ ux_icon('lucide:shield', {width:13,height:13,class:'inline mr-1.5'}) }}Roles
+        <span class="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">{{ roles|length }}</span>
+    </button>
+    {% endif %}
+    {% if canViewPermissions %}
+    <button id="tab-btn-permissions"
+            onclick="switchTab('permissions')"
+            class="tab-btn px-4 py-2.5 text-xs font-semibold border-b-2 -mb-px transition-colors">
+        {{ ux_icon('lucide:key', {width:13,height:13,class:'inline mr-1.5'}) }}Permissions
+        <span class="ml-1.5 rounded-full bg-slate-100 px-1.5 py-0.5 text-[9px] font-bold text-slate-500">{{ permissionsByCategory|length }}</span>
+    </button>
+    {% endif %}
+</div>
+
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# TAB: USERS                                                                  #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{% if canViewUsers %}
+<div id="tab-users" class="tab-panel">
+
+    <div class="flex items-center justify-between mb-4">
+        <p class="text-xs text-slate-400">Platform admin accounts and their assigned roles</p>
+        {% if canCreateUsers %}
+        <button onclick="openUserDrawer()"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors">
+            {{ ux_icon('lucide:plus', {width:13,height:13}) }} Add User
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 text-left">
+                        <th class="px-5 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">User</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 hidden sm:table-cell">Roles</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Status</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 hidden md:table-cell">Created</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                {% for u in users %}
+                <tr id="user-row-{{ u.id }}" class="hover:bg-slate-50/50 transition-colors">
+                    <td class="px-5 py-3.5">
+                        <div class="flex items-center gap-3">
+                            <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
+                                 style="background:linear-gradient(135deg,#4f46e5,#7c3aed);">
+                                {{ u.name|first|upper }}
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-1.5">
+                                    <span class="text-sm font-semibold text-slate-800">{{ u.name }}</span>
+                                    {% if u.is_platform_owner %}
+                                    <span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Owner</span>
+                                    {% endif %}
+                                    {% if u.is_system_account %}
+                                    <span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500">System</span>
+                                    {% endif %}
+                                    {% if u.id == session.user.id %}
+                                    <span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-indigo-50 text-indigo-500">You</span>
+                                    {% endif %}
+                                </div>
+                                <div class="text-xs text-slate-400">{{ u.email }}</div>
+                            </div>
+                        </div>
+                    </td>
+                    <td class="px-4 py-3.5 hidden sm:table-cell">
+                        {% if u.role_names %}
+                            {% for rname in u.role_names|split(', ') %}
+                            <span class="inline-block mr-1 mb-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-medium text-indigo-600">{{ rname }}</span>
+                            {% endfor %}
+                        {% else %}
+                            <span class="text-xs text-slate-300 italic">No roles</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3.5">
+                        {% if u.status == 'active' %}
+                        <span class="rounded-full bg-emerald-50 px-2.5 py-1 text-[10px] font-semibold text-emerald-600">Active</span>
+                        {% elseif u.status == 'suspended' %}
+                        <span class="rounded-full bg-red-50 px-2.5 py-1 text-[10px] font-semibold text-red-500">Suspended</span>
+                        {% else %}
+                        <span class="rounded-full bg-slate-100 px-2.5 py-1 text-[10px] font-semibold text-slate-500">Inactive</span>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3.5 hidden md:table-cell text-xs text-slate-400">
+                        {{ u.created_at|date('M j, Y') }}
+                    </td>
+                    <td class="px-4 py-3.5 text-right">
+                        <div class="inline-flex items-center gap-1">
+                            {% if canAssignRoles and (not u.is_platform_owner or isOwner) and u.id not in peerUserIds %}
+                            <button title="Assign Roles"
+                                    onclick="openUserRolesDrawer({{ u|json_encode|e('html_attr') }})"
+                                    class="inline-flex items-center rounded-lg border border-indigo-100 bg-indigo-50 px-2 py-1 text-[10px] font-medium text-indigo-500 hover:bg-indigo-100 transition-colors">
+                                {{ ux_icon('lucide:shield-check', {width:10,height:10}) }}
+                            </button>
+                            {% endif %}
+                            {% if canEditUsers and not u.is_system_account and (not u.is_platform_owner or isOwner) and u.id not in peerUserIds %}
+                            <button title="Edit"
+                                    onclick="openEditUserDrawer({{ u|json_encode|e('html_attr') }})"
+                                    class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                                {{ ux_icon('lucide:pencil', {width:10,height:10}) }}
+                            </button>
+                            {% endif %}
+                            {% if canDeleteUsers and not u.is_system_account and not u.is_platform_owner and u.id != session.user.id and u.id not in peerUserIds %}
+                            <button title="Delete"
+                                    onclick="deleteUser({{ u.id }}, '{{ u.name|e('js') }}')"
+                                    class="inline-flex items-center rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-medium text-red-500 hover:bg-red-100 transition-colors">
+                                {{ ux_icon('lucide:trash-2', {width:10,height:10}) }}
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-5 py-12 text-center text-sm text-slate-300 italic">No users yet.</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# TAB: ROLES                                                                  #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{% if canViewRoles %}
+<div id="tab-roles" class="tab-panel" style="display:none;">
+
+    <div class="flex items-center justify-between mb-4">
+        <p class="text-xs text-slate-400">Define groups of permissions that can be assigned to users</p>
+        {% if canCreateRoles %}
+        <button onclick="openRoleDrawer()"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors">
+            {{ ux_icon('lucide:plus', {width:13,height:13}) }} Add Role
+        </button>
+        {% endif %}
+    </div>
+
+    <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+        <div class="overflow-x-auto">
+            <table class="w-full">
+                <thead>
+                    <tr class="bg-slate-50 border-b border-slate-100 text-left">
+                        <th class="px-5 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400">Role</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 text-center">Permissions</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 text-center hidden sm:table-cell">Users</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 hidden md:table-cell">Created</th>
+                        <th class="px-4 py-3 text-[10.5px] font-bold uppercase tracking-wider text-slate-400 text-right">Actions</th>
+                    </tr>
+                </thead>
+                <tbody class="divide-y divide-slate-50">
+                {% for r in roles %}
+                <tr id="role-row-{{ r.id }}" class="hover:bg-slate-50/50 transition-colors">
+                    <td class="px-5 py-3.5">
+                        <div class="flex items-center gap-2">
+                            <span class="text-sm font-semibold text-slate-800">{{ r.name }}</span>
+                            {% if r.is_system_role %}
+                            <span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-slate-100 text-slate-500">System</span>
+                            {% endif %}
+                        </div>
+                        {% if r.description %}
+                        <div class="text-xs text-slate-400 mt-0.5">{{ r.description }}</div>
+                        {% endif %}
+                    </td>
+                    <td class="px-4 py-3.5 text-center">
+                        <span class="rounded-full bg-indigo-50 px-2.5 py-1 text-xs font-semibold text-indigo-600">{{ r.permission_count }}</span>
+                    </td>
+                    <td class="px-4 py-3.5 text-center hidden sm:table-cell">
+                        <span class="text-xs text-slate-500">{{ r.admin_count }}</span>
+                    </td>
+                    <td class="px-4 py-3.5 hidden md:table-cell text-xs text-slate-400">
+                        {{ r.created_at|date('M j, Y') }}
+                    </td>
+                    <td class="px-4 py-3.5 text-right">
+                        <div class="inline-flex items-center gap-1">
+                            {% if canAssignPermissions %}
+                            <button title="Manage Permissions"
+                                    onclick="openRolePermissionsDrawer({{ r|json_encode|e('html_attr') }})"
+                                    class="inline-flex items-center gap-1 rounded-lg border border-indigo-100 bg-indigo-50 px-2.5 py-1 text-[10px] font-medium text-indigo-500 hover:bg-indigo-100 transition-colors">
+                                {{ ux_icon('lucide:key', {width:10,height:10}) }} Permissions
+                            </button>
+                            {% endif %}
+                            {% if canEditRoles and not r.is_system_role %}
+                            <button title="Edit"
+                                    onclick="openEditRoleDrawer({{ r|json_encode|e('html_attr') }})"
+                                    class="inline-flex items-center rounded-lg border border-slate-200 bg-white px-2 py-1 text-[10px] font-medium text-slate-600 hover:bg-slate-50 transition-colors">
+                                {{ ux_icon('lucide:pencil', {width:10,height:10}) }}
+                            </button>
+                            {% endif %}
+                            {% if canDeleteRoles and not r.is_system_role %}
+                            <button title="Delete"
+                                    onclick="deleteRole({{ r.id }}, '{{ r.name|e('js') }}')"
+                                    class="inline-flex items-center rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-medium text-red-500 hover:bg-red-100 transition-colors">
+                                {{ ux_icon('lucide:trash-2', {width:10,height:10}) }}
+                            </button>
+                            {% endif %}
+                        </div>
+                    </td>
+                </tr>
+                {% else %}
+                <tr>
+                    <td colspan="5" class="px-5 py-12 text-center text-sm text-slate-300 italic">No roles yet.</td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# TAB: PERMISSIONS                                                            #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{% if canViewPermissions %}
+<div id="tab-permissions" class="tab-panel" style="display:none;">
+
+    <div class="flex items-center justify-between mb-4">
+        <p class="text-xs text-slate-400">All platform permission keys available for assignment to roles</p>
+        {% if canCreatePermissions %}
+        <button onclick="openPermissionDrawer()"
+                class="inline-flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-sm hover:bg-indigo-700 transition-colors">
+            {{ ux_icon('lucide:plus', {width:13,height:13}) }} Add Permission
+        </button>
+        {% endif %}
+    </div>
+
+    {% for category, perms in permissionsByCategory %}
+    <div class="mb-4">
+        <div class="mb-2 flex items-center gap-2">
+            <span class="text-[10.5px] font-bold uppercase tracking-wider text-slate-400">{{ category }}</span>
+            <span class="text-[9px] text-slate-300">{{ perms|length }}</span>
+        </div>
+        <div class="bg-white border border-slate-200 rounded-2xl shadow-sm overflow-hidden">
+            <table class="w-full">
+                <tbody class="divide-y divide-slate-50">
+                {% for p in perms %}
+                <tr id="perm-row-{{ p.id }}" class="hover:bg-slate-50/50 transition-colors">
+                    <td class="px-5 py-3">
+                        <div class="text-xs font-semibold text-slate-800">{{ p.name }}</div>
+                        <div class="font-mono text-[10px] text-indigo-400">{{ p.action_key }}</div>
+                    </td>
+                    <td class="px-4 py-3 hidden md:table-cell">
+                        <span class="text-xs text-slate-400">{{ p.description ?: '—' }}</span>
+                    </td>
+                    <td class="px-4 py-3 text-center hidden sm:table-cell">
+                        <span class="rounded-full bg-slate-100 px-2 py-0.5 text-[10px] font-semibold text-slate-500">
+                            {{ p.role_count }} role{{ p.role_count != 1 ? 's' : '' }}
+                        </span>
+                    </td>
+                    <td class="px-4 py-3 hidden lg:table-cell text-xs text-slate-400">{{ p.created_at|date('M j, Y') }}</td>
+                    <td class="px-4 py-3 text-right">
+                        {% if canDeletePermissions %}
+                        <button title="Delete"
+                                onclick="deletePermission({{ p.id }}, '{{ p.name|e('js') }}')"
+                                class="inline-flex items-center rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-medium text-red-500 hover:bg-red-100 transition-colors">
+                            {{ ux_icon('lucide:trash-2', {width:10,height:10}) }}
+                        </button>
+                        {% endif %}
+                    </td>
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    </div>
+    {% else %}
+    <div class="rounded-2xl border border-dashed border-slate-200 bg-white py-12 text-center text-sm text-slate-300">
+        No permissions yet.
+    </div>
+    {% endfor %}
+</div>
+{% endif %}
+
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# MAIN DRAWER — user CRUD / role CRUD / permission create / user role assign  #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div id="ac-backdrop"
+     onclick="closeAcDrawer()"
+     style="display:none;position:fixed;inset:0;background:rgba(15,15,30,0.35);z-index:40;backdrop-filter:blur(2px);"></div>
+
+<div id="ac-drawer"
+     style="position:fixed;top:0;right:0;height:100vh;width:420px;max-width:100vw;background:#fff;z-index:50;
+            box-shadow:-8px 0 40px rgba(0,0,0,0.12);transform:translateX(100%);transition:transform 0.25s ease;
+            display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div>
+            <div id="ac-drawer-title" style="font-size:14px;font-weight:700;color:#0f172a;"></div>
+            <div id="ac-drawer-subtitle" style="font-size:11px;color:#94a3b8;margin-top:2px;"></div>
+        </div>
+        <button onclick="closeAcDrawer()" style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px;border-radius:6px;"
+                onmouseover="this.style.color='#475569'" onmouseout="this.style.color='#94a3b8'">
+            {{ ux_icon('lucide:x', {width:16,height:16}) }}
+        </button>
+    </div>
+    <div id="ac-drawer-body" style="flex:1;overflow-y:auto;padding:20px;"></div>
+    <div id="ac-drawer-error" style="display:none;margin:0 20px 0;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#dc2626;"></div>
+    <div style="padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;gap:10px;flex-shrink:0;">
+        <button id="ac-drawer-submit" onclick="submitDrawer()"
+                style="flex:1;height:38px;background:#4f46e5;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">Save</button>
+        <button onclick="closeAcDrawer()"
+                style="height:38px;padding:0 16px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;font-size:13px;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">Cancel</button>
+    </div>
+</div>
+
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{# PERMISSIONS DRAWER — wider, for assigning permissions to a role             #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div id="perm-backdrop"
+     onclick="closeAcPermDrawer()"
+     style="display:none;position:fixed;inset:0;background:rgba(15,15,30,0.35);z-index:40;backdrop-filter:blur(2px);"></div>
+
+<div id="perm-drawer"
+     style="position:fixed;top:0;right:0;height:100vh;width:560px;max-width:100vw;background:#fff;z-index:51;
+            box-shadow:-8px 0 40px rgba(0,0,0,0.14);transform:translateX(100%);transition:transform 0.25s ease;
+            display:flex;flex-direction:column;overflow:hidden;">
+    <div style="padding:18px 20px 14px;border-bottom:1px solid #f1f5f9;display:flex;align-items:center;justify-content:space-between;flex-shrink:0;">
+        <div>
+            <div id="perm-drawer-title" style="font-size:14px;font-weight:700;color:#0f172a;"></div>
+            <div id="perm-drawer-count" style="font-size:11px;color:#94a3b8;margin-top:2px;"></div>
+        </div>
+        <button onclick="closeAcPermDrawer()" style="background:none;border:none;cursor:pointer;color:#94a3b8;padding:4px;border-radius:6px;"
+                onmouseover="this.style.color='#475569'" onmouseout="this.style.color='#94a3b8'">
+            {{ ux_icon('lucide:x', {width:16,height:16}) }}
+        </button>
+    </div>
+    <div id="perm-drawer-body" style="flex:1;overflow-y:auto;padding:20px;"></div>
+    <div id="perm-drawer-error" style="display:none;margin:0 20px 0;padding:10px 12px;background:#fef2f2;border:1px solid #fecaca;border-radius:8px;font-size:12px;color:#dc2626;"></div>
+    <div style="padding:14px 20px;border-top:1px solid #f1f5f9;display:flex;gap:10px;flex-shrink:0;">
+        <button id="perm-drawer-submit" onclick="saveRolePermissions()"
+                style="flex:1;height:38px;background:#4f46e5;color:#fff;border:none;border-radius:9px;font-size:13px;font-weight:600;cursor:pointer;transition:background 0.15s;"
+                onmouseover="this.style.background='#4338ca'" onmouseout="this.style.background='#4f46e5'">Save Permissions</button>
+        <button onclick="closeAcPermDrawer()"
+                style="height:38px;padding:0 16px;background:#f8fafc;color:#64748b;border:1px solid #e2e8f0;border-radius:9px;font-size:13px;cursor:pointer;"
+                onmouseover="this.style.background='#f1f5f9'" onmouseout="this.style.background='#f8fafc'">Cancel</button>
+    </div>
+</div>
+
+{% endblock %}
+
+
+{% block javascripts %}{{ parent() }}
+<style>
+    .tab-btn { color:#94a3b8; border-color:transparent; }
+    .tab-btn:hover { color:#475569; }
+    .tab-btn.active { color:#4f46e5; border-color:#4f46e5; }
+</style>
+
+<script>
+(function () {
+
+    /* ── DATA FROM SERVER ─────────────────────────────────────────────── */
+    const ALL_ROLES = {{ roles|json_encode|raw }};
+    const PERM_CATEGORIES = {{ permissionsByCategory|json_encode|raw }};
+    const DEFAULT_TAB = '{{ defaultTab }}';
+
+    /* ── STATE ────────────────────────────────────────────────────────── */
+    let drawerMode   = null;  // 'add-user'|'edit-user'|'user-roles'|'add-role'|'edit-role'|'add-permission'
+    let currentId    = null;
+    let currentRoleId = null;
+
+    /* ── TABS ─────────────────────────────────────────────────────────── */
+    window.switchTab = function (name) {
+        document.querySelectorAll('.tab-panel').forEach(p => p.style.display = 'none');
+        document.querySelectorAll('.tab-btn').forEach(b => b.classList.remove('active'));
+        const panel = document.getElementById('tab-' + name);
+        if (panel) panel.style.display = 'block';
+        const btn = document.getElementById('tab-btn-' + name);
+        if (btn) btn.classList.add('active');
+    };
+    switchTab(DEFAULT_TAB);
+
+    /* ── HELPERS ──────────────────────────────────────────────────────── */
+    const field = s => `
+        <div style="margin-bottom:14px;">
+            <label style="display:block;font-size:11px;font-weight:600;color:#475569;margin-bottom:5px;">${s.label}${s.required ? ' <span style="color:#ef4444">*</span>' : ''}</label>
+            ${s.type === 'select'
+                ? `<select name="${s.name}" style="width:100%;height:38px;border:1px solid #e2e8f0;border-radius:8px;padding:0 10px;font-size:13px;outline:none;background:#fff;">${s.options.map(o => `<option value="${o.v}"${o.sel?' selected':''}>${o.l}</option>`).join('')}</select>`
+                : `<input name="${s.name}" type="${s.type||'text'}" value="${s.value||''}" placeholder="${s.placeholder||''}" ${s.required?'required':''} autocomplete="off"
+                     style="width:100%;height:38px;border:1px solid #e2e8f0;border-radius:8px;padding:0 12px;font-size:13px;${s.mono?'font-family:monospace;':''}outline:none;transition:border-color 0.15s;"
+                     onfocus="this.style.borderColor='#6366f1'" onblur="this.style.borderColor='#e2e8f0'">`
+            }
+            ${s.hint ? `<div style="font-size:10px;color:#94a3b8;margin-top:3px;">${s.hint}</div>` : ''}
+        </div>`;
+
+    function setDrawerTitle(title, subtitle) {
+        document.getElementById('ac-drawer-title').textContent = title;
+        document.getElementById('ac-drawer-subtitle').textContent = subtitle || '';
+    }
+    function hideError() {
+        const e = document.getElementById('ac-drawer-error');
+        e.style.display = 'none'; e.textContent = '';
+    }
+    function showError(msg) {
+        const e = document.getElementById('ac-drawer-error');
+        e.textContent = msg; e.style.display = 'block';
+    }
+    function openDrawer() {
+        hideError();
+        document.getElementById('ac-drawer').style.transform = 'translateX(0)';
+        document.getElementById('ac-backdrop').style.display = 'block';
+        document.getElementById('ac-drawer-submit').disabled = false;
+        document.getElementById('ac-drawer-submit').textContent = 'Save';
+    }
+    window.closeAcDrawer = function () {
+        document.getElementById('ac-drawer').style.transform = 'translateX(100%)';
+        document.getElementById('ac-backdrop').style.display = 'none';
+    };
+
+    /* ── USERS ────────────────────────────────────────────────────────── */
+    window.openUserDrawer = function () {
+        drawerMode = 'add-user'; currentId = null;
+        setDrawerTitle('Add User', 'New platform admin account');
+        document.getElementById('ac-drawer-body').innerHTML =
+            field({label:'Full Name',name:'name',required:true,placeholder:'Jane Doe'}) +
+            field({label:'Email',name:'email',type:'email',required:true,placeholder:'jane@example.com'}) +
+            field({label:'Password',name:'password',type:'password',required:true,placeholder:'Min 8 characters'}) +
+            field({label:'Status',name:'status',type:'select',options:[
+                {v:'active',l:'Active',sel:true},{v:'inactive',l:'Inactive'},{v:'suspended',l:'Suspended'}
+            ]});
+        openDrawer();
+    };
+
+    window.openEditUserDrawer = function (u) {
+        drawerMode = 'edit-user'; currentId = u.id;
+        setDrawerTitle('Edit User', u.name);
+        document.getElementById('ac-drawer-body').innerHTML =
+            field({label:'Full Name',name:'name',required:true,value:u.name||''}) +
+            field({label:'Email',name:'email',type:'email',required:true,value:u.email||''}) +
+            field({label:'Status',name:'status',type:'select',options:[
+                {v:'active',l:'Active',sel:u.status==='active'},{v:'inactive',l:'Inactive',sel:u.status==='inactive'},{v:'suspended',l:'Suspended',sel:u.status==='suspended'}
+            ]});
+        openDrawer();
+    };
+
+    window.openUserRolesDrawer = function (u) {
+        drawerMode = 'user-roles'; currentId = u.id;
+        const currentIds = u.role_ids ? u.role_ids.split(',').map(Number) : [];
+        setDrawerTitle('Assign Roles', u.name);
+        let html = '<div style="font-size:11px;color:#64748b;margin-bottom:12px;">Select roles to assign to this user.</div>';
+        if (ALL_ROLES.length === 0) {
+            html += '<div style="font-size:12px;color:#94a3b8;font-style:italic;">No roles available.</div>';
+        } else {
+            ALL_ROLES.forEach(r => {
+                const checked = currentIds.includes(Number(r.id)) ? 'checked' : '';
+                html += `<label style="display:flex;align-items:flex-start;gap:10px;padding:10px 12px;border-radius:8px;border:1px solid ${checked?'#6366f1':'#e2e8f0'};margin-bottom:8px;cursor:pointer;transition:border-color 0.15s;" class="role-label">
+                    <input type="checkbox" name="roles[]" value="${r.id}" ${checked} style="margin-top:1px;accent-color:#4f46e5;">
+                    <div>
+                        <div style="font-size:12px;font-weight:600;color:#0f172a;">${r.name}</div>
+                        ${r.description ? `<div style="font-size:11px;color:#94a3b8;">${r.description}</div>` : ''}
+                        <div style="font-size:10px;color:#a5b4fc;margin-top:2px;">${r.permission_count} permission${r.permission_count!=1?'s':''}</div>
+                    </div>
+                </label>`;
+            });
+        }
+        document.getElementById('ac-drawer-body').innerHTML = html;
+        // Live border update on checkbox change
+        document.getElementById('ac-drawer-body').querySelectorAll('input[type=checkbox]').forEach(cb => {
+            cb.addEventListener('change', function() {
+                this.closest('label').style.borderColor = this.checked ? '#6366f1' : '#e2e8f0';
+            });
+        });
+        openDrawer();
+    };
+
+    window.deleteUser = function (id, name) {
+        platformConfirm({
+            title: 'Delete user?',
+            message: `Remove platform admin "${name}"? This cannot be undone.`,
+            confirmText: 'Delete',
+            onConfirm: () => {
+                fetch(`/platform/access/users/${id}/delete`, { method: 'POST' })
+                    .then(r => r.json()).then(d => {
+                        if (d.ok) { const el = document.getElementById('user-row-' + id); if (el) el.remove(); }
+                        else platformAlert({ message: d.error || 'Could not delete user.' });
+                    }).catch(() => platformAlert({ message: 'Request failed.' }));
+            },
+        });
+    };
+
+    /* ── ROLES ────────────────────────────────────────────────────────── */
+    window.openRoleDrawer = function () {
+        drawerMode = 'add-role'; currentId = null;
+        setDrawerTitle('Add Role', 'New permission group');
+        document.getElementById('ac-drawer-body').innerHTML =
+            field({label:'Role Name',name:'name',required:true,placeholder:'e.g. Support Agent'}) +
+            field({label:'Description',name:'description',placeholder:'What this role can do'});
+        openDrawer();
+    };
+
+    window.openEditRoleDrawer = function (r) {
+        drawerMode = 'edit-role'; currentId = r.id;
+        setDrawerTitle('Edit Role', r.name);
+        document.getElementById('ac-drawer-body').innerHTML =
+            field({label:'Role Name',name:'name',required:true,value:r.name||''}) +
+            field({label:'Description',name:'description',value:r.description||'',placeholder:'What this role can do'});
+        openDrawer();
+    };
+
+    window.deleteRole = function (id, name) {
+        platformConfirm({
+            title: 'Delete role?',
+            message: `Delete role "${name}"? Users with this role will lose these permissions.`,
+            confirmText: 'Delete',
+            onConfirm: () => {
+                fetch(`/platform/access/roles/${id}/delete`, { method: 'POST' })
+                    .then(r => r.json()).then(d => {
+                        if (d.ok) { const el = document.getElementById('role-row-' + id); if (el) el.remove(); }
+                        else platformAlert({ message: d.error || 'Could not delete role.' });
+                    }).catch(() => platformAlert({ message: 'Request failed.' }));
+            },
+        });
+    };
+
+    /* ── ROLE PERMISSIONS DRAWER ──────────────────────────────────────── */
+    window.openRolePermissionsDrawer = function (r) {
+        currentRoleId = r.id;
+        const currentIds = r.permission_ids ? r.permission_ids.split(',').map(Number) : [];
+        let selected = currentIds.length;
+        document.getElementById('perm-drawer-title').textContent = r.name + ' — Permissions';
+        document.getElementById('perm-drawer-count').textContent = selected + ' permission' + (selected !== 1 ? 's' : '') + ' assigned';
+        document.getElementById('perm-drawer-error').style.display = 'none';
+
+        let html = '';
+        Object.entries(PERM_CATEGORIES).forEach(([cat, perms]) => {
+            html += `<div style="margin-bottom:16px;">
+                <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:8px;">
+                    <span style="font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:.08em;color:#94a3b8;">${cat}</span>
+                    <button type="button" onclick="toggleCategory('${cat}', this)" style="font-size:10px;color:#6366f1;background:none;border:none;cursor:pointer;padding:0;">Select all</button>
+                </div>`;
+            perms.forEach(p => {
+                const chk = currentIds.includes(Number(p.id)) ? 'checked' : '';
+                html += `<label data-cat="${cat}" style="display:flex;align-items:flex-start;gap:10px;padding:9px 12px;border-radius:7px;border:1px solid ${chk?'#6366f1':'#e2e8f0'};margin-bottom:6px;cursor:pointer;transition:border-color 0.12s;" class="perm-label">
+                    <input type="checkbox" name="permissions[]" value="${p.id}" ${chk} style="margin-top:2px;accent-color:#4f46e5;" onchange="onPermChange(this)">
+                    <div>
+                        <div style="font-size:12px;font-weight:600;color:#0f172a;">${p.name}</div>
+                        <div style="font-family:monospace;font-size:10px;color:#a5b4fc;">${p.action_key}</div>
+                        ${p.description ? `<div style="font-size:10px;color:#94a3b8;margin-top:1px;">${p.description}</div>` : ''}
+                    </div>
+                </label>`;
+            });
+            html += '</div>';
+        });
+
+        document.getElementById('perm-drawer-body').innerHTML = html || '<div style="font-size:12px;color:#94a3b8;font-style:italic;">No permissions found.</div>';
+        document.getElementById('perm-drawer-submit').disabled = false;
+        document.getElementById('perm-drawer-submit').textContent = 'Save Permissions';
+        document.getElementById('perm-drawer').style.transform = 'translateX(0)';
+        document.getElementById('perm-backdrop').style.display = 'block';
+    };
+
+    window.onPermChange = function (cb) {
+        cb.closest('label').style.borderColor = cb.checked ? '#6366f1' : '#e2e8f0';
+        const total = document.getElementById('perm-drawer-body').querySelectorAll('input[type=checkbox]:checked').length;
+        document.getElementById('perm-drawer-count').textContent = total + ' permission' + (total !== 1 ? 's' : '') + ' assigned';
+    };
+
+    window.toggleCategory = function (cat, btn) {
+        const labels = document.querySelectorAll(`label[data-cat="${CSS.escape(cat)}"]`);
+        const allChecked = [...labels].every(l => l.querySelector('input').checked);
+        labels.forEach(l => {
+            const cb = l.querySelector('input');
+            cb.checked = !allChecked;
+            l.style.borderColor = cb.checked ? '#6366f1' : '#e2e8f0';
+        });
+        btn.textContent = allChecked ? 'Select all' : 'Deselect all';
+        const total = document.getElementById('perm-drawer-body').querySelectorAll('input[type=checkbox]:checked').length;
+        document.getElementById('perm-drawer-count').textContent = total + ' permission' + (total !== 1 ? 's' : '') + ' assigned';
+    };
+
+    window.saveRolePermissions = function () {
+        const btn = document.getElementById('perm-drawer-submit');
+        btn.disabled = true; btn.textContent = 'Saving…';
+        document.getElementById('perm-drawer-error').style.display = 'none';
+
+        const checked = [...document.getElementById('perm-drawer-body').querySelectorAll('input[type=checkbox]:checked')];
+        const body = new URLSearchParams();
+        checked.forEach(cb => body.append('permissions[]', cb.value));
+
+        fetch(`/platform/access/roles/${currentRoleId}/permissions/save`, { method: 'POST', body })
+            .then(r => r.json()).then(d => {
+                if (d.ok) {
+                    closeAcPermDrawer();
+                    try { Turbo.visit(window.location.href, { action: 'replace' }); }
+                    catch (_) { window.location.reload(); }
+                } else {
+                    const e = document.getElementById('perm-drawer-error');
+                    e.textContent = d.error || 'An error occurred.';
+                    e.style.display = 'block';
+                    btn.disabled = false; btn.textContent = 'Save Permissions';
+                }
+            }).catch(() => {
+                const e = document.getElementById('perm-drawer-error');
+                e.textContent = 'Request failed. Please try again.';
+                e.style.display = 'block';
+                btn.disabled = false; btn.textContent = 'Save Permissions';
+            });
+    };
+
+    window.closeAcPermDrawer = function () {
+        document.getElementById('perm-drawer').style.transform = 'translateX(100%)';
+        document.getElementById('perm-backdrop').style.display = 'none';
+    };
+
+    /* ── PERMISSIONS ──────────────────────────────────────────────────── */
+    window.openPermissionDrawer = function () {
+        drawerMode = 'add-permission'; currentId = null;
+        setDrawerTitle('Add Permission', 'New platform permission key');
+        document.getElementById('ac-drawer-body').innerHTML =
+            field({label:'Display Name',name:'name',required:true,placeholder:'e.g. View Reports'}) +
+            field({label:'Action Key',name:'action_key',required:true,placeholder:'VIEW_REPORTS',mono:true,hint:'Uppercase with underscores. Stored as-is.'}) +
+            field({label:'Category',name:'category',required:true,placeholder:'e.g. Analytics'}) +
+            field({label:'Description',name:'description',placeholder:'What this permission allows'});
+        openDrawer();
+    };
+
+    window.deletePermission = function (id, name) {
+        platformConfirm({
+            title: 'Delete permission?',
+            message: `Delete "${name}"? All roles using it will lose this permission.`,
+            confirmText: 'Delete',
+            onConfirm: () => {
+                fetch(`/platform/access/permissions/${id}/delete`, { method: 'POST' })
+                    .then(r => r.json()).then(d => {
+                        if (d.ok) { const el = document.getElementById('perm-row-' + id); if (el) el.remove(); }
+                        else platformAlert({ message: d.error || 'Could not delete permission.' });
+                    }).catch(() => platformAlert({ message: 'Request failed.' }));
+            },
+        });
+    };
+
+    /* ── MAIN DRAWER SUBMIT ───────────────────────────────────────────── */
+    window.submitDrawer = function () {
+        hideError();
+        const btn = document.getElementById('ac-drawer-submit');
+        btn.disabled = true; btn.textContent = 'Saving…';
+
+        const body = new URLSearchParams(
+            new FormData(document.querySelector('#ac-drawer-body input, #ac-drawer-body select')
+                ? document.createElement('form') : document.createElement('form'))
+        );
+        // Collect all inputs/selects in the drawer body
+        const inputs = document.getElementById('ac-drawer-body').querySelectorAll('input, select');
+        const fd = new FormData();
+        inputs.forEach(el => {
+            if (!el.name) return;
+            if (el.type === 'checkbox' && !el.checked) return;
+            fd.append(el.name, el.value);
+        });
+        const postBody = new URLSearchParams(fd);
+
+        const urls = {
+            'add-user':        '/platform/access/users/create',
+            'edit-user':       `/platform/access/users/${currentId}/edit`,
+            'user-roles':      `/platform/access/users/${currentId}/roles/save`,
+            'add-role':        '/platform/access/roles/create',
+            'edit-role':       `/platform/access/roles/${currentId}/edit`,
+            'add-permission':  '/platform/access/permissions/create',
+        };
+
+        fetch(urls[drawerMode], { method: 'POST', body: postBody })
+            .then(r => r.json()).then(d => {
+                if (d.ok) {
+                    closeAcDrawer();
+                    try { Turbo.visit(window.location.href, { action: 'replace' }); }
+                    catch (_) { window.location.reload(); }
+                } else {
+                    showError(d.error || 'An error occurred.');
+                    btn.disabled = false; btn.textContent = 'Save';
+                }
+            }).catch(() => {
+                showError('Request failed. Please try again.');
+                btn.disabled = false; btn.textContent = 'Save';
+            });
+    };
+
+    document.addEventListener('keydown', e => {
+        if (e.key === 'Escape') { closeAcDrawer(); closeAcPermDrawer(); }
+    });
+
+}());
+</script>
+{% endblock %}
