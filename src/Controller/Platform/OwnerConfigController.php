@@ -71,7 +71,7 @@ final class OwnerConfigController extends PlatformBaseController
         }
 
         $exists = (bool) $this->db->fetchOne(
-            'SELECT 1 FROM permissions WHERE name = :name OR action_key = :action_key LIMIT 1',
+            'SELECT 1 FROM permissions WHERE (name = :name OR action_key = :action_key) AND deleted_at IS NULL LIMIT 1',
             ['name' => $name, 'action_key' => $actionKey],
         );
 
@@ -113,7 +113,7 @@ final class OwnerConfigController extends PlatformBaseController
         }
 
         $exists = (bool) $this->db->fetchOne(
-            'SELECT 1 FROM permissions WHERE (name = :name OR action_key = :action_key) AND id != :id LIMIT 1',
+            'SELECT 1 FROM permissions WHERE (name = :name OR action_key = :action_key) AND id != :id AND deleted_at IS NULL LIMIT 1',
             ['name' => $name, 'action_key' => $actionKey, 'id' => $id],
         );
 

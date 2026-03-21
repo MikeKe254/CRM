@@ -89,7 +89,7 @@ class PublicController extends AbstractController
     private function tenantExists(string $subdomain): bool
     {
         return (bool) $this->db->fetchOne(
-            'SELECT 1 FROM companies WHERE id <> 0 AND subdomain = :subdomain LIMIT 1',
+            'SELECT 1 FROM companies WHERE id <> 0 AND subdomain = :subdomain AND deleted_at IS NULL LIMIT 1',
             ['subdomain' => $subdomain],
         );
     }

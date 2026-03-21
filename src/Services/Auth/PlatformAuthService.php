@@ -44,7 +44,7 @@ final class PlatformAuthService
     public function findActivePlatformAdminByEmailOrNull(string $email): array|false
     {
         $admin = $this->db->fetchAssociative(
-            'SELECT * FROM platform_admins WHERE email = :email LIMIT 1',
+            'SELECT * FROM platform_admins WHERE email = :email AND deleted_at IS NULL LIMIT 1',
             ['email' => $email],
         );
 
@@ -112,7 +112,7 @@ final class PlatformAuthService
     private function findPlatformAdminById(int $platformAdminId): array
     {
         $admin = $this->db->fetchAssociative(
-            'SELECT * FROM platform_admins WHERE id = :id LIMIT 1',
+            'SELECT * FROM platform_admins WHERE id = :id AND deleted_at IS NULL LIMIT 1',
             ['id' => $platformAdminId],
         );
 
@@ -208,7 +208,7 @@ final class PlatformAuthService
         }
 
         $company = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE id = :id LIMIT 1',
+            'SELECT * FROM companies WHERE id = :id AND deleted_at IS NULL LIMIT 1',
             ['id' => $companyId],
         );
 

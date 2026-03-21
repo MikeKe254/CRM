@@ -51,6 +51,10 @@ final class AccessController extends PlatformBaseController
 
         // Users with their assigned roles.
         // Non-owners: owner accounts are hidden entirely — they should not know owners exist.
+        // $showDeleted: platform owners and admins with view_deleted_entries see soft-deleted accounts too.
+        $showDeleted = $this->platformCan->isPlatformOwner($session)
+            || $this->platformCan->check($session, 'view_deleted_entries');
+
         $users = $canViewUsers ? $this->db->fetchAllAssociative(
             'SELECT pa.id, pa.name, pa.email, pa.status,
                     pa.is_platform_owner, pa.is_system_account, pa.created_at,
@@ -59,7 +63,10 @@ final class AccessController extends PlatformBaseController
                FROM platform_admins pa
                LEFT JOIN platform_admin_roles par ON par.platform_admin_id = pa.id
                LEFT JOIN platform_roles pr        ON pr.id = par.platform_role_id
-              ' . ($isOwner ? '' : 'WHERE pa.is_platform_owner = 0') . '
+              ' . ($isOwner
+                    ? ($showDeleted ? '' : 'WHERE pa.deleted_at IS NULL')
+                    : ('WHERE pa.is_platform_owner = 0' . ($showDeleted ? '' : ' AND pa.deleted_at IS NULL'))
+                ) . '
               GROUP BY pa.id
               ORDER BY pa.name ASC',
         ) : [];
@@ -133,6 +140,7 @@ final class AccessController extends PlatformBaseController
             'permissionsByCategory' => $permissionsByCategory,
             'defaultTab'         => $canViewUsers ? 'users' : ($canViewRoles ? 'roles' : 'permissions'),
             'peerUserIds'        => $peerUserIds,
+            'showDeleted'        => $showDeleted,
 
             // Capability flags passed to template to show/hide buttons
             'canViewUsers'         => $canViewUsers,
@@ -219,7 +227,7 @@ final class AccessController extends PlatformBaseController
 
         // Fetch target account
         $target = $this->db->fetchAssociative(
-            'SELECT is_system_account, is_platform_owner, status FROM platform_admins WHERE id = :id',
+            'SELECT is_system_account, is_platform_owner, status FROM platform_admins WHERE id = :id AND deleted_at IS NULL',
             ['id' => $id],
         );
         if (!$target) {
@@ -281,7 +289,7 @@ final class AccessController extends PlatformBaseController
         }
 
         $target = $this->db->fetchAssociative(
-            'SELECT is_system_account, is_platform_owner FROM platform_admins WHERE id = :id',
+            'SELECT is_system_account, is_platform_owner FROM platform_admins WHERE id = :id AND deleted_at IS NULL',
             ['id' => $id],
         );
 
@@ -298,7 +306,10 @@ final class AccessController extends PlatformBaseController
         }
 
         try {
-            $this->db->delete('platform_admins', ['id' => $id]);
+            $this->db->executeStatement(
+                'UPDATE platform_admins SET deleted_at = NOW() WHERE id = :id',
+                ['id' => $id],
+            );
             return new JsonResponse(['ok' => true]);
         } catch (\Throwable $e) {
             return new JsonResponse(['ok' => false, 'error' => $this->dbError($e)]);
@@ -323,7 +334,7 @@ final class AccessController extends PlatformBaseController
 
         // Prevent non-owners from modifying roles on an owner account
         $targetOwner = $this->db->fetchOne(
-            'SELECT is_platform_owner FROM platform_admins WHERE id = :id',
+            'SELECT is_platform_owner FROM platform_admins WHERE id = :id AND deleted_at IS NULL',
             ['id' => $id],
         );
         if ((bool) $targetOwner && !$this->platformCan->isPlatformOwner($session)) {

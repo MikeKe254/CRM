@@ -65,7 +65,7 @@
                 </thead>
                 <tbody class="divide-y divide-slate-50">
                 {% for u in users %}
-                <tr id="user-row-{{ u.id }}" class="hover:bg-slate-50/50 transition-colors">
+                <tr id="user-row-{{ u.id }}" class="hover:bg-slate-50/50 transition-colors {% if u.deleted_at %}opacity-50{% endif %}">
                     <td class="px-5 py-3.5">
                         <div class="flex items-center gap-3">
                             <div class="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full text-xs font-bold text-white"
@@ -75,6 +75,9 @@
                             <div>
                                 <div class="flex items-center gap-1.5">
                                     <span class="text-sm font-semibold text-slate-800">{{ u.name }}</span>
+                                    {% if u.deleted_at %}
+                                    <span class="ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-500">Deleted</span>
+                                    {% endif %}
                                     {% if u.is_platform_owner %}
                                     <span class="rounded px-1.5 py-0.5 text-[9px] font-bold bg-amber-50 text-amber-600 border border-amber-200">Owner</span>
                                     {% endif %}
@@ -112,6 +115,7 @@
                     </td>
                     <td class="px-4 py-3.5 text-right">
                         <div class="inline-flex items-center gap-1">
+                            {% if not u.deleted_at %}
                             {% if canAssignRoles and (not u.is_platform_owner or isOwner) and u.id not in peerUserIds %}
                             <button title="Assign Roles"
                                     onclick="openUserRolesDrawer({{ u|json_encode|e('html_attr') }})"
@@ -132,6 +136,7 @@
                                     class="inline-flex items-center rounded-lg border border-red-100 bg-red-50 px-2 py-1 text-[10px] font-medium text-red-500 hover:bg-red-100 transition-colors">
                                 {{ ux_icon('lucide:trash-2', {width:10,height:10}) }}
                             </button>
+                            {% endif %}
                             {% endif %}
                         </div>
                     </td>

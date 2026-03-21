@@ -47,7 +47,7 @@ class PosLoginController extends AbstractController
 
         if ($terminal !== '') {
             $company = $this->db->fetchAssociative(
-                'SELECT id FROM companies WHERE id <> 0 AND subdomain = :subdomain LIMIT 1',
+                'SELECT id FROM companies WHERE id <> 0 AND subdomain = :subdomain AND deleted_at IS NULL LIMIT 1',
                 ['subdomain' => $subdomain],
             );
 

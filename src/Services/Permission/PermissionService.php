@@ -47,19 +47,22 @@ final class PermissionService
      * List every permission in the system, optionally filtered by category.
      * No authorization required — this is a read-only global list.
      *
-     * @param string|null $category  Filter by category slug (e.g. 'dashboard', 'stk')
+     * @param string|null $category       Filter by category slug (e.g. 'dashboard', 'stk')
+     * @param bool        $includeDeleted When true, soft-deleted permissions are included too
      */
-    public function listAll(?string $category = null): array
+    public function listAll(?string $category = null, bool $includeDeleted = false): array
     {
+        $deletedClause = $includeDeleted ? '' : 'AND deleted_at IS NULL';
+
         if ($category !== null) {
             return $this->db->fetchAllAssociative(
-                'SELECT * FROM permissions WHERE category = :category ORDER BY category, name',
+                "SELECT * FROM permissions WHERE category = :category {$deletedClause} ORDER BY category, name",
                 ['category' => $category],
             );
         }
 
         return $this->db->fetchAllAssociative(
-            'SELECT * FROM permissions ORDER BY category, name',
+            "SELECT * FROM permissions WHERE 1=1 {$deletedClause} ORDER BY category, name",
         );
     }
 
@@ -123,7 +126,7 @@ final class PermissionService
     public function listCategories(): array
     {
         $rows = $this->db->fetchAllAssociative(
-            'SELECT DISTINCT category FROM permissions ORDER BY category',
+            'SELECT DISTINCT category FROM permissions WHERE deleted_at IS NULL ORDER BY category',
         );
 
         return array_column($rows, 'category');
@@ -669,7 +672,7 @@ final class PermissionService
     private function getRoleOrNull(int $roleId, int $companyId): array|false
     {
         return $this->db->fetchAssociative(
-            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id',
+            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $roleId, 'company_id' => $companyId],
         );
     }
@@ -677,7 +680,7 @@ final class PermissionService
     private function getPermissionOrNull(int $permissionId): array|false
     {
         return $this->db->fetchAssociative(
-            'SELECT * FROM permissions WHERE id = :id',
+            'SELECT * FROM permissions WHERE id = :id AND deleted_at IS NULL',
             ['id' => $permissionId],
         );
     }

@@ -121,7 +121,7 @@ class ActivityLogController extends AdminBaseController
         );
 
         $users = $this->db->fetchAllAssociative(
-            'SELECT id, name FROM users WHERE company_id = :company_id ORDER BY name',
+            'SELECT id, name FROM users WHERE company_id = :company_id AND deleted_at IS NULL ORDER BY name',
             ['company_id' => $session->company->id],
         );
 

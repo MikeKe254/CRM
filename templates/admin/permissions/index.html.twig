@@ -31,8 +31,8 @@
     </div>
     <div class="divide-y divide-gray-50">
     {% for p in perms %}
-    <div class="perm-row px-5 py-3.5 hover:bg-gray-50 transition-colors">
-        <div class="text-sm font-medium text-gray-900">{{ p.name }}</div>
+    <div class="perm-row px-5 py-3.5 hover:bg-gray-50 transition-colors {% if p.deleted_at %}opacity-50{% endif %}">
+        <div class="text-sm font-medium text-gray-900">{{ p.name }}{% if p.deleted_at %}<span class="ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-500">Deleted</span>{% endif %}</div>
         {% if p.description is defined and p.description %}
         <div class="text-xs text-gray-400 mt-0.5">{{ p.description }}</div>
         {% endif %}

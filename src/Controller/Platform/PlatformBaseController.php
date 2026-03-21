@@ -21,6 +21,11 @@ abstract class PlatformBaseController extends AbstractController
 
     protected function requirePlatform(Request $request, ?string $permission = null): AuthResult|Response
     {
+        // Platform routes are only accessible from the platform admin host (admin.*)
+        if (!str_starts_with($request->getHost(), 'admin.')) {
+            return $this->redirect('/');
+        }
+
         $token = $this->resolveToken($request);
 
         if (!$token) {

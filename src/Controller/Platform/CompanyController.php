@@ -31,8 +31,13 @@ final class CompanyController extends PlatformBaseController
             return $session;
         }
 
+        $showDeleted = $this->platformCan->isPlatformOwner($session)
+            || $this->platformCan->check($session, 'view_deleted_entries');
+
+        $deletedFilter = $showDeleted ? '' : 'AND c.deleted_at IS NULL';
+
         $companies = $this->db->fetchAllAssociative(
-            'SELECT c.id,
+            "SELECT c.id,
                     c.name,
                     c.subdomain,
                     c.email,
@@ -40,6 +45,7 @@ final class CompanyController extends PlatformBaseController
                     c.plan,
                     c.status,
                     c.created_at,
+                    c.deleted_at,
                     COUNT(DISTINCT u.id) AS user_count,
                     COUNT(DISTINCT pt.id) AS terminal_count,
                     COUNT(DISTINCT mp.id) AS payment_count
@@ -51,13 +57,15 @@ final class CompanyController extends PlatformBaseController
               AND (pt.expires_at IS NULL OR pt.expires_at >= NOW())
              LEFT JOIN mpesa_payments mp ON mp.company_id = c.id
              WHERE c.id <> 0
-             GROUP BY c.id, c.name, c.subdomain, c.email, c.phone, c.plan, c.status, c.created_at
-             ORDER BY c.name ASC'
+               {$deletedFilter}
+             GROUP BY c.id, c.name, c.subdomain, c.email, c.phone, c.plan, c.status, c.created_at, c.deleted_at
+             ORDER BY c.name ASC"
         );
 
         return $this->render('platform/companies/index.html.twig', [
-            'session' => $session,
-            'companies' => $companies,
+            'session'     => $session,
+            'companies'   => $companies,
+            'showDeleted' => $showDeleted,
         ]);
     }
 }

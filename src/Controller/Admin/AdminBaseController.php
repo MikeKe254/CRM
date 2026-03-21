@@ -51,6 +51,15 @@ abstract class AdminBaseController extends AbstractController
         Request $request,
         ?string $permission = null,
     ): AuthResult|Response {
+        // Tenant routes are never accessible from the platform admin host (admin.*)
+        if (str_starts_with($request->getHost(), 'admin.')) {
+            if ($request->headers->get('Accept') && str_contains($request->headers->get('Accept', ''), 'application/json')) {
+                return new JsonResponse(['error' => 'Not found.'], 404);
+            }
+            $domain = substr($request->getHost(), strlen('admin.'));
+            return $this->redirectToRoute('platform_dashboard', ['domain' => $domain]);
+        }
+
         $token = $this->resolveToken($request);
 
         if (!$token) {

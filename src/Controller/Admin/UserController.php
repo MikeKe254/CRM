@@ -37,17 +37,23 @@ class UserController extends AdminBaseController
         $session = $this->requireAdmin($request, 'view_users');
         if ($session instanceof Response) return $session;
 
+        $showDeleted = $session->user->isSuperAdmin
+            && ($this->platformCan->isPlatformOwner($session) || $this->platformCan->check($session, 'view_deleted_entries'));
+
+        $deletedFilter = $showDeleted ? '' : 'AND u.deleted_at IS NULL';
+
         $users = $this->db->fetchAllAssociative(
-            'SELECT u.id, u.name, u.email, u.can_dashboard_login, u.can_pos_login,
-                    u.is_super_admin, u.created_at,
+            "SELECT u.id, u.name, u.email, u.can_dashboard_login, u.can_pos_login,
+                    u.is_super_admin, u.created_at, u.deleted_at,
                     MIN(ur.role_id)                                        AS role_id,
-                    GROUP_CONCAT(r.name ORDER BY r.name SEPARATOR ", ")    AS roles
+                    GROUP_CONCAT(r.name ORDER BY r.name SEPARATOR ', ')    AS roles
              FROM   users u
              LEFT JOIN user_roles ur ON ur.user_id = u.id
              LEFT JOIN roles r ON r.id = ur.role_id
              WHERE  u.company_id = :company_id
+               {$deletedFilter}
              GROUP  BY u.id
-             ORDER  BY u.name',
+             ORDER  BY u.name",
             ['company_id' => $session->company->id],
         );
 
@@ -59,10 +65,11 @@ class UserController extends AdminBaseController
         $this->activityLog->record($session, 'user.view', request: $request);
 
         return $this->render('admin/users/index.html.twig', [
-            'session' => $session,
-            'users'   => $users,
-            'roles'   => $roles,
-            'can'     => [
+            'session'     => $session,
+            'users'       => $users,
+            'roles'       => $roles,
+            'showDeleted' => $showDeleted,
+            'can'         => [
                 'create' => $this->can->check($session, 'create_users'),
                 'edit'   => $this->can->check($session, 'edit_users'),
                 'delete' => $this->can->check($session, 'delete_users'),
@@ -103,7 +110,7 @@ class UserController extends AdminBaseController
 
         if ($email !== '') {
             $exists = $this->db->fetchOne(
-                'SELECT id FROM users WHERE email = :email AND company_id = :company_id',
+                'SELECT id FROM users WHERE email = :email AND company_id = :company_id AND deleted_at IS NULL',
                 ['email' => $email, 'company_id' => $session->company->id],
             );
             if ($exists) {
@@ -151,7 +158,7 @@ class UserController extends AdminBaseController
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
         $user = $this->db->fetchAssociative(
-            'SELECT * FROM users WHERE id = :id AND company_id = :company_id',
+            'SELECT * FROM users WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $id, 'company_id' => $session->company->id],
         );
 
@@ -239,7 +246,7 @@ class UserController extends AdminBaseController
         if (isset($data['can_pos_login']))            $changes[] = ($data['can_pos_login'] ? 'enabled' : 'disabled') . ' POS login';
         if ($roleId > 0) {
             $roleName = (string) $this->db->fetchOne(
-                'SELECT name FROM roles WHERE id = :id AND company_id = :company_id',
+                'SELECT name FROM roles WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
                 ['id' => $roleId, 'company_id' => $session->company->id],
             );
             $changes[] = 'role set to ' . ($roleName ?: "role #$roleId");
@@ -276,7 +283,7 @@ class UserController extends AdminBaseController
         }
 
         $user = $this->db->fetchAssociative(
-            'SELECT id, name, email, is_super_admin FROM users WHERE id = :id AND company_id = :company_id',
+            'SELECT id, name, email, is_super_admin FROM users WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $id, 'company_id' => $session->company->id],
         );
 
@@ -286,7 +293,7 @@ class UserController extends AdminBaseController
         $this->auth->logoutAllDevices($id, $session->company->id);
         $this->db->executeStatement('DELETE FROM user_roles WHERE user_id = :id', ['id' => $id]);
         $this->db->executeStatement(
-            'DELETE FROM users WHERE id = :id AND company_id = :company_id',
+            'UPDATE users SET deleted_at = NOW() WHERE id = :id AND company_id = :company_id',
             ['id' => $id, 'company_id' => $session->company->id],
         );
 

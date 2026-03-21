@@ -36,8 +36,11 @@ class PermissionController extends AdminBaseController
         $session = $this->requireAdmin($request, 'view_permissions');
         if ($session instanceof Response) return $session;
 
+        $showDeleted = $session->user->isSuperAdmin
+            && ($this->platformCan->isPlatformOwner($session) || $this->platformCan->check($session, 'view_deleted_entries'));
+
         $grouped = [];
-        foreach ($this->permissions->listAll() as $p) {
+        foreach ($this->permissions->listAll(includeDeleted: $showDeleted) as $p) {
             $grouped[$p['category']][] = $p;
         }
 
@@ -46,10 +49,11 @@ class PermissionController extends AdminBaseController
         $this->activityLog->record($session, 'permission.view', request: $request);
 
         return $this->render('admin/permissions/index.html.twig', [
-            'session'    => $session,
-            'grouped'    => $grouped,
-            'categories' => $categories,
-            'can'        => [
+            'session'     => $session,
+            'grouped'     => $grouped,
+            'categories'  => $categories,
+            'showDeleted' => $showDeleted,
+            'can'         => [
                 'assign' => $this->can->check($session, 'assign_permissions'),
             ],
         ]);

@@ -38,16 +38,18 @@
             </thead>
             <tbody>
             {% for role in roles %}
-            <tr id="role-row-{{ role.id }}" class="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+            <tr id="role-row-{{ role.id }}" class="border-b border-gray-50 hover:bg-gray-50 transition-colors {% if role.deleted_at %}opacity-50{% endif %}">
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-2">
                         <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
                             <svg width="14" height="14" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
                         </div>
-                        <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}"
-                           class="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors">
-                            {{ role.name }}
-                        </a>
+                        <div>
+                            <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}"
+                               class="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors">
+                                {{ role.name }}
+                            </a>{% if role.deleted_at %}<span class="ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-500">Deleted</span>{% endif %}
+                        </div>
                     </div>
                 </td>
                 <td class="px-4 py-3 text-sm text-gray-500">{{ role.description ?? '—' }}</td>
@@ -65,6 +67,7 @@
                 </td>
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-1">
+                        {% if not role.deleted_at %}
                         <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}"
                            class="text-xs text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 px-2.5 py-1 rounded transition-colors">
                             Permissions
@@ -76,6 +79,7 @@
                         {% if can.delete and not role.is_system_role %}
                         <button onclick="deleteRole({{ role.id }}, '{{ role.name|e('js') }}')"
                                 class="text-xs text-red-600 border border-red-200 bg-white hover:bg-red-50 px-2.5 py-1 rounded transition-colors">Delete</button>
+                        {% endif %}
                         {% endif %}
                     </div>
                 </td>

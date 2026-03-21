@@ -539,7 +539,7 @@ final class AuthService
     private function resolveCompany(string $subdomain): array
     {
         $company = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE id <> 0 AND subdomain = :subdomain LIMIT 1',
+            'SELECT * FROM companies WHERE id <> 0 AND subdomain = :subdomain AND deleted_at IS NULL LIMIT 1',
             ['subdomain' => $subdomain],
         );
 
@@ -557,7 +557,7 @@ final class AuthService
         }
 
         $company = $this->db->fetchAssociative(
-            'SELECT * FROM companies WHERE id = :id LIMIT 1',
+            'SELECT * FROM companies WHERE id = :id AND deleted_at IS NULL LIMIT 1',
             ['id' => $companyId],
         );
 
@@ -571,7 +571,7 @@ final class AuthService
     private function findUserByEmailOrNull(string $email, int $companyId): array|false
     {
         return $this->db->fetchAssociative(
-            'SELECT * FROM users WHERE email = :email AND company_id = :company_id LIMIT 1',
+            'SELECT * FROM users WHERE email = :email AND company_id = :company_id AND deleted_at IS NULL LIMIT 1',
             ['email' => $email, 'company_id' => $companyId],
         );
     }
@@ -589,7 +589,8 @@ final class AuthService
             'SELECT * FROM users
              WHERE  company_id   = :company_id
                AND  can_pos_login = 1
-               AND  pin IS NOT NULL',
+               AND  pin IS NOT NULL
+               AND  deleted_at IS NULL',
             ['company_id' => $companyId],
         );
 
@@ -609,7 +610,7 @@ final class AuthService
             $user = false;
         } else {
             $user = $this->db->fetchAssociative(
-                'SELECT * FROM users WHERE id = :id AND company_id = :company_id LIMIT 1',
+                'SELECT * FROM users WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL LIMIT 1',
                 ['id' => $userId, 'company_id' => $companyId],
             );
         }

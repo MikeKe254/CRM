@@ -39,23 +39,30 @@ class RoleController extends AdminBaseController
         $session = $this->requireAdmin($request, 'view_roles');
         if ($session instanceof Response) return $session;
 
+        $showDeleted = $session->user->isSuperAdmin
+            && ($this->platformCan->isPlatformOwner($session) || $this->platformCan->check($session, 'view_deleted_entries'));
+
+        $deletedFilter = $showDeleted ? '' : 'AND r.deleted_at IS NULL';
+
         $roles = $this->db->fetchAllAssociative(
-            'SELECT r.id, r.name, r.description, r.is_system_role,
+            "SELECT r.id, r.name, r.description, r.is_system_role, r.deleted_at,
                     COUNT(rp.id) AS permission_count
              FROM   roles r
              LEFT JOIN role_permissions rp ON rp.role_id = r.id
              WHERE  r.company_id = :company_id
+               {$deletedFilter}
              GROUP  BY r.id
-             ORDER  BY r.is_system_role DESC, r.name',
+             ORDER  BY r.is_system_role DESC, r.name",
             ['company_id' => $session->company->id],
         );
 
         $this->activityLog->record($session, 'role.view', request: $request);
 
         return $this->render('admin/roles/index.html.twig', [
-            'session' => $session,
-            'roles'   => $roles,
-            'can'     => [
+            'session'     => $session,
+            'roles'       => $roles,
+            'showDeleted' => $showDeleted,
+            'can'         => [
                 'create' => $this->can->check($session, 'create_roles'),
                 'edit'   => $this->can->check($session, 'edit_roles'),
                 'delete' => $this->can->check($session, 'delete_roles'),
@@ -75,7 +82,7 @@ class RoleController extends AdminBaseController
         if ($session instanceof Response) return $session;
 
         $role = $this->db->fetchAssociative(
-            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id',
+            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $id, 'company_id' => $session->company->id],
         );
 
@@ -206,7 +213,7 @@ class RoleController extends AdminBaseController
         }
 
         $exists = $this->db->fetchOne(
-            'SELECT id FROM roles WHERE name = :name AND company_id = :company_id',
+            'SELECT id FROM roles WHERE name = :name AND company_id = :company_id AND deleted_at IS NULL',
             ['name' => $name, 'company_id' => $session->company->id],
         );
 
@@ -242,7 +249,7 @@ class RoleController extends AdminBaseController
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
         $role = $this->db->fetchAssociative(
-            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id',
+            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $id, 'company_id' => $session->company->id],
         );
 
@@ -257,7 +264,7 @@ class RoleController extends AdminBaseController
         }
 
         $conflict = $this->db->fetchOne(
-            'SELECT id FROM roles WHERE name = :name AND company_id = :company_id AND id != :id',
+            'SELECT id FROM roles WHERE name = :name AND company_id = :company_id AND id != :id AND deleted_at IS NULL',
             ['name' => $name, 'company_id' => $session->company->id, 'id' => $id],
         );
 
@@ -289,7 +296,7 @@ class RoleController extends AdminBaseController
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
         $role = $this->db->fetchAssociative(
-            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id',
+            'SELECT * FROM roles WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $id, 'company_id' => $session->company->id],
         );
 
@@ -302,9 +309,9 @@ class RoleController extends AdminBaseController
         // Remove role from all users
         $this->db->executeStatement('DELETE FROM user_roles WHERE role_id = :id', ['id' => $id]);
 
-        // Delete role
+        // Soft-delete role
         $this->db->executeStatement(
-            'DELETE FROM roles WHERE id = :id AND company_id = :company_id',
+            'UPDATE roles SET deleted_at = NOW() WHERE id = :id AND company_id = :company_id',
             ['id' => $id, 'company_id' => $session->company->id],
         );
 
@@ -330,11 +337,11 @@ class RoleController extends AdminBaseController
         if ($permissionId === 0) return $this->error('Permission ID is required.');
 
         $roleName = (string) $this->db->fetchOne(
-            'SELECT name FROM roles WHERE id = :id AND company_id = :company_id',
+            'SELECT name FROM roles WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $id, 'company_id' => $session->company->id],
         );
         $permName = (string) $this->db->fetchOne(
-            'SELECT name FROM permissions WHERE id = :id',
+            'SELECT name FROM permissions WHERE id = :id AND deleted_at IS NULL',
             ['id' => $permissionId],
         );
 
@@ -365,11 +372,11 @@ class RoleController extends AdminBaseController
         if ($permissionId === 0) return $this->error('Permission ID is required.');
 
         $roleName = (string) $this->db->fetchOne(
-            'SELECT name FROM roles WHERE id = :id AND company_id = :company_id',
+            'SELECT name FROM roles WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
             ['id' => $id, 'company_id' => $session->company->id],
         );
         $permName = (string) $this->db->fetchOne(
-            'SELECT name FROM permissions WHERE id = :id',
+            'SELECT name FROM permissions WHERE id = :id AND deleted_at IS NULL',
             ['id' => $permissionId],
         );
 

@@ -32,10 +32,10 @@ final class DashboardController extends PlatformBaseController
         }
 
         $stats = [
-            'companies' => (int) $this->db->fetchOne('SELECT COUNT(*) FROM companies WHERE id <> 0'),
-            'active_companies' => (int) $this->db->fetchOne("SELECT COUNT(*) FROM companies WHERE id <> 0 AND status = 'active'"),
-            'platform_admins' => (int) $this->db->fetchOne("SELECT COUNT(*) FROM platform_admins WHERE status = 'active'"),
-            'tenant_users' => (int) $this->db->fetchOne('SELECT COUNT(*) FROM users WHERE company_id IS NOT NULL AND company_id <> 0'),
+            'companies' => (int) $this->db->fetchOne('SELECT COUNT(*) FROM companies WHERE id <> 0 AND deleted_at IS NULL'),
+            'active_companies' => (int) $this->db->fetchOne("SELECT COUNT(*) FROM companies WHERE id <> 0 AND status = 'active' AND deleted_at IS NULL"),
+            'platform_admins' => (int) $this->db->fetchOne("SELECT COUNT(*) FROM platform_admins WHERE status = 'active' AND deleted_at IS NULL"),
+            'tenant_users' => (int) $this->db->fetchOne('SELECT COUNT(*) FROM users WHERE company_id IS NOT NULL AND company_id <> 0 AND deleted_at IS NULL'),
             'active_terminals' => (int) $this->db->fetchOne(
                 'SELECT COUNT(*)
                  FROM pos_terminals
