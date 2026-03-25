@@ -180,6 +180,7 @@ final class UserActivityLogService
 
             $this->db->insert('user_activity_logs', [
                 'company_id'   => $session->company->id,
+                'branch_id'    => $session->branch?->id,
                 'user_id'      => $session->user->id,
                 'actor_type'   => $session->user->isSuperAdmin ? 'superadmin' : 'tenant',
                 'module_id'    => $moduleId,
@@ -256,6 +257,7 @@ final class UserActivityLogService
 
             $this->db->insert('user_activity_logs', [
                 'company_id'   => $session->company->id,
+                'branch_id'    => $session->branch?->id,
                 'user_id'      => $session->user->id,
                 'actor_type'   => $session->user->isSuperAdmin ? 'superadmin' : 'tenant',
                 'module_id'    => $moduleId,

@@ -25,7 +25,7 @@ final class DashboardController extends PlatformBaseController
     #[Route('', name: 'platform_dashboard', methods: ['GET'])]
     public function index(Request $request): Response
     {
-        $session = $this->requirePlatform($request, 'view_companies');
+        $session = $this->requirePlatform($request);
 
         if ($session instanceof Response) {
             return $session;

@@ -36,6 +36,32 @@
     <div id="admin-drawer-footer" class="flex gap-3 px-5 py-4 border-t border-gray-100 flex-shrink-0"></div>
 </div>
 
+<div id="admin-modal-backdrop"
+     class="hidden fixed inset-0 z-[310] bg-slate-950/40 backdrop-blur-sm px-4 items-center justify-center">
+    <div id="admin-modal-card"
+         class="w-full max-w-md rounded-2xl bg-white shadow-2xl ring-1 ring-slate-200/70 transform transition duration-200 scale-95 opacity-0">
+        <div class="px-6 pt-6">
+            <div class="mx-auto flex h-12 w-12 items-center justify-center rounded-full" id="admin-modal-icon-wrap">
+                <div id="admin-modal-icon" class="flex h-6 w-6 items-center justify-center"></div>
+            </div>
+            <div id="admin-modal-title" class="mt-4 text-center text-base font-semibold text-slate-900"></div>
+            <div id="admin-modal-message" class="mt-2 text-center text-sm leading-6 text-slate-500"></div>
+        </div>
+        <div class="flex gap-3 px-6 py-5" id="admin-modal-buttons">
+            <button id="admin-modal-cancel"
+                    type="button"
+                    class="flex-1 rounded-xl border border-slate-200 bg-white px-4 py-2.5 text-sm font-medium text-slate-600 transition hover:bg-slate-50">
+                Cancel
+            </button>
+            <button id="admin-modal-confirm"
+                    type="button"
+                    class="flex-1 rounded-xl px-4 py-2.5 text-sm font-semibold text-white transition">
+                Confirm
+            </button>
+        </div>
+    </div>
+</div>
+
 {% block admin_scripts %}{% endblock %}
 
 {% endblock %}

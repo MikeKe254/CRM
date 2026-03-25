@@ -1,10 +1,16 @@
 {% extends 'layouts/admin.html.twig' %}
 {% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
 {% set tenant_domain = currentDomain() %}
+{% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
 {% block admin_title %}Roles{% endblock %}
 {% block admin_subtitle %}Manage roles and their permission sets{% endblock %}
 
 {% block admin_actions %}
+<a href="{{ path('admin_roles_hierarchy', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+   class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-1.5">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 2v6m0 8v6M2 12h6m8 0h6"/></svg>
+    Hierarchy
+</a>
 {% if can.create %}
 <button onclick="openCreateRole()"
         class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
@@ -14,6 +20,7 @@
 {% endblock %}
 
 {% block admin_content %}
+{% set protected_core_roles = ['Assistant Manager', 'Department Manager', 'Supervisor', 'Support Functions'] %}
 <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
 
     <div class="flex items-center gap-3 px-4 py-3 border-b border-gray-100">
@@ -30,37 +37,77 @@
             <thead>
                 <tr class="border-b border-gray-100">
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Role</th>
-                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Description</th>
-                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Permissions</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Parent</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Level</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Scope</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Type</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Permissions</th>
                     <th class="px-4 py-3 w-48"></th>
                 </tr>
             </thead>
             <tbody>
             {% for role in roles %}
+            {% set is_protected_core_role = role.name in protected_core_roles %}
             <tr id="role-row-{{ role.id }}" class="border-b border-gray-50 hover:bg-gray-50 transition-colors {% if role.deleted_at %}opacity-50{% endif %}">
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-2">
-                        <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center flex-shrink-0">
-                            <svg width="14" height="14" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0
+                                    {% if role.scope == 'hq' %}bg-purple-50{% elseif role.scope == 'branch' %}bg-emerald-50{% else %}bg-indigo-50{% endif %}">
+                            <svg width="14" height="14" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
+                                 stroke="{{ role.scope == 'hq' ? '#7c3aed' : (role.scope == 'branch' ? '#059669' : '#4f46e5') }}">
+                                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                            </svg>
                         </div>
                         <div>
-                            <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}"
-                               class="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors">
-                                {{ role.name }}
-                            </a>{% if role.deleted_at %}<span class="ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-500">Deleted</span>{% endif %}
+                            <div class="flex items-center gap-1.5">
+                                <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: role.id}) }}"
+                                   class="text-sm font-medium text-gray-900 hover:text-indigo-600 transition-colors">
+                                    {{ role.name }}
+                                </a>{% if role.deleted_at %}<span class="inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-500">Deleted</span>{% endif %}
+                            </div>
+                            {% if role.description %}
+                                <p class="text-xs text-gray-400 mt-0.5 line-clamp-1">{{ role.description }}</p>
+                            {% endif %}
                         </div>
                     </div>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-500">{{ role.description ?? '—' }}</td>
-                <td class="px-4 py-3">
-                    <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold">
-                        {{ role.permission_count }} permission{{ role.permission_count != 1 ? 's' : '' }}
-                    </span>
+                <td class="px-4 py-3 text-sm text-gray-600">
+                    {% if role.parent_role_name %}
+                        <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: role.parent_role_id}) }}"
+                           class="text-indigo-600 hover:text-indigo-700 font-medium">
+                            {{ role.parent_role_name }}
+                        </a>
+                    {% else %}
+                        <span class="text-gray-400">—</span>
+                    {% endif %}
                 </td>
                 <td class="px-4 py-3">
-                    {% if role.is_system_role %}
-                        <span class="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-semibold">System</span>
+                    {% if role.level is not null %}
+                        {% set levelLabels = {0: 'Operational', 1: 'Supervisor', 2: 'Management', 3: 'Executive', 4: 'Owner'} %}
+                        {% set levelColors = {0: 'bg-blue-50 text-blue-700', 1: 'bg-green-50 text-green-700', 2: 'bg-amber-50 text-amber-700', 3: 'bg-purple-50 text-purple-700', 4: 'bg-red-50 text-red-700'} %}
+                        <span class="text-xs px-2 py-0.5 rounded font-semibold {{ levelColors[role.level] ?? 'bg-gray-100 text-gray-600' }}" title="Role hierarchy level">
+                            {{ levelLabels[role.level] ?? 'Unknown' }}
+                        </span>
+                    {% else %}
+                        <span class="text-xs text-gray-400">—</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    {% if role.scope == 'hq' %}
+                        <span class="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-semibold" title="Assignable at HQ/company-level nodes only">HQ only</span>
+                    {% elseif role.scope == 'region' %}
+                        <span class="text-xs bg-sky-50 text-sky-700 px-2 py-0.5 rounded font-semibold" title="Assignable at regional nodes only">Region only</span>
+                    {% elseif role.scope == 'branch' %}
+                        <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-semibold" title="Assignable at branch-level nodes only">Branch only</span>
+                    {% else %}
+                        <span class="text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-semibold" title="Assignable at any node">Any level</span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-3">
+                    {% if role.is_head_role %}
+                        <span class="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-semibold" title="Structural management role — permissions cannot be edited">Head</span>
+                    {% elseif role.is_system_role or is_protected_core_role %}
+                        <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold" title="{{ is_protected_core_role ? 'Built-in branch management role — managed by the system' : 'Built-in operational role — fully customisable' }}">System</span>
                     {% else %}
                         <span class="text-xs bg-gray-100 text-gray-600 px-2 py-0.5 rounded font-semibold">Custom</span>
                     {% endif %}
@@ -68,15 +115,15 @@
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-1">
                         {% if not role.deleted_at %}
-                        <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, id: role.id}) }}"
+                        <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: role.id}) }}"
                            class="text-xs text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 px-2.5 py-1 rounded transition-colors">
                             Permissions
                         </a>
-                        {% if can.edit and not role.is_system_role %}
+                        {% if role.can_edit and not role.is_head_role and not is_protected_core_role %}
                         <button onclick="openEditRole({{ role|json_encode|e('html_attr') }})"
                                 class="text-xs text-indigo-600 border border-indigo-200 bg-white hover:bg-indigo-50 px-2.5 py-1 rounded transition-colors">Edit</button>
                         {% endif %}
-                        {% if can.delete and not role.is_system_role %}
+                        {% if role.can_delete and not role.is_head_role and not is_protected_core_role %}
                         <button onclick="deleteRole({{ role.id }}, '{{ role.name|e('js') }}')"
                                 class="text-xs text-red-600 border border-red-200 bg-white hover:bg-red-50 px-2.5 py-1 rounded transition-colors">Delete</button>
                         {% endif %}
@@ -85,7 +132,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="5" class="px-4 py-12 text-center text-sm text-gray-400">No roles found.</td></tr>
+            <tr><td colspan="7" class="px-4 py-12 text-center text-sm text-gray-400">No roles found.</td></tr>
             {% endfor %}
             </tbody>
         </table>
@@ -94,22 +141,64 @@
 {% endblock %}
 
 {% block admin_scripts %}
+{% set is_hq_ctx = session.branch is null or session.branch.isHq %}
 <script>
 liveFilter('role-search', 'roles-table');
 
+// True when the current session is at HQ level — scope selector is only shown then.
+var IS_HQ_CTX = {{ is_hq_ctx ? 'true' : 'false' }};
+var ALLOWED_SCOPE_VALUES = {{ allowedScopes|json_encode|raw }};
+var SCOPE_LABELS = {
+    any: 'Any level — assignable at any branch',
+    hq: 'HQ only — assignable at HQ / company-level nodes',
+    region: 'Region only — assignable at regional nodes',
+    branch: 'Branch only — assignable at individual branches',
+};
+
+function buildScopeOptions(selectedScope) {
+    return ALLOWED_SCOPE_VALUES
+        .map(scope => `<option value="${scope}" ${selectedScope === scope ? 'selected' : ''}>${SCOPE_LABELS[scope] ?? scope}</option>`)
+        .join('');
+}
+
+var SCOPE_OPTIONS = `
+    <option value="any">Any level — assignable at any branch</option>
+    <option value="hq">HQ only — assignable at HQ / company-level nodes</option>
+    <option value="branch">Branch only — assignable at individual branches</option>
+`;
+
 function roleFormHtml(r = {}) {
+    const scopeBlock = IS_HQ_CTX
+        ? (() => {
+            const selectedScope = ALLOWED_SCOPE_VALUES.includes(r.scope ?? '') ? r.scope : (ALLOWED_SCOPE_VALUES[0] ?? 'branch');
+            const scopeOpts = buildScopeOptions(selectedScope);
+            return `
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Scope *</label>
+                <select id="f-scope"
+                        class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    ${scopeOpts}
+                </select>
+                <p class="mt-1 text-xs text-gray-400">Controls at which nodes this role can be assigned to users.</p>
+            </div>`;
+          })()
+        : `<div class="mb-4 px-3 py-2.5 bg-blue-50 border border-blue-100 rounded-lg text-xs text-blue-600 leading-relaxed">
+               Roles created at a branch are always <strong>Branch-scoped</strong> — they can only be assigned within this branch.
+           </div>`;
+
     return `
         <div id="drawer-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Role Name *</label>
-            <input id="f-name" type="text" value="${r.name??''}" placeholder="e.g. Manager"
-                   class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+            <input id="f-name" type="text" value="${r.name ?? ''}" placeholder="e.g. Supervisor"
+                   class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
         </div>
         <div class="mb-4">
             <label class="block text-sm font-medium text-gray-700 mb-1">Description</label>
-            <input id="f-desc" type="text" value="${r.description??''}" placeholder="What does this role do?"
-                   class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
+            <input id="f-desc" type="text" value="${r.description ?? ''}" placeholder="What does this role do?"
+                   class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
         </div>
+        ${scopeBlock}
     `;
 }
 
@@ -124,26 +213,34 @@ function openCreateRole() { openDrawer('Add Role', roleFormHtml(), drawerFooter(
 function openEditRole(r)   { openDrawer('Edit Role', roleFormHtml(r), drawerFooter(`submitEditRole(${r.id})`)); }
 
 function submitCreateRole() {
-    adminFetch('{{ path('admin_roles_create', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', {
-        name:        document.getElementById('f-name').value,
+    const errEl = document.getElementById('drawer-error');
+    const name = document.getElementById('f-name').value.trim();
+    if (!name) { errEl.textContent = 'Role name is required.'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    const scopeEl = document.getElementById('f-scope');
+    adminFetch('{{ path('admin_roles_create', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}', {
+        name:        name,
         description: document.getElementById('f-desc').value,
+        scope:       scopeEl ? scopeEl.value : 'branch',
     }, () => turboReload());
 }
 
 function submitEditRole(id) {
-    // 2026-03-19: Use the real Symfony route path. The role update endpoint is
-    // "/update", not "/edit", and generated URLs keep the tenant host/domain correct.
-    adminFetch(`{{ path('admin_roles_update', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__ROLE_ID__'}) }}`.replace('__ROLE_ID__', id), {
-        name:        document.getElementById('f-name').value,
+    const errEl = document.getElementById('drawer-error');
+    const name = document.getElementById('f-name').value.trim();
+    if (!name) { errEl.textContent = 'Role name is required.'; errEl.classList.remove('hidden'); return; }
+    errEl.classList.add('hidden');
+    const scopeEl = document.getElementById('f-scope');
+    adminFetch(`{{ path('admin_roles_update', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: '__ID__'}) }}`.replace('__ID__', id), {
+        name:        name,
         description: document.getElementById('f-desc').value,
+        scope:       scopeEl ? scopeEl.value : 'branch',
     }, () => turboReload());
 }
 
 function deleteRole(id, name) {
-    // 2026-03-19: Generate the delete URL from Symfony so role actions stay valid
-    // across dynamic tenant domains and route naming changes.
     adminDelete(
-        `{{ path('admin_roles_delete', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__ROLE_ID__'}) }}`.replace('__ROLE_ID__', id),
+        `{{ path('admin_roles_delete', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: '__ID__'}) }}`.replace('__ID__', id),
         `Delete role "${name}"? All users with this role will lose it.`,
         () => document.getElementById(`role-row-${id}`)?.remove()
     );

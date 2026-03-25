@@ -22,7 +22,7 @@ use Symfony\Component\Routing\Attribute\Route;
  *   GET /mpesa/search          → advanced search with filters
  *   GET /mpesa/search/summary  → analytics summary for a search result set
  */
-#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
+#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class SearchController extends AbstractController
 {
     public function __construct(

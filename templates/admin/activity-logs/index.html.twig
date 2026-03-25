@@ -6,8 +6,34 @@
 
 {% block admin_content %}
 
+{# ── SCOPE TOGGLE ─────────────────────────────────────────────────────────── #}
+{% if hasSubBranches is defined and hasSubBranches %}
+{% set branchName = session.branch.name ?? 'This Branch' %}
+<div class="flex items-center gap-3 mb-4">
+    <div class="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-medium bg-white">
+        <a href="?scope=branch"
+           class="px-3 h-8 flex items-center transition-colors
+                  {{ scopeMode == 'branch' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
+            {{ branchName }} only
+        </a>
+        <a href="?scope=subtree"
+           class="px-3 h-8 flex items-center border-l border-gray-200 transition-colors
+                  {{ scopeMode != 'branch' ? 'bg-indigo-600 text-white' : 'text-gray-500 hover:bg-gray-50' }}">
+            All Sub-branches
+        </a>
+    </div>
+    {% if scopeMode == 'branch' %}
+    <span class="text-xs text-amber-600 font-medium">Showing this branch only</span>
+    {% endif %}
+</div>
+{% endif %}
+
 {# ── FILTERS ───────────────────────────────────────────────────────────────── #}
 <form method="GET" class="bg-white rounded-xl border border-gray-200 p-4 mb-4">
+    {# Carry scope through filter form submissions #}
+    {% if scopeMode is defined and scopeMode != 'subtree' %}
+    <input type="hidden" name="scope" value="{{ scopeMode }}">
+    {% endif %}
     <div class="flex flex-wrap items-end gap-3">
 
         <div>
@@ -56,7 +82,7 @@
         </button>
 
         {% if filters|filter(v => v is not empty)|length > 0 %}
-        <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
+        <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch')}) }}{{ scopeMode is defined and scopeMode == 'branch' ? '?scope=branch' : '' }}"
            class="h-9 px-4 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors inline-flex items-center">
             Clear
         </a>

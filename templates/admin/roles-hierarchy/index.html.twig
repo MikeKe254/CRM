@@ -1,0 +1,231 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
+
+{% block admin_title %}Role Hierarchy{% endblock %}
+{% block admin_subtitle %}Visualize and manage the explicit role hierarchy structure{% endblock %}
+
+{% block admin_actions %}
+<a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+   class="inline-flex items-center gap-1.5 h-9 px-4 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+    Back to Roles
+</a>
+{% endblock %}
+
+{% block admin_content %}
+{% set protected_core_roles = ['Assistant Manager', 'Department Manager', 'Supervisor', 'Support Functions'] %}
+
+{# ── LEGEND ── #}
+<div class="mb-6 bg-white rounded-lg border border-gray-200 p-4">
+    <h3 class="text-sm font-semibold text-gray-900 mb-3">Role Levels</h3>
+    <div class="grid grid-cols-2 md:grid-cols-5 gap-3">
+        {% set levels = {
+            0: {label: 'Operational', color: 'bg-blue-50 text-blue-700'},
+            1: {label: 'Supervisor', color: 'bg-green-50 text-green-700'},
+            2: {label: 'Management', color: 'bg-amber-50 text-amber-700'},
+            3: {label: 'Executive', color: 'bg-purple-50 text-purple-700'},
+            4: {label: 'Owner', color: 'bg-red-50 text-red-700'}
+        } %}
+        {% for level, info in levels %}
+        <div class="flex items-center gap-2">
+            <span class="text-xs px-2 py-0.5 rounded font-semibold {{ info.color }}">{{ level }}</span>
+            <span class="text-xs text-gray-600">{{ info.label }}</span>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{# ── HIERARCHY TREE MACRO ── #}
+{% macro hierarchyNode(role, can, tenant_subdomain, tenant_domain, current_branch, depth, editableRoleIds) %}
+{% import _self as m %}
+{% set levelLabels = {0: 'Operational', 1: 'Supervisor', 2: 'Management', 3: 'Executive', 4: 'Owner'} %}
+{% set levelColors = {0: 'bg-blue-50 text-blue-700', 1: 'bg-green-50 text-green-700', 2: 'bg-amber-50 text-amber-700', 3: 'bg-purple-50 text-purple-700', 4: 'bg-red-50 text-red-700'} %}
+{% set is_protected_core_role = role.name in ['Assistant Manager', 'Department Manager', 'Supervisor', 'Support Functions'] %}
+
+<div class="hierarchy-node" id="role-node-{{ role.id }}" data-role-id="{{ role.id }}" data-level="{{ role.level }}">
+    <div class="flex items-start gap-3 px-4 py-3.5 rounded-lg border bg-white hover:border-indigo-200 transition-colors"
+         style="margin-left: {{ (depth * 32) }}px; margin-bottom: 8px;">
+
+        {# Role icon #}
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5
+                    {% if role.is_head_role %}bg-purple-100{% elseif role.is_system_role or is_protected_core_role %}bg-blue-100{% else %}bg-indigo-100{% endif %}">
+            <svg width="14" height="14" fill="none" stroke-width="1.5" viewBox="0 0 24 24"
+                 stroke="{{ role.is_head_role ? '#7c3aed' : ((role.is_system_role or is_protected_core_role) ? '#1d4ed8' : '#4f46e5') }}">
+                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+            </svg>
+        </div>
+
+        <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap mb-2">
+                <a href="{{ path('admin_roles_show', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: role.id}) }}"
+                   class="text-sm font-medium text-indigo-600 hover:text-indigo-700">
+                    {{ role.name }}
+                </a>
+
+                {# Type badge #}
+                {% if role.is_head_role %}
+                    <span class="text-[10px] font-bold uppercase tracking-wide bg-purple-50 text-purple-700 px-1.5 py-0.5 rounded">Head</span>
+                {% elseif role.is_system_role or is_protected_core_role %}
+                    <span class="text-[10px] font-bold uppercase tracking-wide bg-blue-50 text-blue-700 px-1.5 py-0.5 rounded">System</span>
+                {% else %}
+                    <span class="text-[10px] font-bold uppercase tracking-wide bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded">Custom</span>
+                {% endif %}
+
+                {# Level badge #}
+                <span class="text-xs px-2 py-0.5 rounded font-semibold {{ levelColors[role.level] ?? 'bg-gray-100 text-gray-600' }}" title="Hierarchy level">
+                    {{ levelLabels[role.level] ?? 'Unknown' }}
+                </span>
+
+                {# Scope badge #}
+                {% if role.scope == 'hq' %}
+                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-purple-50 text-purple-700">HQ only</span>
+                {% elseif role.scope == 'region' %}
+                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-sky-50 text-sky-700">Region only</span>
+                {% elseif role.scope == 'branch' %}
+                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-emerald-50 text-emerald-700">Branch only</span>
+                {% else %}
+                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded bg-gray-100 text-gray-500">Any level</span>
+                {% endif %}
+
+                {# Permissions count #}
+                <span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold">
+                    {{ role.permission_count }} perm{{ role.permission_count != 1 ? 's' : '' }}
+                </span>
+            </div>
+
+            {# Description #}
+            {% if role.description %}
+            <p class="text-xs text-gray-500 mb-2">{{ role.description }}</p>
+            {% endif %}
+
+            {# Parent info #}
+            {% if role.parent_role_name %}
+            <div class="text-xs text-gray-600">
+                <span class="text-gray-400">Parent:</span>
+                <a href="#role-node-{{ role.parent_role_id }}" class="text-indigo-600 hover:text-indigo-700 font-medium">
+                    {{ role.parent_role_name }}
+                </a>
+            </div>
+            {% endif %}
+        </div>
+
+        {# Actions #}
+        {% if can.edit and not role.is_head_role and role.id in editableRoleIds %}
+        <button onclick="openEditHierarchy({{ role.id }}, '{{ role.name|e('js') }}')"
+                class="flex-shrink-0 text-xs text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 px-2.5 py-1 rounded transition-colors">
+            Edit
+        </button>
+        {% endif %}
+    </div>
+
+    {# Children #}
+        {% if role.children|length > 0 %}
+    <div class="hierarchy-children">
+        {% for child in role.children %}
+        {{ m.hierarchyNode(child, can, tenant_subdomain, tenant_domain, current_branch, depth + 1, editableRoleIds) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endmacro %}
+
+{# ── TREE ── #}
+{% if tree|length > 0 %}
+{% import _self as macros %}
+<div id="hierarchy-tree" class="space-y-2">
+    {% for root in tree %}
+    {{ macros.hierarchyNode(root, can, tenant_subdomain, tenant_domain, current_branch, 0, editableRoleIds) }}
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-lg border border-gray-200 px-4 py-12 text-center">
+    <p class="text-sm text-gray-400">No role hierarchy defined yet.</p>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+function openEditHierarchy(roleId, roleName) {
+    const roles = {{ allRoles|json_encode|raw }};
+    const editableRoleIds = {{ editableRoleIds|json_encode|raw }};
+    const assignableParentRoleIds = {{ assignableParentRoleIds|json_encode|raw }};
+    const maxAssignableLevel = {{ maxAssignableLevel is null ? 'null' : maxAssignableLevel }};
+    const currentRole = roles.find(r => r.id === roleId);
+
+    if (!currentRole) {
+        alert('Role not found');
+        return;
+    }
+
+    if (!editableRoleIds.includes(roleId)) {
+        adminAlert('You cannot edit a role at your hierarchy level or above.');
+        return;
+    }
+
+    const assignableParents = roles.filter(r => {
+        return r.id !== roleId &&
+               assignableParentRoleIds.includes(r.id) &&
+               (r.level === null || r.level >= (currentRole.level ?? 0)) &&
+               (maxAssignableLevel === null || (r.level ?? 0) <= maxAssignableLevel);
+    });
+
+    const parentOpts = assignableParents
+        .map(r => `<option value="${r.id}" ${currentRole.parent_role_id === r.id ? 'selected' : ''}>${r.name}</option>`)
+        .join('');
+
+    const levelOpts = [0, 1, 2, 3, 4]
+        .filter(l => maxAssignableLevel === null || l < maxAssignableLevel)
+        .map(l => {
+            const labels = {0: 'Operational', 1: 'Supervisor', 2: 'Management', 3: 'Executive', 4: 'Owner'};
+            return `<option value="${l}" ${currentRole.level === l ? 'selected' : ''}>${l} - ${labels[l]}</option>`;
+        })
+        .join('');
+
+    const body = `
+        <div id="drawer-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Parent Role</label>
+            <select id="f-parent"
+                    class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <option value="">None (root role)</option>${parentOpts}
+            </select>
+            <p class="mt-1 text-xs text-gray-400">Select the parent role in the hierarchy.</p>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Level *</label>
+            <select id="f-level"
+                    class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                ${levelOpts}
+            </select>
+            <p class="mt-1 text-xs text-gray-400">0=Operational, 1=Supervisor, 2=Management, 3=Executive, 4=Owner</p>
+        </div>
+    `;
+
+    const footer = `
+        <button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+        <button data-primary onclick="submitEditHierarchy(${roleId})" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>
+    `;
+
+    openDrawer(`Edit Hierarchy - ${roleName}`, body, footer);
+}
+
+function submitEditHierarchy(roleId) {
+    const parentId = document.getElementById('f-parent').value || null;
+    const level = document.getElementById('f-level').value;
+
+    const url = `{{ path('admin_roles_hierarchy_set_parent', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: '__ID__'}) }}`
+        .replace('__ID__', roleId);
+
+    adminFetch(url, {
+        parent_role_id: parentId,
+        level: level,
+    }, () => turboReload());
+}
+</script>
+{% endblock %}

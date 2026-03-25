@@ -7,6 +7,7 @@ namespace App\Controller\Platform;
 use App\Services\Auth\AuthService;
 use App\Services\Permission\PlatformCheckPermissionService;
 use Doctrine\DBAL\Connection;
+use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
@@ -35,6 +36,7 @@ final class PlatformAdminController extends PlatformBaseController
             'SELECT pa.id,
                     pa.name,
                     pa.email,
+                    pa.mobile,
                     pa.status,
                     pa.is_platform_owner,
                     pa.is_system_account,
@@ -51,7 +53,36 @@ final class PlatformAdminController extends PlatformBaseController
 
         return $this->render('platform/platform_admins/index.html.twig', [
             'session' => $session,
-            'admins' => $admins,
+            'admins'  => $admins,
         ]);
+    }
+
+    #[Route('/{id}/edit', name: 'platform_admins_edit', methods: ['POST'])]
+    public function edit(int $id, Request $request): JsonResponse
+    {
+        $session = $this->requirePlatformOwner($request);
+        if ($session instanceof Response) {
+            return new JsonResponse(['success' => false, 'message' => 'Unauthorized.'], 403);
+        }
+
+        $admin = $this->db->fetchAssociative(
+            'SELECT id, name FROM platform_admins WHERE id = :id',
+            ['id' => $id],
+        );
+
+        if (!$admin) {
+            return new JsonResponse(['success' => false, 'message' => 'Admin not found.'], 404);
+        }
+
+        $name   = trim((string) $request->request->get('name', ''));
+        $mobile = trim((string) $request->request->get('mobile', '')) ?: null;
+
+        if ($name === '') {
+            return new JsonResponse(['success' => false, 'message' => 'Name is required.']);
+        }
+
+        $this->db->update('platform_admins', ['name' => $name, 'mobile' => $mobile], ['id' => $id]);
+
+        return new JsonResponse(['success' => true, 'message' => 'Updated.']);
     }
 }

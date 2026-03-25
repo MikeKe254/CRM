@@ -16,6 +16,12 @@ use Symfony\Component\Routing\Attribute\Route;
 #[Route('/platform/access', host: 'admin.{domain}', requirements: ['domain' => '.+'])]
 final class AccessController extends PlatformBaseController
 {
+    private const OWNER_ONLY_PLATFORM_PERMISSION_KEYS = [
+        'MANAGE_PLATFORM_OWNERS',
+        'ASSIGN_OWNER_ROLE',
+        'EDIT_PLATFORM_CORE_SETTINGS',
+    ];
+
     public function __construct(
         AuthService $auth,
         PlatformCheckPermissionService $platformCan,
@@ -56,8 +62,8 @@ final class AccessController extends PlatformBaseController
             || $this->platformCan->check($session, 'view_deleted_entries');
 
         $users = $canViewUsers ? $this->db->fetchAllAssociative(
-            'SELECT pa.id, pa.name, pa.email, pa.status,
-                    pa.is_platform_owner, pa.is_system_account, pa.created_at,
+            'SELECT pa.id, pa.name, pa.email, pa.mobile, pa.status,
+                    pa.is_platform_owner, pa.is_system_account, pa.created_at, pa.deleted_at,
                     GROUP_CONCAT(DISTINCT pr.name  ORDER BY pr.name  SEPARATOR \', \') AS role_names,
                     GROUP_CONCAT(DISTINCT pr.id    ORDER BY pr.id)                    AS role_ids
                FROM platform_admins pa
@@ -112,6 +118,9 @@ final class AccessController extends PlatformBaseController
         // Group permissions by category — non-owners only see permissions they hold
         $permissionsByCategory = [];
         foreach ($permissions as $p) {
+            if (!$isOwner && in_array((string) $p['action_key'], self::OWNER_ONLY_PLATFORM_PERMISSION_KEYS, true)) {
+                continue;
+            }
             if (!$isOwner && !in_array((int) $p['id'], $ownedPermissionIds, true)) {
                 continue;
             }
@@ -172,6 +181,7 @@ final class AccessController extends PlatformBaseController
 
         $name     = trim((string) $request->request->get('name', ''));
         $email    = strtolower(trim((string) $request->request->get('email', '')));
+        $mobile   = trim((string) $request->request->get('mobile', '')) ?: null;
         $password = (string) $request->request->get('password', '');
         $status   = in_array($request->request->get('status'), ['active', 'inactive', 'suspended'], true)
                         ? $request->request->get('status')
@@ -193,6 +203,7 @@ final class AccessController extends PlatformBaseController
             $this->db->insert('platform_admins', [
                 'name'               => $name,
                 'email'              => $email,
+                'mobile'             => $mobile,
                 'password'           => password_hash($password, PASSWORD_DEFAULT),
                 'status'             => $status,
                 'is_platform_owner'  => 0,
@@ -213,6 +224,7 @@ final class AccessController extends PlatformBaseController
 
         $name   = trim((string) $request->request->get('name', ''));
         $email  = strtolower(trim((string) $request->request->get('email', '')));
+        $mobile = trim((string) $request->request->get('mobile', '')) ?: null;
         $status = in_array($request->request->get('status'), ['active', 'inactive', 'suspended'], true)
                       ? $request->request->get('status')
                       : 'active';
@@ -264,6 +276,7 @@ final class AccessController extends PlatformBaseController
             $this->db->update('platform_admins', [
                 'name'   => $name,
                 'email'  => $email,
+                'mobile' => $mobile,
                 'status' => $status,
             ], ['id' => $id]);
 
@@ -478,6 +491,28 @@ final class AccessController extends PlatformBaseController
         // Privilege escalation guard: you cannot assign a permission you do not hold yourself.
         // Platform owners bypass this (isPlatformOwner → check() always returns true).
         if (!$this->platformCan->isPlatformOwner($session) && count($permissionIds) > 0) {
+            $ownerOnlySelected = (int) $this->db->fetchOne(
+                'SELECT COUNT(*)
+                   FROM platform_permissions pp
+                  WHERE pp.id IN (:ids)
+                    AND pp.action_key IN (:owner_only_keys)',
+                [
+                    'ids' => array_values($permissionIds),
+                    'owner_only_keys' => self::OWNER_ONLY_PLATFORM_PERMISSION_KEYS,
+                ],
+                [
+                    'ids' => ArrayParameterType::INTEGER,
+                    'owner_only_keys' => ArrayParameterType::STRING,
+                ],
+            );
+
+            if ($ownerOnlySelected > 0) {
+                return new JsonResponse([
+                    'ok' => false,
+                    'error' => 'Only the platform owner can view or assign owner-only platform permissions.',
+                ], 403);
+            }
+
             $unowned = (int) $this->db->fetchOne(
                 'SELECT COUNT(*)
                    FROM platform_permissions pp

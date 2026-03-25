@@ -491,6 +491,7 @@ final class AuthService
         string $ipAddress,
     ): void {
         $expiresAt = (new \DateTimeImmutable())->modify('+30 days')->format('Y-m-d H:i:s');
+        $branchId = $this->resolveTerminalBranchId($companyId, $authorizedByUserId);
 
         $existing = $this->db->fetchAssociative(
             'SELECT id FROM pos_terminals
@@ -504,6 +505,7 @@ final class AuthService
             $this->db->executeStatement(
                 'UPDATE pos_terminals
                  SET    authorized_by_user_id = :user_id,
+                        branch_id             = :branch_id,
                         device_name           = :device_name,
                         ip_address            = :ip_address,
                         authorized_at         = NOW(),
@@ -512,6 +514,7 @@ final class AuthService
                  WHERE  id = :id',
                 [
                     'user_id'     => $authorizedByUserId,
+                    'branch_id'   => $branchId,
                     'device_name' => $deviceName,
                     'ip_address'  => $ipAddress,
                     'expires_at'  => $expiresAt,
@@ -521,6 +524,7 @@ final class AuthService
         } else {
             $this->db->insert('pos_terminals', [
                 'company_id'            => $companyId,
+                'branch_id'             => $branchId,
                 'terminal_identifier'   => $terminalIdentifier,
                 'authorized_by_user_id' => $authorizedByUserId,
                 'device_name'           => $deviceName,
@@ -529,6 +533,96 @@ final class AuthService
                 'expires_at'            => $expiresAt,
             ]);
         }
+    }
+
+    private function resolveTerminalBranchId(int $companyId, int $authorizedByUserId): ?int
+    {
+        if (!$this->isMultiBranchEnabled($companyId)) {
+            $singleBranchId = $this->db->fetchOne(
+                'SELECT id
+                   FROM branches
+                  WHERE company_id = :company_id
+                    AND slug = :slug
+                    AND deleted_at IS NULL
+                  LIMIT 1',
+                [
+                    'company_id' => $companyId,
+                    'slug' => 'head-office-branch',
+                ],
+            );
+
+            if ($singleBranchId !== false) {
+                return (int) $singleBranchId;
+            }
+        }
+
+        if ($authorizedByUserId > 0) {
+            $nodeId = $this->db->fetchOne(
+                'SELECT unr.node_id
+                   FROM user_node_roles unr
+                   JOIN branches b ON b.id = unr.node_id
+                  WHERE unr.user_id = :user_id
+                    AND b.company_id = :company_id
+                    AND b.deleted_at IS NULL
+                  ORDER BY unr.is_primary DESC, unr.node_id ASC
+                  LIMIT 1',
+                [
+                    'user_id' => $authorizedByUserId,
+                    'company_id' => $companyId,
+                ],
+            );
+
+            if ($nodeId !== false) {
+                return (int) $nodeId;
+            }
+        }
+
+        return null;
+    }
+
+    private function isMultiBranchEnabled(int $companyId): bool
+    {
+        $platformReleased = (bool) $this->db->fetchOne(
+            'SELECT platform_released FROM modules WHERE slug = :slug LIMIT 1',
+            ['slug' => 'multi_branch'],
+        );
+
+        if (!$platformReleased) {
+            return false;
+        }
+
+        $inPlan = (bool) $this->db->fetchOne(
+            'SELECT 1
+               FROM company_subscriptions cs
+               JOIN plan_features pf        ON pf.plan_id      = cs.plan_id
+               JOIN module_features mf      ON mf.id           = pf.feature_id
+               JOIN module_submodules ms    ON ms.id           = mf.submodule_id
+               JOIN modules m               ON m.id            = ms.module_id
+              WHERE cs.company_id = :cid
+                AND m.slug        = :module
+                AND cs.status    IN (\'trial\', \'active\')
+                AND (cs.ends_at IS NULL OR cs.ends_at > NOW())
+              LIMIT 1',
+            ['cid' => $companyId, 'module' => 'multi_branch'],
+        );
+
+        if ($inPlan) {
+            return true;
+        }
+
+        return (bool) $this->db->fetchOne(
+            'SELECT tfo.is_enabled
+               FROM tenant_feature_overrides tfo
+               JOIN module_features mf   ON mf.id  = tfo.feature_id
+               JOIN module_submodules ms ON ms.id  = mf.submodule_id
+               JOIN modules m            ON m.id   = ms.module_id
+              WHERE tfo.company_id = :cid
+                AND m.slug         = :module
+                AND tfo.is_enabled = 1
+                AND (tfo.expires_at IS NULL OR tfo.expires_at > NOW())
+              LIMIT 1',
+            ['cid' => $companyId, 'module' => 'multi_branch'],
+        );
     }
 
     // =========================================================================

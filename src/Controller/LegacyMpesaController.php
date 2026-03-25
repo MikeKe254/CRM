@@ -15,7 +15,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * Serves the POS dashboard.
  * Access is gated by the angavu_terminal cookie.
  */
-#[Route('/legacy/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
+#[Route('/legacy/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class LegacyMpesaController extends AbstractController
 {
     public function __construct(

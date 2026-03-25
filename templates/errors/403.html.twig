@@ -1,6 +1,7 @@
 {% extends 'layouts/admin.html.twig' %}
 {% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
 {% set tenant_domain = currentDomain() %}
+{% set current_branch = session.branch is defined and session.branch ? session.branch.slug : app.request.attributes.get('branch') %}
 
 {% block admin_title %}{% endblock %}
 {% block admin_subtitle %}{% endblock %}
@@ -63,7 +64,7 @@
 
                 {# ── ACTIONS ── #}
                 <div class="flex items-center gap-3">
-                    <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
+                    <a href="{{ current_branch ? path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) : path('app_branch_picker', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
                        class="inline-flex items-center gap-2 h-10 px-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-lg transition-colors shadow-sm">
                         {{ ux_icon('lucide:layout-dashboard', {width: 15, height: 15}) }}
                         Go to Dashboard

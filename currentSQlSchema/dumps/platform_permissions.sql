@@ -116,7 +116,9 @@ INSERT INTO `platform_permissions` (`id`, `name`, `category`, `description`, `ac
 (73, 'delete_platform_roles', 'platform_admins', 'Delete platform role definitions.', 'DELETE_PLATFORM_ROLES', '2026-03-20 00:00:00'),
 (74, 'suspend_platform_admins', 'platform_admins', 'Suspend platform admin accounts.', 'SUSPEND_PLATFORM_ADMINS', '2026-03-20 00:00:00'),
 (75, 'view_superadmin_activity_logs', 'audit_security', 'View activity logs for platform admins.', 'VIEW_SUPERADMIN_ACTIVITY_LOGS', '2026-03-20 00:00:00'),
-(76, 'view_owner_activity_logs', 'audit_security', 'View activity logs for the platform owner.', 'VIEW_OWNER_ACTIVITY_LOGS', '2026-03-20 00:00:00');
+(76, 'view_owner_activity_logs', 'audit_security', 'View activity logs for the platform owner.', 'VIEW_OWNER_ACTIVITY_LOGS', '2026-03-20 00:00:00'),
+(78, 'manage_company_org_chart', 'company_access', 'Manage a company organisation chart while inside company context.', 'MANAGE_COMPANY_ORG_CHART', '2026-03-24 00:00:00'),
+(79, 'view_company_org_chart', 'company_access', 'View a company organisation chart while inside company context.', 'VIEW_COMPANY_ORG_CHART', '2026-03-24 00:00:00');
 
 --
 -- Indexes for dumped tables
@@ -145,3 +147,34 @@ COMMIT;
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;
 /*!40101 SET CHARACTER_SET_RESULTS=@OLD_CHARACTER_SET_RESULTS */;
 /*!40101 SET COLLATION_CONNECTION=@OLD_COLLATION_CONNECTION */;
+
+-- ============================================================
+-- Grant: Tenant Dashboard Access role + award to Mike US
+-- Run once to enable non-owner platform admins to access
+-- company dashboards via ACCESS_COMPANY_CONTEXT permission.
+-- ============================================================
+
+-- 1. Create the "Tenant Access" platform role (skip if already exists)
+INSERT IGNORE INTO `platform_roles` (`name`, `description`, `is_system_role`, `created_at`)
+VALUES ('Tenant Access', 'Allows a platform admin to open and navigate company (tenant) dashboards.', 1, NOW());
+
+-- 2. Link ACCESS_COMPANY_CONTEXT (id=15) to the new role
+INSERT IGNORE INTO `platform_role_permissions` (`platform_role_id`, `platform_permission_id`, `created_at`)
+SELECT r.id, 15, NOW()
+FROM `platform_roles` r
+WHERE r.name = 'Tenant Access';
+
+-- 3. Award the role to Mike US (adjust name/email if different)
+INSERT IGNORE INTO `platform_admin_roles` (`platform_admin_id`, `platform_role_id`, `created_at`)
+SELECT pa.id, r.id, NOW()
+FROM `platform_admins` pa
+JOIN `platform_roles` r ON r.name = 'Tenant Access'
+WHERE pa.name = 'Mike US';
+
+-- Verify: should return 1 row for Mike US with ACCESS_COMPANY_CONTEXT
+-- SELECT pa.name, pp.action_key
+-- FROM platform_admin_roles par
+-- JOIN platform_admins pa ON pa.id = par.platform_admin_id
+-- JOIN platform_role_permissions prp ON prp.platform_role_id = par.platform_role_id
+-- JOIN platform_permissions pp ON pp.id = prp.platform_permission_id
+-- WHERE pa.name = 'Mike US' AND pp.action_key = 'ACCESS_COMPANY_CONTEXT';

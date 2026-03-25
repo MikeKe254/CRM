@@ -110,7 +110,7 @@ function revokeTerminal(id, name) {
     // 2026-03-19: Generate the revoke URL from Symfony so terminal actions stay
     // valid across dynamic tenant domains.
     adminDelete(
-        `{{ path('admin_terminals_revoke', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__TERMINAL_ID__'}) }}`.replace('__TERMINAL_ID__', id),
+        `{{ path('admin_terminals_revoke', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch'), id: '__TERMINAL_ID__'}) }}`.replace('__TERMINAL_ID__', id),
         `Revoke "${name}"? Staff will no longer be able to PIN login on this device.`,
         () => turboReload()
     );
@@ -120,7 +120,7 @@ function reactivateTerminal(id, name) {
     if (!confirm(`Reactivate "${name}" for 30 days?`)) return;
     // 2026-03-19: Generate the reactivate URL from Symfony so terminal actions
     // do not depend on hardcoded admin paths.
-    fetch(`{{ path('admin_terminals_reactivate', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__TERMINAL_ID__'}) }}`.replace('__TERMINAL_ID__', id), { method: 'POST' })
+    fetch(`{{ path('admin_terminals_reactivate', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch'), id: '__TERMINAL_ID__'}) }}`.replace('__TERMINAL_ID__', id), { method: 'POST' })
         .then(r => r.json())
         .then(d => { if (d.success) turboReload(); else alert(d.message); });
 }

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Controller\Platform;
 
 use App\Services\Auth\AuthService;
+use App\Services\Feature\PlatformFeatureService;
 use App\Services\Permission\PlatformCheckPermissionService;
 use Doctrine\DBAL\Connection;
 use Symfony\Component\HttpFoundation\JsonResponse;
@@ -19,6 +20,7 @@ final class ModuleController extends PlatformBaseController
         AuthService $auth,
         PlatformCheckPermissionService $platformCan,
         private readonly Connection $db,
+        private readonly PlatformFeatureService $platform,
     ) {
         parent::__construct($auth, $platformCan);
     }
@@ -35,7 +37,7 @@ final class ModuleController extends PlatformBaseController
 
         // Three flat queries, tree assembled in PHP — no N+1
         $modules = $this->db->fetchAllAssociative(
-            'SELECT id, name, slug, icon, description, sort_order, is_active
+            'SELECT id, name, slug, icon, description, sort_order, is_active, platform_released
                FROM modules
               ORDER BY sort_order ASC, name ASC',
         );
@@ -47,7 +49,7 @@ final class ModuleController extends PlatformBaseController
         );
 
         $features = $this->db->fetchAllAssociative(
-            'SELECT id, submodule_id, name, slug, description, sort_order, is_active
+            'SELECT id, submodule_id, name, slug, description, sort_order, is_active, platform_released
                FROM module_features
               ORDER BY sort_order ASC, name ASC',
         );
@@ -253,12 +255,13 @@ final class ModuleController extends PlatformBaseController
 
         try {
             $this->db->insert('module_features', [
-                'submodule_id' => $submoduleId,
-                'name'         => $name,
-                'slug'         => $this->normalizeSlug($slug),
-                'description'  => $desc,
-                'sort_order'   => $order,
-                'is_active'    => 1,
+                'submodule_id'     => $submoduleId,
+                'name'             => $name,
+                'slug'             => $this->normalizeSlug($slug),
+                'description'      => $desc,
+                'sort_order'       => $order,
+                'is_active'        => 1,
+                'platform_released' => 0,
             ]);
 
             return new JsonResponse(['ok' => true]);
@@ -306,6 +309,38 @@ final class ModuleController extends PlatformBaseController
         } catch (\Throwable $e) {
             return new JsonResponse(['ok' => false, 'error' => $this->dbError($e)]);
         }
+    }
+
+    // =========================================================================
+    // RELEASE GATES
+    // =========================================================================
+
+    #[Route('/{id}/release', name: 'platform_modules_toggle_release', methods: ['POST'])]
+    public function toggleModuleRelease(int $id, Request $request): JsonResponse
+    {
+        $session = $this->requirePlatformOwner($request);
+        if ($session instanceof Response) {
+            return new JsonResponse(['ok' => false, 'error' => 'Unauthorized'], 403);
+        }
+
+        $released = (bool) $request->request->get('released', 0);
+        $this->platform->toggleModule($id, $released);
+
+        return new JsonResponse(['ok' => true, 'released' => $released]);
+    }
+
+    #[Route('/features/{id}/release', name: 'platform_features_toggle_release', methods: ['POST'])]
+    public function toggleRelease(int $id, Request $request): JsonResponse
+    {
+        $session = $this->requirePlatformOwner($request);
+        if ($session instanceof Response) {
+            return new JsonResponse(['ok' => false, 'error' => 'Unauthorized'], 403);
+        }
+
+        $released = (bool) $request->request->get('released', 0);
+        $this->platform->toggle($id, $released);
+
+        return new JsonResponse(['ok' => true, 'released' => $released]);
     }
 
     // =========================================================================

@@ -1,0 +1,44 @@
+{% extends 'layouts/auth.html.twig' %}
+{% set tenant_subdomain = app.request.attributes.get('subdomain') %}
+{% set tenant_domain = currentDomain() %}
+
+{% block auth_title %}No Branch Access | {{ session.company.name }}{% endblock %}
+
+{% block auth_content %}
+
+    <div class="text-center">
+        <div class="mx-auto mb-4 flex items-center justify-center"
+             style="width:48px;height:48px;background:#fef2f2;border-radius:12px;">
+            <svg width="24" height="24" fill="none" stroke="#dc2626" stroke-width="1.5" viewBox="0 0 24 24">
+                <circle cx="12" cy="12" r="10"/>
+                <line x1="12" y1="8" x2="12" y2="12"/>
+                <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+        </div>
+
+        <h2 class="text-xl font-semibold text-gray-800 mb-2">No Branch Access</h2>
+        <p class="text-sm text-gray-500 mb-6">
+            Your account has not been assigned to any branch yet.<br>
+            Please contact your administrator to get access.
+        </p>
+
+        <div class="text-xs text-gray-400">
+            Signed in as <strong>{{ session.user.name }}</strong> &bull; {{ session.company.name }}
+        </div>
+
+        <div class="mt-4">
+            <button onclick="logoutNoAccess('{{ path('app_logout', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', '{{ path('app_login', {subdomain: tenant_subdomain, domain: tenant_domain}) }}')"
+                    class="text-sm text-indigo-600 hover:text-indigo-800 font-medium">
+                Sign out and try another account
+            </button>
+        </div>
+    </div>
+
+<script>
+function logoutNoAccess(logoutUrl, loginUrl) {
+    fetch(logoutUrl, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+        .finally(() => { window.location.href = loginUrl; });
+}
+</script>
+
+{% endblock %}

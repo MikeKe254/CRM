@@ -24,8 +24,10 @@ final class PlatformCheckPermissionService
 
         // ── Platform role management (CRUD + permission assignment) ──────────
         'view_roles'         => ['ASSIGN_PLATFORM_ROLES'],
+        'view_roles_hierarchy' => ['ASSIGN_PLATFORM_ROLES'],
         'create_roles'       => ['CREATE_PLATFORM_ROLES'],
         'edit_roles'         => ['EDIT_PLATFORM_ROLES'],
+        'edit_roles_hierarchy' => ['EDIT_PLATFORM_ROLES'],
         'delete_roles'       => ['DELETE_PLATFORM_ROLES'],
         'assign_permissions' => ['ASSIGN_PLATFORM_ROLES'],
 
@@ -33,6 +35,11 @@ final class PlatformCheckPermissionService
         'view_permissions'   => ['VIEW_PLATFORM_PERMISSIONS'],
         // create_permissions / delete_permissions: no mapping → resolves to
         // CREATE_PERMISSIONS / DELETE_PERMISSIONS which don't exist → only owners
+
+        // ── Tenant dashboard access ──────────────────────────────────────────
+        'access_company_context' => ['ACCESS_COMPANY_CONTEXT'],
+        'view_company_org_chart' => ['VIEW_COMPANY_ORG_CHART'],
+        'manage_company_org_chart' => ['MANAGE_COMPANY_ORG_CHART'],
 
         // ── Misc ─────────────────────────────────────────────────────────────
         'authorize_pos_terminal' => ['AUTHORIZE_TERMINALS'],

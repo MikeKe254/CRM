@@ -15,7 +15,7 @@ final class TenantEntryController extends AbstractController
         private readonly Connection $db,
     ) {}
 
-    #[Route('/', name: 'tenant_entry', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'], methods: ['GET'])]
+    #[Route('/', name: 'tenant_entry', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'], methods: ['GET'])]
     public function index(string $subdomain, string $domain): Response
     {
         $exists = (bool) $this->db->fetchOne(
@@ -24,7 +24,7 @@ final class TenantEntryController extends AbstractController
         );
 
         if ($exists) {
-            return $this->redirectToRoute('app_dashboard', [
+            return $this->redirectToRoute('app_login', [
                 'subdomain' => $subdomain,
                 'domain' => $domain,
             ]);

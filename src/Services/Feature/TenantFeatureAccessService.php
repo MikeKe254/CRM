@@ -140,6 +140,20 @@ final class TenantFeatureAccessService
     public const FEATURE_EVENT_TRIGGERS        = 'event_triggers';
     public const FEATURE_EXTERNAL_SYNC         = 'external_sync';
 
+    // ── Multi Branch ─────────────────────────────────────────────────────────
+    public const FEATURE_BRANCH_CREATE                 = 'branch_create';
+    public const FEATURE_BRANCH_EDIT                   = 'branch_edit';
+    public const FEATURE_BRANCH_SETTINGS               = 'branch_settings';
+    public const FEATURE_BRANCH_DEACTIVATE             = 'branch_deactivate';
+    public const FEATURE_BRANCH_HIERARCHY_SETUP        = 'branch_hierarchy_setup';
+    public const FEATURE_BRANCH_HIERARCHY_VIEW         = 'branch_hierarchy_view';
+    public const FEATURE_BRANCH_ROLE_ASSIGNMENT        = 'branch_role_assignment';
+    public const FEATURE_BRANCH_USER_ASSIGNMENT        = 'branch_user_assignment';
+    public const FEATURE_BRANCH_PERMISSION_MANAGEMENT  = 'branch_permission_management';
+    public const FEATURE_BRANCH_REVENUE_REPORT         = 'branch_revenue_report';
+    public const FEATURE_BRANCH_PERFORMANCE_COMPARISON = 'branch_performance_comparison';
+    public const FEATURE_CROSS_BRANCH_ANALYTICS        = 'cross_branch_analytics';
+
     // ── Settings ─────────────────────────────────────────────────────────────
     public const FEATURE_BUSINESS_SETTINGS     = 'business_settings';
     public const FEATURE_MODULE_TOGGLES        = 'module_toggles';
@@ -158,9 +172,11 @@ final class TenantFeatureAccessService
      * Value: bool — true = has access, false = no access
      */
     private array $cache = [];
+    private ?bool $hasGraceEndsAtColumn = null;
 
     public function __construct(
         private readonly Connection $db,
+        private readonly PlatformFeatureService $platform,
     ) {}
 
     // =========================================================================
@@ -185,6 +201,11 @@ final class TenantFeatureAccessService
 
         if (array_key_exists($cacheKey, $this->cache)) {
             return $this->cache[$cacheKey];
+        }
+
+        // ── 0. Platform gate — unreleased features are off for everyone ──────
+        if (!$this->platform->isReleased($featureSlug)) {
+            return $this->cache[$cacheKey] = false;
         }
 
         // ── 1. Check tenant_feature_overrides (explicit override wins) ────────
@@ -216,16 +237,7 @@ final class TenantFeatureAccessService
               WHERE cs.company_id = :company_id
                 AND mf.slug       = :slug
                 AND mf.is_active  = 1
-                AND (
-                      -- Normal active/trial access
-                      (cs.status IN (\'trial\', \'active\')
-                       AND (cs.ends_at IS NULL OR cs.ends_at > NOW()))
-                      OR
-                      -- Past due but within grace period
-                      (cs.status = \'past_due\'
-                       AND cs.grace_ends_at IS NOT NULL
-                       AND cs.grace_ends_at > NOW())
-                    )
+                AND ' . $this->subscriptionAccessCondition() . '
               LIMIT 1',
             ['company_id' => $companyId, 'slug' => $featureSlug],
         );
@@ -302,14 +314,7 @@ final class TenantFeatureAccessService
                JOIN module_features mf ON mf.id      = pf.feature_id
               WHERE cs.company_id = :company_id
                 AND mf.is_active  = 1
-                AND (
-                      (cs.status IN (\'trial\', \'active\')
-                       AND (cs.ends_at IS NULL OR cs.ends_at > NOW()))
-                      OR
-                      (cs.status = \'past_due\'
-                       AND cs.grace_ends_at IS NOT NULL
-                       AND cs.grace_ends_at > NOW())
-                    )',
+                AND ' . $this->subscriptionAccessCondition(),
             ['company_id' => $companyId],
         );
 
@@ -343,5 +348,44 @@ final class TenantFeatureAccessService
     public function clearCache(): void
     {
         $this->cache = [];
+    }
+
+    private function subscriptionAccessCondition(): string
+    {
+        $baseCondition = "(
+              (cs.status IN ('trial', 'active')
+               AND (cs.ends_at IS NULL OR cs.ends_at > NOW()))
+            )";
+
+        if (!$this->hasGraceEndsAtColumn()) {
+            return $baseCondition;
+        }
+
+        return "(
+              (cs.status IN ('trial', 'active')
+               AND (cs.ends_at IS NULL OR cs.ends_at > NOW()))
+              OR
+              (cs.status = 'past_due'
+               AND cs.grace_ends_at IS NOT NULL
+               AND cs.grace_ends_at > NOW())
+            )";
+    }
+
+    private function hasGraceEndsAtColumn(): bool
+    {
+        if ($this->hasGraceEndsAtColumn !== null) {
+            return $this->hasGraceEndsAtColumn;
+        }
+
+        $exists = $this->db->fetchOne(
+            "SELECT 1
+               FROM INFORMATION_SCHEMA.COLUMNS
+              WHERE TABLE_SCHEMA = DATABASE()
+                AND TABLE_NAME = 'company_subscriptions'
+                AND COLUMN_NAME = 'grace_ends_at'
+              LIMIT 1",
+        );
+
+        return $this->hasGraceEndsAtColumn = (bool) $exists;
     }
 }

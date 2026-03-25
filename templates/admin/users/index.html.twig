@@ -23,6 +23,24 @@
             <input id="user-search" type="text" placeholder="Search users…"
                    class="h-9 pl-8 pr-3 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 w-56">
         </div>
+
+        {# Scope toggle — only shown when user has sub-branches #}
+        {% if hasSubBranches is defined and hasSubBranches %}
+        {% set branchName = session.branch.name ?? 'This Branch' %}
+        <div class="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+            <a href="?scope=branch"
+               class="px-3 h-8 flex items-center transition-colors
+                      {{ scopeMode == 'branch' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50' }}">
+                {{ branchName }}
+            </a>
+            <a href="?scope=subtree"
+               class="px-3 h-8 flex items-center border-l border-gray-200 transition-colors
+                      {{ scopeMode != 'branch' ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50' }}">
+                All Sub-branches
+            </a>
+        </div>
+        {% endif %}
+
         <span class="ml-auto text-xs text-gray-400">{{ users|length }} user{{ users|length != 1 ? 's' : '' }}</span>
     </div>
 
@@ -49,12 +67,23 @@
                             {{ user.name|first|upper }}
                         </div>
                         <div>
-                            <div class="text-sm font-medium text-gray-900">{{ user.name }}{% if user.deleted_at %}<span class="ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-500">Deleted</span>{% endif %}</div>
+                            <div class="text-sm font-medium text-gray-900">
+                                {{ user.name }}
+                                {% if user.is_current_tenant_user %}
+                                    <span class="ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-indigo-50 text-indigo-600">Me</span>
+                                {% endif %}
+                                {% if user.deleted_at %}
+                                    <span class="ml-2 inline-block rounded px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wide bg-red-50 text-red-500">Deleted</span>
+                                {% endif %}
+                            </div>
                             {% if user.is_super_admin %}<span class="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">Super Admin</span>{% endif %}
                         </div>
                     </div>
                 </td>
-                <td class="px-4 py-3 text-sm text-gray-500">{{ user.email ?? '—' }}</td>
+                <td class="px-4 py-3">
+                    <div class="text-sm text-gray-500">{{ user.email ?? '—' }}</div>
+                    {% if user.mobile %}<div class="text-xs text-gray-400 mt-0.5">{{ user.mobile }}</div>{% endif %}
+                </td>
                 <td class="px-4 py-3">
                     {% if user.roles %}
                         {% for role in user.roles|split(', ') %}
@@ -78,7 +107,7 @@
                     {% endif %}
                 </td>
                 <td class="px-4 py-3">
-                    {% if can.edit %}
+                    {% if can.edit and user.can_toggle_access %}
                     <label class="toggle-switch">
                         <input type="checkbox" data-access-toggle="dashboard" {{ user.can_dashboard_login ? 'checked' : '' }} onchange="toggleUserAccess({{ user.id }}, 'dashboard', this.checked)">
                         <span class="toggle-slider"></span>
@@ -86,7 +115,7 @@
                     {% else %}{{ user.can_dashboard_login ? '✓' : '—' }}{% endif %}
                 </td>
                 <td class="px-4 py-3">
-                    {% if can.edit %}
+                    {% if can.edit and user.can_toggle_access %}
                     <label class="toggle-switch">
                         <input type="checkbox" data-access-toggle="pos" {{ user.can_pos_login ? 'checked' : '' }} onchange="toggleUserAccess({{ user.id }}, 'pos', this.checked)">
                         <span class="toggle-slider"></span>
@@ -96,11 +125,13 @@
                 <td class="px-4 py-3">
                     <div class="flex items-center gap-1">
                         {% if not user.deleted_at %}
-                        {% if can.edit %}
+                        <button onclick="openUserDetail({{ user|json_encode|e('html_attr') }})"
+                                class="text-xs text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 px-2.5 py-1 rounded transition-colors">View</button>
+                        {% if can.edit and user.can_manage_user %}
                         <button onclick="openEditUser({{ user|json_encode|e('html_attr') }})"
                                 class="text-xs text-indigo-600 border border-indigo-200 bg-white hover:bg-indigo-50 px-2.5 py-1 rounded transition-colors">Edit</button>
                         {% endif %}
-                        {% if can.delete and not user.is_super_admin %}
+                        {% if can.delete and not user.is_super_admin and user.can_manage_user %}
                         <button onclick="deleteUser({{ user.id }}, '{{ user.name|e('js') }}')"
                                 class="text-xs text-red-600 border border-red-200 bg-white hover:bg-red-50 px-2.5 py-1 rounded transition-colors">Delete</button>
                         {% endif %}
@@ -115,27 +146,49 @@
         </table>
     </div>
 </div>
+{# ── User Detail Modal ───────────────────────────────────── #}
+<div id="user-detail-modal" class="fixed inset-0 z-50 hidden items-center justify-center bg-black/40 backdrop-blur-sm p-4">
+    <div class="bg-white rounded-xl shadow-xl w-full max-w-lg">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">Staff Profile</h3>
+            <button onclick="closeUserDetail()" class="text-gray-400 hover:text-gray-600">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+            </button>
+        </div>
+        <div id="user-detail-body" class="px-6 py-5 space-y-4"></div>
+        <div class="px-6 py-4 border-t border-gray-100 flex justify-end">
+            <button onclick="closeUserDetail()"
+                    class="px-4 h-9 border border-gray-200 text-sm text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">Close</button>
+        </div>
+    </div>
+</div>
 {% endblock %}
 
 {% block admin_scripts %}
 <script>
-const roles = {{ roles|json_encode|raw }};
+const roles       = {{ roles|json_encode|raw }};
+const departments = {{ departments|json_encode|raw }};
+const areas       = {{ areas|json_encode|raw }};
 liveFilter('user-search', 'users-table');
 
 function drawerInput(label, id, type='text', value='', placeholder='') {
+    const ac = type === 'password' ? 'autocomplete="new-password"' : 'autocomplete="off"';
     return `<div class="mb-4">
         <label class="block text-sm font-medium text-gray-700 mb-1">${label}</label>
-        <input id="${id}" type="${type}" value="${value}" placeholder="${placeholder}"
+        <input id="${id}" type="${type}" value="${value}" placeholder="${placeholder}" ${ac}
                class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
     </div>`;
 }
 
-function drawerSelect(label, id, options, selected='') {
-    const opts = options.map(o => `<option value="${o.id}" ${o.id==selected?'selected':''}>${o.name}</option>`).join('');
+function drawerSelect(label, id, options, selected='', emptyLabel='— None —', warnEmpty=false) {
+    const opts = options.map(o => `<option value="${o.id}" ${String(o.id)==String(selected)?'selected':''}>${o.name}</option>`).join('');
+    const emptyNote = warnEmpty && options.length === 0
+        ? ' <span class="text-xs text-amber-600 ml-1">(none in this branch yet)</span>'
+        : '';
     return `<div class="mb-4">
-        <label class="block text-sm font-medium text-gray-700 mb-1">${label}</label>
+        <label class="block text-sm font-medium text-gray-700 mb-1">${label}${emptyNote}</label>
         <select id="${id}" class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
-            <option value="">No role</option>${opts}
+            <option value="">${emptyLabel}</option>${opts}
         </select>
     </div>`;
 }
@@ -147,14 +200,37 @@ function drawerCheckbox(label, id, sub, checked=false) {
     </label>`;
 }
 
+function drawerAreaCheckboxes(selectedIds) {
+    const selected = (selectedIds ?? '').toString().split(',').map(s => s.trim()).filter(Boolean);
+    if (areas.length === 0) {
+        return `<div class="mb-4"><label class="block text-sm font-medium text-gray-700 mb-1">Areas</label>
+            <p class="text-xs text-gray-400 italic">No areas configured yet.</p></div>`;
+    }
+    const items = areas.map(a => {
+        const checked = selected.includes(String(a.id)) ? 'checked' : '';
+        return `<label class="flex items-center gap-2 px-2 py-1.5 rounded hover:bg-indigo-50 cursor-pointer">
+            <input type="checkbox" name="f-area-cb" value="${a.id}" ${checked}
+                   class="w-4 h-4 accent-indigo-600 flex-shrink-0">
+            <span class="text-sm text-gray-700">${a.name}</span>
+        </label>`;
+    }).join('');
+    return `<div class="mb-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Areas <span class="text-xs text-gray-400 font-normal">(where they work)</span></label>
+        <div class="border border-gray-200 rounded-lg overflow-y-auto max-h-44 p-1">${items}</div>
+    </div>`;
+}
+
 function userFormHtml(u = {}) {
     return `
         <div id="drawer-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
         ${drawerInput('Full Name *', 'f-name', 'text', u.name??'', 'e.g. John Kamau')}
         ${drawerInput('Email Address', 'f-email', 'email', u.email??'', 'email@example.com')}
+        ${drawerInput('Mobile Number', 'f-mobile', 'tel', u.mobile??'', 'e.g. +254712345678')}
         ${drawerInput(u.id?'Password (leave blank to keep)':'Password *', 'f-password', 'password', '', '••••••••')}
         ${drawerInput(u.id?'PIN for POS (leave blank to keep)':'PIN for POS', 'f-pin', 'password', '', '4–6 digit PIN')}
-        ${drawerSelect('Role', 'f-role', roles, u.role_id??'')}
+        ${drawerSelect('Role', 'f-role', roles, u.current_node_role_id??'', '— No role —', true)}
+        ${drawerSelect('Department', 'f-department', departments, u.department_id??'', '— No department —')}
+        ${drawerAreaCheckboxes(u.area_ids??'')}
         <div class="mb-1"><label class="block text-sm font-medium text-gray-700 mb-2">Access</label>
         ${drawerCheckbox('Dashboard Login', 'f-dash', 'Can access the management dashboard', u.can_dashboard_login)}
         ${drawerCheckbox('POS Login', 'f-pos', 'Can unlock POS terminal with PIN', u.can_pos_login)}
@@ -172,37 +248,63 @@ function drawerFooter(onSave) {
 function openCreateUser() { openDrawer('Add User', userFormHtml(), drawerFooter('submitCreateUser()')); }
 function openEditUser(u)   { openDrawer('Edit User', userFormHtml(u), drawerFooter(`submitEditUser(${u.id})`)); }
 
+function collectUserParams() {
+    const params = new URLSearchParams();
+    params.append('name',                document.getElementById('f-name').value);
+    params.append('email',               document.getElementById('f-email').value);
+    params.append('mobile',              document.getElementById('f-mobile').value);
+    params.append('password',            document.getElementById('f-password').value);
+    params.append('pin',                 document.getElementById('f-pin').value);
+    params.append('role_id',             document.getElementById('f-role').value);
+    params.append('department_id',       document.getElementById('f-department').value);
+    params.append('can_dashboard_login', document.getElementById('f-dash').checked ? 1 : 0);
+    params.append('can_pos_login',       document.getElementById('f-pos').checked  ? 1 : 0);
+    document.querySelectorAll('input[name="f-area-cb"]:checked').forEach(cb => {
+        params.append('area_ids[]', cb.value);
+    });
+    // Always send area_ids[] so the controller knows to sync (empty array = clear all)
+    if (!document.querySelector('input[name="f-area-cb"]:checked')) {
+        params.append('area_ids[]', '');
+    }
+    return params;
+}
+
+async function submitWithParams(url, params) {
+    const btn = document.querySelector('#admin-drawer-footer button[data-primary]');
+    const err = document.getElementById('drawer-error');
+    if (btn) { btn.disabled = true; btn.textContent = 'Saving…'; }
+    if (err) { err.textContent = ''; err.classList.add('hidden'); }
+    try {
+        const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: params.toString() });
+        const data = await res.json();
+        if (data.success) { window.closeDrawer(); turboReload(); }
+        else if (err) { err.textContent = data.message; err.classList.remove('hidden'); }
+    } catch {
+        if (err) { err.textContent = 'An unexpected error occurred.'; err.classList.remove('hidden'); }
+    } finally {
+        if (btn) { btn.disabled = false; btn.textContent = 'Save'; }
+    }
+}
+
 function submitCreateUser() {
-    adminFetch('{{ path('admin_users_create', {subdomain: tenant_subdomain, domain: tenant_domain}) }}', {
-        name:                document.getElementById('f-name').value,
-        email:               document.getElementById('f-email').value,
-        password:            document.getElementById('f-password').value,
-        pin:                 document.getElementById('f-pin').value,
-        role_id:             document.getElementById('f-role').value,
-        can_dashboard_login: document.getElementById('f-dash').checked ? 1 : 0,
-        can_pos_login:       document.getElementById('f-pos').checked  ? 1 : 0,
-    }, () => turboReload());
+    submitWithParams(
+        '{{ path('admin_users_create', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch')}) }}',
+        collectUserParams()
+    );
 }
 
 function submitEditUser(id) {
-    // 2026-03-19: Generate the edit URL from Symfony so user updates follow the
-    // current tenant route host and do not depend on hardcoded admin paths.
-    adminFetch(`{{ path('admin_users_edit', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__USER_ID__'}) }}`.replace('__USER_ID__', id), {
-        name:                document.getElementById('f-name').value,
-        email:               document.getElementById('f-email').value,
-        password:            document.getElementById('f-password').value,
-        pin:                 document.getElementById('f-pin').value,
-        role_id:             document.getElementById('f-role').value,
-        can_dashboard_login: document.getElementById('f-dash').checked ? 1 : 0,
-        can_pos_login:       document.getElementById('f-pos').checked  ? 1 : 0,
-    }, () => turboReload());
+    submitWithParams(
+        `{{ path('admin_users_edit', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch'), id: '__USER_ID__'}) }}`.replace('__USER_ID__', id),
+        collectUserParams()
+    );
 }
 
 function deleteUser(id, name) {
     // 2026-03-19: Generate the delete URL from Symfony so tenant user actions
     // remain correct across dynamic domains.
     adminDelete(
-        `{{ path('admin_users_delete', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__USER_ID__'}) }}`.replace('__USER_ID__', id),
+        `{{ path('admin_users_delete', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch'), id: '__USER_ID__'}) }}`.replace('__USER_ID__', id),
         `Delete "${name}"? This cannot be undone.`,
         () => document.getElementById(`user-row-${id}`)?.remove()
     );
@@ -210,13 +312,107 @@ function deleteUser(id, name) {
 
 function toggleUserAccess(id, type, enabled) {
     const field = type === 'dashboard' ? 'can_dashboard_login' : 'can_pos_login';
-    // 2026-03-19: Use the generated edit endpoint so access toggles stay aligned
-    // with the tenant route definition.
-    fetch(`{{ path('admin_users_edit', {subdomain: tenant_subdomain, domain: tenant_domain, id: '__USER_ID__'}) }}`.replace('__USER_ID__', id), {
+    fetch(`{{ path('admin_users_edit', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch'), id: '__USER_ID__'}) }}`.replace('__USER_ID__', id), {
         method:  'POST',
         headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
         body:    new URLSearchParams({ [field]: enabled ? 1 : 0 }).toString(),
     }).then(() => updateUserAccessBadge(id));
+}
+
+// ── User Detail Modal ────────────────────────────────────
+function openUserDetail(u) {
+    const accessLabels = {
+        '11': 'Full (Dashboard + POS)',
+        '10': 'Dashboard only',
+        '01': 'POS only',
+        '00': 'No access',
+    };
+    const accessKey = `${u.can_dashboard_login ? 1 : 0}${u.can_pos_login ? 1 : 0}`;
+    const access = accessLabels[accessKey] ?? '—';
+
+    const rolesHtml = u.roles
+        ? u.roles.split(', ').map(r => `<span class="text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-medium">${r}</span>`).join(' ')
+        : '<span class="text-xs text-gray-400">No role</span>';
+
+    const deptHtml = u.department_name
+        ? `<span class="text-xs bg-violet-50 text-violet-700 px-2 py-0.5 rounded font-medium">${u.department_name}</span>`
+        : '<span class="text-xs text-gray-400">—</span>';
+
+    const areasHtml = u.area_names
+        ? u.area_names.split(', ').map(a => `<span class="text-xs bg-teal-50 text-teal-700 px-2 py-0.5 rounded font-medium">${a}</span>`).join(' ')
+        : '<span class="text-xs text-gray-400">—</span>';
+
+    const initial = (u.name ?? '?')[0].toUpperCase();
+    const created = u.created_at ? new Date(u.created_at).toLocaleDateString('en-GB', {day:'numeric',month:'short',year:'numeric'}) : '—';
+
+    document.getElementById('user-detail-body').innerHTML = `
+        <div class="flex items-center gap-4">
+            <div class="w-14 h-14 rounded-full bg-indigo-100 text-indigo-600 flex items-center justify-center text-xl font-bold flex-shrink-0">${initial}</div>
+            <div>
+                <div class="text-base font-semibold text-gray-900">${u.name ?? '—'}</div>
+                <div class="text-sm text-gray-500">${u.email ?? 'No email'}</div>
+                <div class="text-sm text-gray-400 mt-0.5">${u.mobile || '—'}</div>
+            </div>
+        </div>
+        <div class="grid grid-cols-2 gap-4 pt-2">
+            <div>
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Role(s)</div>
+                <div class="flex flex-wrap gap-1">${rolesHtml}</div>
+            </div>
+            <div>
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Access</div>
+                <div class="text-sm text-gray-700">${access}</div>
+            </div>
+            <div>
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Department</div>
+                <div class="flex flex-wrap gap-1">${deptHtml}</div>
+            </div>
+            <div>
+                <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Member since</div>
+                <div class="text-sm text-gray-700">${created}</div>
+            </div>
+        </div>
+        <div>
+            <div class="text-xs font-semibold text-gray-400 uppercase tracking-wide mb-1">Areas</div>
+            <div class="flex flex-wrap gap-1">${areasHtml}</div>
+        </div>
+    `;
+
+    const modal = document.getElementById('user-detail-modal');
+    modal.classList.remove('hidden');
+    modal.classList.add('flex');
+}
+
+function closeUserDetail() {
+    const modal = document.getElementById('user-detail-modal');
+    modal.classList.add('hidden');
+    modal.classList.remove('flex');
+}
+
+document.getElementById('user-detail-modal')?.addEventListener('click', function(e) {
+    if (e.target === this) closeUserDetail();
+});
+
+function updateUserAccessBadge(id) {
+    const row = document.getElementById(`user-row-${id}`);
+    if (!row) return;
+    const dash  = row.querySelector('[data-access-toggle="dashboard"]')?.checked ?? false;
+    const pos   = row.querySelector('[data-access-toggle="pos"]')?.checked  ?? false;
+    const badge = row.querySelector('[data-access-badge]');
+    if (!badge) return;
+    if (dash && pos) {
+        badge.className  = 'text-xs bg-green-50 text-green-700 px-2 py-0.5 rounded font-semibold';
+        badge.textContent = 'Full';
+    } else if (dash) {
+        badge.className  = 'text-xs bg-blue-50 text-blue-700 px-2 py-0.5 rounded font-semibold';
+        badge.textContent = 'Dashboard';
+    } else if (pos) {
+        badge.className  = 'text-xs bg-amber-50 text-amber-700 px-2 py-0.5 rounded font-semibold';
+        badge.textContent = 'POS only';
+    } else {
+        badge.className  = 'text-xs bg-gray-100 text-gray-500 px-2 py-0.5 rounded font-semibold';
+        badge.textContent = 'None';
+    }
 }
 </script>
 {% endblock %}

@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace App\Services\Permission;
 
 use App\Services\Auth\DTO\AuthResult;
+use App\Services\Branch\BranchPermissionService;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -45,6 +46,7 @@ final class CheckPermissionService
     public function __construct(
         private readonly Connection $db,
         private readonly PlatformCheckPermissionService $platformCan,
+        private readonly BranchPermissionService $branchPermissions,
     ) {}
 
     // =========================================================================
@@ -60,10 +62,26 @@ final class CheckPermissionService
      */
     public function check(AuthResult $session, string $permission): bool
     {
+        // Platform admins are governed by platform-level permissions on the platform console,
+        // but bypass all tenant permission checks when operating inside a company dashboard.
+        // company !== null  → tenant dashboard context  → always true (requireAdmin() bypasses too)
+        // company === null  → platform console context  → check real platform permissions
         if ($this->platformCan->isPlatformAdminSession($session)) {
-            return $this->platformCan->check($session, $permission);
+            return $session->company !== null
+                ? true
+                : $this->platformCan->check($session, $permission);
         }
 
+        // Branch-aware check: use hierarchy-resolved permissions when branch context exists
+        if ($session->branch !== null) {
+            return $this->branchPermissions->check(
+                $session->user->id,
+                $session->branch->id,
+                strtolower($permission),
+            );
+        }
+
+        // Fallback: flat user_roles check (pre-branch contexts, e.g. login redirect)
         $resolved = $this->resolve($session, $permission);
 
         return $resolved['granted'];

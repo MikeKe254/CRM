@@ -1,63 +1,39 @@
 <div id="sidebar-overlay"></div>
 
-{% set platform_domain = currentDomain() %}
 {% set current_route = app.request.attributes.get('_route') %}
+{% set is_platform_owner = isPlatformOwner() %}
 {% set platform_sidebar_sections = [
     {
         label: 'Overview',
         items: [
-            { route: 'platform_dashboard', label: 'Dashboard', icon: 'lucide:layout-dashboard', href: path('platform_dashboard', {domain: platform_domain}), active_prefix: 'platform_dashboard', permission: 'view_companies' },
-            { route: 'platform_companies', label: 'Companies', icon: 'lucide:building-2', href: path('platform_companies', {domain: platform_domain}), active_prefix: 'platform_companies', permission: 'view_companies' },
-            { route: null, label: 'Analytics', icon: 'lucide:chart-column-big', href: '#', active_prefix: null, permission: 'view_company_analytics' },
-            { route: null, label: 'Transactions', icon: 'lucide:receipt-text', href: '#', active_prefix: null, permission: 'view_all_company_transactions' },
-            { route: null, label: 'Customers', icon: 'lucide:users-round', href: '#', active_prefix: null, permission: 'view_company_users' }
-        ]
-    },
-    {
-        label: 'Operations',
-        items: [
-            { route: null, label: 'Payments', icon: 'lucide:credit-card', href: '#', active_prefix: null, permission: 'view_payment_configs' },
-            { route: null, label: 'Terminals', icon: 'lucide:monitor-smartphone', href: '#', active_prefix: null, permission: 'view_terminals' },
-            { route: null, label: 'Billing', icon: 'lucide:wallet-cards', href: '#', active_prefix: null, permission: 'view_billing' },
-            { route: null, label: 'Subscriptions', icon: 'lucide:badge-dollar-sign', href: '#', active_prefix: null, permission: 'view_subscriptions' },
-            { route: null, label: 'Integrations', icon: 'lucide:plug-zap', href: '#', active_prefix: null, permission: 'manage_integrations' }
+            { label: 'Dashboard',  icon: 'lucide:layout-dashboard', href: '/platform/dashboard',        active_prefix: 'platform_dashboard', permission: 'view_companies' },
+            { label: 'Companies',  icon: 'lucide:building-2',       href: '/platform/companies',        active_prefix: 'platform_companies', permission: 'view_companies' }
         ]
     },
     {
         label: 'Governance',
         items: [
-            { route: 'platform_admins', label: 'Platform Admins', icon: 'lucide:shield-check', href: path('platform_admins', {domain: platform_domain}), active_prefix: 'platform_admins', permission: 'view_platform_admins' },
-            { route: 'platform_access', label: 'Access Control', icon: 'lucide:user-cog', href: path('platform_access', {domain: platform_domain}), active_prefix: 'platform_access', permission: 'view_users' },
-            { route: 'platform_activity_logs', label: 'Activity Logs', icon: 'lucide:scroll-text', href: path('platform_activity_logs', {domain: platform_domain}), active_prefix: 'platform_activity_logs', permission: 'view_superadmin_activity_logs' },
-            { route: null, label: 'Security Events', icon: 'lucide:shield-alert', href: '#', active_prefix: null, permission: 'view_security_events' },
-            { route: null, label: 'Active Sessions', icon: 'lucide:scan-eye', href: '#', active_prefix: null, permission: 'view_active_sessions' },
-            { route: null, label: 'Feature Flags', icon: 'lucide:sliders-horizontal', href: '#', active_prefix: null, permission: 'manage_feature_flags' }
-        ]
-    },
-    {
-        label: 'Configuration',
-        items: [
-            { route: null, label: 'Platform Settings', icon: 'lucide:sliders-vertical', href: '#', active_prefix: null, permission: 'view_platform_settings' },
-            { route: null, label: 'Notifications', icon: 'lucide:bell-ring', href: '#', active_prefix: null, permission: 'view_platform_settings' },
-            { route: null, label: 'Support Tools', icon: 'lucide:wrench', href: '#', active_prefix: null, permission: 'perform_company_support_actions' }
+            { label: 'Platform Admins', icon: 'lucide:shield-check', href: '/platform/platform-admins', active_prefix: 'platform_admins',        permission: 'view_platform_admins' },
+            { label: 'Access Control',  icon: 'lucide:user-cog',     href: '/platform/access',          active_prefix: 'platform_access',        permission: 'view_users' },
+            { label: 'Activity Logs',   icon: 'lucide:scroll-text',  href: '/platform/activity-logs',   active_prefix: 'platform_activity_logs', permission: 'view_superadmin_activity_logs' }
         ]
     },
     {
         label: 'Plans & Features',
         owner_only: true,
         items: [
-            { route: 'platform_plans',   label: 'Plans',              icon: 'lucide:layers',       href: path('platform_plans',   {domain: platform_domain}), active_prefix: 'platform_plans',   permission: 'view_plans' },
-            { route: 'platform_modules', label: 'Modules & Features', icon: 'lucide:boxes',        href: path('platform_modules', {domain: platform_domain}), active_prefix: 'platform_modules', permission: 'manage_modules' }
+            { label: 'Plans',              icon: 'lucide:layers', href: '/platform/plans',   active_prefix: 'platform_plans',   permission: 'view_plans' },
+            { label: 'Modules & Features', icon: 'lucide:boxes',  href: '/platform/modules', active_prefix: 'platform_modules', permission: 'manage_modules' }
         ]
     },
     {
         label: 'Owner Configs',
         owner_only: true,
         items: [
-            { route: 'platform_owner_permissions', label: 'Permissions', icon: 'lucide:key', href: path('platform_owner_permissions', {domain: platform_domain}), active_prefix: 'platform_owner_permissions', permission: 'edit_platform_core_settings' },
-            { route: 'platform_owner_payment_methods', label: 'Payment Methods', icon: 'lucide:credit-card', href: path('platform_owner_payment_methods', {domain: platform_domain}), active_prefix: 'platform_owner_payment_methods', permission: 'edit_platform_core_settings' },
-            { route: 'platform_owner_platform_permissions', label: 'Platform Permissions', icon: 'lucide:shield-check', href: path('platform_owner_platform_permissions', {domain: platform_domain}), active_prefix: 'platform_owner_platform_permissions', permission: 'edit_platform_core_settings' },
-            { route: 'platform_owner_features', label: 'Features', icon: 'lucide:shapes', href: path('platform_owner_features', {domain: platform_domain}), active_prefix: 'platform_owner_features', permission: 'edit_platform_core_settings' }
+            { label: 'Permissions',          icon: 'lucide:key',          href: '/platform/owner/permissions',          active_prefix: 'platform_owner_permissions',          permission: 'edit_platform_core_settings' },
+            { label: 'Payment Methods',      icon: 'lucide:credit-card',  href: '/platform/owner/payment-methods',      active_prefix: 'platform_owner_payment_methods',      permission: 'edit_platform_core_settings' },
+            { label: 'Platform Permissions', icon: 'lucide:shield-check', href: '/platform/owner/platform-permissions', active_prefix: 'platform_owner_platform_permissions', permission: 'edit_platform_core_settings' },
+            { label: 'Features',             icon: 'lucide:shapes',       href: '/platform/owner/features',             active_prefix: 'platform_owner_features',             permission: 'edit_platform_core_settings' }
         ]
     }
 ] %}
@@ -83,31 +59,33 @@
 
     <nav class="flex-1 overflow-y-auto overflow-x-hidden" style="padding:10px 8px;">
         {% for section in platform_sidebar_sections %}
-            {% set visible_items = [] %}
-            {% for item in section.items %}
-                {% if item.permission is empty or can(item.permission) %}
-                    {% set visible_items = visible_items|merge([item]) %}
-                {% endif %}
-            {% endfor %}
+            {% if section.owner_only is not defined or not section.owner_only or is_platform_owner %}
+                {% set visible_items = [] %}
+                {% for item in section.items %}
+                    {% if item.permission is empty or can(item.permission) %}
+                        {% set visible_items = visible_items|merge([item]) %}
+                    {% endif %}
+                {% endfor %}
 
-            {% if visible_items is not empty %}
-            <div class="sidebar-section-label" style="color:rgba(165,180,252,0.35);font-size:9.5px;letter-spacing:0.1em;{% if not loop.first %}margin-top:10px;{% endif %}display:flex;align-items:center;gap:4px;">
-                {% if section.owner_only is defined and section.owner_only %}
-                    {{ ux_icon('lucide:crown', { width: 8, height: 8 }) }}
-                {% endif %}
-                {{ section.label }}
-            </div>
+                {% if visible_items is not empty %}
+                <div class="sidebar-section-label" style="color:rgba(165,180,252,0.35);font-size:9.5px;letter-spacing:0.1em;{% if not loop.first %}margin-top:10px;{% endif %}display:flex;align-items:center;gap:4px;">
+                    {% if section.owner_only is defined and section.owner_only %}
+                        {{ ux_icon('lucide:crown', { width: 8, height: 8 }) }}
+                    {% endif %}
+                    {{ section.label }}
+                </div>
 
-            {% for item in visible_items %}
-                {% set is_active = item.active_prefix and current_route starts with item.active_prefix %}
-                <a href="{{ item.href }}"
-                   class="sidebar-link {% if is_active %}active{% endif %}"
-                   data-tooltip="{{ item.label }}"
-                   style="{% if is_active %}background:rgba(99,102,241,0.2);color:#a5b4fc;{% endif %}">
-                    {{ ux_icon(item.icon, {width: 15, height: 15}) }}
-                    <span class="sidebar-label">{{ item.label }}</span>
-                </a>
-            {% endfor %}
+                {% for item in visible_items %}
+                    {% set is_active = item.active_prefix and current_route starts with item.active_prefix %}
+                    <a href="{{ item.href }}"
+                       class="sidebar-link {% if is_active %}active{% endif %}"
+                       data-tooltip="{{ item.label }}"
+                       style="{% if is_active %}background:rgba(99,102,241,0.2);color:#a5b4fc;{% endif %}">
+                        {{ ux_icon(item.icon, {width: 15, height: 15}) }}
+                        <span class="sidebar-label">{{ item.label }}</span>
+                    </a>
+                {% endfor %}
+                {% endif %}
             {% endif %}
         {% endfor %}
 
@@ -133,7 +111,7 @@
         </div>
 
         <button class="sidebar-label sidebar-logout flex-shrink-0"
-                onclick="sidebarLogout('{{ path('platform_logout', {domain: platform_domain}) }}', '{{ path('platform_login', {domain: platform_domain}) }}')"
+                onclick="sidebarLogout('/platform/logout', '/platform/login')"
                 title="Sign out"
                 style="background:none;border:none;cursor:pointer;color:rgba(165,180,252,0.35);padding:5px;border-radius:5px;transition:color 0.15s,background 0.15s;display:flex;align-items:center;"
                 onmouseover="this.style.color='#a5b4fc';this.style.background='rgba(99,102,241,0.15)'"

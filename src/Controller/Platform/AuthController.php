@@ -28,14 +28,14 @@ final class AuthController extends AbstractController
                 $session = $this->auth->validateSession($token);
 
                 if ($session->deviceType === 'dashboard' && $session->user->isSuperAdmin) {
-                    return $this->redirectToRoute('platform_dashboard', ['domain' => $domain]);
+                    return $this->redirect('/platform/dashboard');
                 }
             } catch (AuthException) {
                 return $this->redirectToPlatformLoginClearingCookie();
             }
         }
 
-        return $this->redirectToRoute('platform_login', ['domain' => $domain]);
+        return $this->redirect('/platform/login');
     }
 
     #[Route('/platform/login', name: 'platform_login', methods: ['GET'])]
@@ -48,7 +48,7 @@ final class AuthController extends AbstractController
                 $session = $this->auth->validateSession($token);
 
                 if ($session->deviceType === 'dashboard' && $session->user->isSuperAdmin) {
-                    return $this->redirectToRoute('platform_dashboard', ['domain' => $domain]);
+                    return $this->redirect('/platform/dashboard');
                 }
             } catch (AuthException) {
                 return $this->redirectToPlatformLoginClearingCookie();
@@ -80,7 +80,7 @@ final class AuthController extends AbstractController
 
             $response = $this->json([
                 'success' => true,
-                'redirect' => $this->generateUrl('platform_dashboard', ['domain' => $domain]),
+                'redirect' => '/platform/dashboard',
                 'data' => $result->toArray(),
             ]);
 

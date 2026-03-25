@@ -5,7 +5,9 @@ declare(strict_types=1);
 namespace App\Services\Permission;
 
 use App\Services\Auth\DTO\AuthResult;
+use App\Services\Branch\BranchPermissionService;
 use App\Services\Permission\DTO\PermissionResult;
+use App\Services\Role\RoleHierarchyService;
 use Doctrine\DBAL\Connection;
 
 /**
@@ -37,6 +39,8 @@ final class PermissionService
     public function __construct(
         private readonly Connection $db,
         private readonly PlatformCheckPermissionService $platformCan,
+        private readonly BranchPermissionService $branchPermissions,
+        private readonly RoleHierarchyService $roleHierarchy,
     ) {}
 
     // =========================================================================
@@ -63,6 +67,51 @@ final class PermissionService
 
         return $this->db->fetchAllAssociative(
             "SELECT * FROM permissions WHERE 1=1 {$deletedClause} ORDER BY category, name",
+        );
+    }
+
+    /**
+     * List permissions the current actor is allowed to see on tenant role pages.
+     * Platform admins can see the full catalog; tenant users only see permissions
+     * they personally hold through their own current role assignments.
+     */
+    public function listVisibleToActor(
+        AuthResult $actor,
+        int $companyId,
+        ?string $category = null,
+        bool $includeDeleted = false,
+    ): array {
+        if ($this->platformCan->isPlatformAdminSession($actor)) {
+            return $this->listAll($category, $includeDeleted);
+        }
+
+        if ($actor->branch === null) {
+            return [];
+        }
+
+        $actionKeys = $this->branchPermissions
+            ->getEffectivePermissions($actor->user->id, $actor->branch->id)
+            ->all();
+
+        if (empty($actionKeys)) {
+            return [];
+        }
+
+        $deletedClause = $includeDeleted ? '' : 'AND deleted_at IS NULL';
+        $categoryClause = $category !== null ? 'AND category = ?' : '';
+        $placeholders = implode(',', array_fill(0, count($actionKeys), '?'));
+        $params = $category !== null
+            ? array_merge($actionKeys, [$category])
+            : $actionKeys;
+
+        return $this->db->fetchAllAssociative(
+            "SELECT *
+             FROM permissions
+             WHERE LOWER(action_key) IN ({$placeholders})
+               {$categoryClause}
+               {$deletedClause}
+             ORDER BY category, name",
+            $params,
         );
     }
 
@@ -162,12 +211,9 @@ final class PermissionService
             return PermissionResult::fail('Role not found in this company.', 404);
         }
 
-        // ── System role guard ─────────────────────────────────────────────────
-        if ($this->isSystemRole($role) && !$this->platformCan->isPlatformAdminSession($actor)) {
-            return PermissionResult::fail(
-                "System role '{$role['name']}' cannot be modified by tenant users.",
-                403,
-            );
+        $targetCheck = $this->assertCanManageTargetRole($actor, $role, $companyId);
+        if (!$targetCheck->success) {
+            return $targetCheck;
         }
 
         // ── Permission exists ─────────────────────────────────────────────────
@@ -177,7 +223,6 @@ final class PermissionService
         }
 
         // ── Ownership check — cannot assign a permission you don't have ───────
-        // Super admins bypass this; regular users can only delegate what they own.
         if (
             !$this->platformCan->isPlatformAdminSession($actor)
             && !$this->actorHasPermission($actor, $permissionId, $companyId)
@@ -275,11 +320,9 @@ final class PermissionService
             return PermissionResult::fail('Role not found in this company.', 404);
         }
 
-        if ($this->isSystemRole($role) && !$this->platformCan->isPlatformAdminSession($actor)) {
-            return PermissionResult::fail(
-                "System role '{$role['name']}' cannot be modified by tenant users.",
-                403,
-            );
+        $targetCheck = $this->assertCanManageTargetRole($actor, $role, $companyId);
+        if (!$targetCheck->success) {
+            return $targetCheck;
         }
 
         // ── Find role_permission ──────────────────────────────────────────────
@@ -314,7 +357,7 @@ final class PermissionService
         // you would lose it and cannot reassign it to yourself (self-role-assignment is blocked).
         if (!$this->platformCan->isPlatformAdminSession($actor)) {
             $actorInRole = (bool) $this->db->fetchOne(
-                'SELECT 1 FROM user_roles WHERE user_id = :user_id AND role_id = :role_id LIMIT 1',
+                'SELECT 1 FROM user_node_roles WHERE user_id = :user_id AND role_id = :role_id LIMIT 1',
                 ['user_id' => $actor->user->id, 'role_id' => $roleId],
             );
             if ($actorInRole) {
@@ -373,17 +416,15 @@ final class PermissionService
             return PermissionResult::fail('Role not found in this company.', 404);
         }
 
-        if ($this->isSystemRole($role) && !$this->platformCan->isPlatformAdminSession($actor)) {
-            return PermissionResult::fail(
-                "System role '{$role['name']}' cannot be modified by tenant users.",
-                403,
-            );
+        $targetCheck = $this->assertCanManageTargetRole($actor, $role, $companyId);
+        if (!$targetCheck->success) {
+            return $targetCheck;
         }
 
         // Own-role unassignment guard: cannot wipe permissions from a role you are in
         if (!$this->platformCan->isPlatformAdminSession($actor)) {
             $actorInRole = (bool) $this->db->fetchOne(
-                'SELECT 1 FROM user_roles WHERE user_id = :user_id AND role_id = :role_id LIMIT 1',
+                'SELECT 1 FROM user_node_roles WHERE user_id = :user_id AND role_id = :role_id LIMIT 1',
                 ['user_id' => $actor->user->id, 'role_id' => $roleId],
             );
             if ($actorInRole) {
@@ -451,7 +492,7 @@ final class PermissionService
 
         // Verify role_permission belongs to this company
         $rolePermission = $this->db->fetchAssociative(
-            'SELECT rp.id, r.is_system_role, r.name AS role_name, p.name AS permission_name
+            'SELECT rp.id, r.id AS role_id, r.source_role_id, r.name AS role_name, p.name AS permission_name
              FROM role_permissions rp
              JOIN roles r ON r.id = rp.role_id
              JOIN permissions p ON p.id = rp.permission_id
@@ -463,14 +504,13 @@ final class PermissionService
             return PermissionResult::fail('Role permission not found in this company.', 404);
         }
 
-        if (
-            (bool) $rolePermission['is_system_role']
-            && !$this->platformCan->isPlatformAdminSession($actor)
-        ) {
-            return PermissionResult::fail(
-                "Cannot set constraints on system role '{$rolePermission['role_name']}'.",
-                403,
-            );
+        $targetCheck = $this->assertCanManageTargetRole($actor, [
+            'id' => $rolePermission['role_id'],
+            'source_role_id' => $rolePermission['source_role_id'],
+            'name' => $rolePermission['role_name'],
+        ], $companyId);
+        if (!$targetCheck->success) {
+            return $targetCheck;
         }
 
         // Upsert constraint
@@ -530,6 +570,27 @@ final class PermissionService
             return $authCheck;
         }
 
+        $rolePermission = $this->db->fetchAssociative(
+            'SELECT rp.id, r.id AS role_id, r.source_role_id, r.name AS role_name
+             FROM role_permissions rp
+             JOIN roles r ON r.id = rp.role_id
+             WHERE rp.id = :id AND r.company_id = :company_id',
+            ['id' => $rolePermissionId, 'company_id' => $companyId],
+        );
+
+        if (!$rolePermission) {
+            return PermissionResult::fail('Role permission not found in this company.', 404);
+        }
+
+        $targetCheck = $this->assertCanManageTargetRole($actor, [
+            'id' => $rolePermission['role_id'],
+            'source_role_id' => $rolePermission['source_role_id'],
+            'name' => $rolePermission['role_name'],
+        ], $companyId);
+        if (!$targetCheck->success) {
+            return $targetCheck;
+        }
+
         $deleted = (int) $this->db->executeStatement(
             'DELETE FROM role_permission_constraints
              WHERE role_permission_id = :rp_id AND constraint_id = :constraint_id',
@@ -564,6 +625,27 @@ final class PermissionService
         $authCheck = $this->assertCanManage($actor, $companyId);
         if (!$authCheck->success) {
             return $authCheck;
+        }
+
+        $rolePermission = $this->db->fetchAssociative(
+            'SELECT rp.id, r.id AS role_id, r.source_role_id, r.name AS role_name
+             FROM role_permissions rp
+             JOIN roles r ON r.id = rp.role_id
+             WHERE rp.id = :id AND r.company_id = :company_id',
+            ['id' => $rolePermissionId, 'company_id' => $companyId],
+        );
+
+        if (!$rolePermission) {
+            return PermissionResult::fail('Role permission not found in this company.', 404);
+        }
+
+        $targetCheck = $this->assertCanManageTargetRole($actor, [
+            'id' => $rolePermission['role_id'],
+            'source_role_id' => $rolePermission['source_role_id'],
+            'name' => $rolePermission['role_name'],
+        ], $companyId);
+        if (!$targetCheck->success) {
+            return $targetCheck;
         }
 
         $count = (int) $this->db->executeStatement(
@@ -638,16 +720,18 @@ final class PermissionService
                 );
         }
 
+        // Use user_node_roles — the branch-aware assignment table (user_roles is legacy)
         $hasPermission = $this->db->fetchOne(
             'SELECT rp.id
-             FROM user_roles ur
-             JOIN role_permissions rp ON rp.role_id = ur.role_id
+             FROM user_node_roles unr
+             JOIN role_permissions rp ON rp.role_id = unr.role_id
              JOIN permissions p ON p.id = rp.permission_id
-             WHERE ur.user_id     = :user_id
+             WHERE unr.user_id    = :user_id
                AND p.action_key   = :action_key
                AND rp.role_id IN (
-                   SELECT id FROM roles WHERE company_id = :company_id
-               )',
+                   SELECT id FROM roles WHERE company_id = :company_id AND deleted_at IS NULL
+               )
+             LIMIT 1',
             [
                 'user_id'    => $actor->user->id,
                 'action_key' => 'ASSIGN_PERMISSIONS',
@@ -663,6 +747,21 @@ final class PermissionService
         }
 
         return PermissionResult::ok();
+    }
+
+    public function canManageRolePermissions(AuthResult $actor, int $roleId, int $companyId): bool
+    {
+        $authCheck = $this->assertCanManage($actor, $companyId);
+        if (!$authCheck->success) {
+            return false;
+        }
+
+        $role = $this->getRoleOrNull($roleId, $companyId);
+        if (!$role) {
+            return false;
+        }
+
+        return $this->assertCanManageTargetRole($actor, $role, $companyId)->success;
     }
 
     // =========================================================================
@@ -688,19 +787,17 @@ final class PermissionService
     /**
      * Check whether the actor personally holds a specific permission
      * via any of their own roles within the company.
-     *
-     * Used to enforce: you can only assign/revoke permissions you yourself have.
      */
     private function actorHasPermission(AuthResult $actor, int $permissionId, int $companyId): bool
     {
         $result = $this->db->fetchOne(
             'SELECT rp.id
-             FROM user_roles ur
-             JOIN role_permissions rp ON rp.role_id = ur.role_id
-             WHERE ur.user_id      = :user_id
+             FROM user_node_roles unr
+             JOIN role_permissions rp ON rp.role_id = unr.role_id
+             WHERE unr.user_id      = :user_id
                AND rp.permission_id = :permission_id
                AND rp.role_id IN (
-                   SELECT id FROM roles WHERE company_id = :company_id
+                   SELECT id FROM roles WHERE company_id = :company_id AND deleted_at IS NULL
                )
              LIMIT 1',
             [
@@ -713,9 +810,32 @@ final class PermissionService
         return (bool) $result;
     }
 
-    private function isSystemRole(array $role): bool
+    private function assertCanManageTargetRole(AuthResult $actor, array $role, int $companyId): PermissionResult
     {
-        return (bool) ($role['is_system_role'] ?? false);
+        if ($this->platformCan->isPlatformAdminSession($actor)) {
+            return PermissionResult::ok();
+        }
+
+        if ($actor->branch === null) {
+            return PermissionResult::fail(
+                'You cannot manage permissions for this role from the current context.',
+                403,
+            );
+        }
+
+        $targetHierarchyRoleId = (int) ($role['source_role_id'] ?: $role['id']);
+        $actorRoleIds = $this->branchPermissions->getUserEffectiveRoles($actor->user->id, $actor->branch->id);
+
+        foreach ($actorRoleIds as $actorRoleId) {
+            if ($this->roleHierarchy->canManageRole((int) $actorRoleId, $targetHierarchyRoleId, $companyId)) {
+                return PermissionResult::ok();
+            }
+        }
+
+        return PermissionResult::fail(
+            'You cannot manage permissions for a role at your hierarchy level or above.',
+            403,
+        );
     }
 
     // =========================================================================

@@ -142,3 +142,14 @@ function init() {
 }
 
 document.addEventListener('turbo:load', init);
+
+// ── BRANCH SWITCHER — outside-click to close ─────────────────────────────────
+
+document.addEventListener('click', function (e) {
+    const btn      = document.getElementById('branch-switcher-btn');
+    const dropdown = document.getElementById('branch-switcher-dropdown');
+    if (!dropdown) return;
+    if (btn && btn.contains(e.target)) return; // handled by toggleDropdown
+    if (dropdown.contains(e.target)) return;   // click inside the dropdown
+    dropdown.classList.remove('open');
+});

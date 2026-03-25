@@ -24,7 +24,7 @@ use Symfony\Component\Routing\Attribute\Route;
  * Route:
  *   GET|POST /mpesa/customer/profile?msisdn=254...
  */
-#[Route('/mpesa/customer', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
+#[Route('/mpesa/customer', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class CustomerController extends AbstractController
 {
     public function __construct(

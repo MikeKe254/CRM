@@ -16,7 +16,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * Handles POS session locking and unlocking.
  */
-#[Route('/mpesa/session', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
+#[Route('/mpesa/session', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class SessionController extends AbstractController
 {
     public function __construct(

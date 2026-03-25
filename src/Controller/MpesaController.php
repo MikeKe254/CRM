@@ -32,7 +32,7 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  * ║   GET   /mpesa/stk/status            — Poll STK push result      ║
  * ╚══════════════════════════════════════════════════════════════════╝
  */
-#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
+#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
 final class MpesaController extends AbstractController
 {
     public function __construct(

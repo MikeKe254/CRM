@@ -1,0 +1,447 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch_slug = app.request.attributes.get('branch') %}
+{% block admin_title %}Organisation{% endblock %}
+{% block admin_subtitle %}Branch hierarchy and access assignments{% endblock %}
+
+{% block admin_actions %}
+{% if canManage %}
+<button onclick="openAssignDrawer()"
+        class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+    + Assign Branch Head
+</button>
+{% endif %}
+{% endblock %}
+
+{# ─────────────────────────────────────────────────────────────────────────── #}
+{# MACROS                                                                       #}
+{# ─────────────────────────────────────────────────────────────────────────── #}
+{% macro roleBadge(roleName) -%}
+    {%- if roleName == 'Owner' -%}bg-rose-100 text-rose-700
+    {%- elseif roleName == 'Director' -%}bg-fuchsia-100 text-fuchsia-700
+    {%- elseif roleName == 'Overall Manager' -%}bg-purple-100 text-purple-700
+    {%- elseif roleName == 'Regional Manager' -%}bg-emerald-100 text-emerald-700
+    {%- elseif roleName == 'Branch Manager' -%}bg-indigo-100 text-indigo-700
+    {%- else -%}bg-blue-50 text-blue-700
+    {%- endif -%}
+{%- endmacro %}
+
+{% macro nodeIcon(node) %}
+    {% if node.isHq %}
+        <svg width="15" height="15" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/><polyline points="9 22 9 12 15 12 15 22"/></svg>
+    {% elseif node.type == 'region' %}
+        <svg width="15" height="15" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15.3 15.3 0 010 20M12 2a15.3 15.3 0 000 20"/></svg>
+    {% elseif node.type == 'area' %}
+        <svg width="15" height="15" fill="none" stroke="#0284c7" stroke-width="1.5" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+    {% else %}
+        <svg width="15" height="15" fill="none" stroke="#059669" stroke-width="1.5" viewBox="0 0 24 24"><path d="M3 9l9-7 9 7v11a2 2 0 01-2 2H5a2 2 0 01-2-2z"/></svg>
+    {% endif %}
+{% endmacro %}
+
+{% macro orgNode(node, byNode, canManage, manageableRoleIds, tenant_subdomain, tenant_domain, current_branch_slug) %}
+{% import _self as m %}
+{% set assignments = byNode[node.id] ?? [] %}
+<div class="org-node-wrap" data-node-id="{{ node.id }}">
+
+    {# ── Node card ── #}
+    <div class="flex items-start gap-3 px-4 py-3.5 rounded-xl border bg-white transition-colors
+                 {% if node.isHq %}border-purple-100 bg-purple-50/30{% elseif node.status != 'active' %}border-amber-100 bg-amber-50/30 opacity-60{% else %}border-gray-100 hover:border-indigo-100{% endif %}"
+         style="margin-left:{{ node.depth * 32 }}px">
+
+        {# Type icon #}
+        <div class="w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 mt-0.5
+                    {% if node.isHq %}bg-purple-100{% elseif node.type == 'region' %}bg-indigo-100{% elseif node.type == 'area' %}bg-sky-100{% else %}bg-emerald-100{% endif %}">
+            {{ m.nodeIcon(node) }}
+        </div>
+
+        <div class="flex-1 min-w-0">
+
+            {# Branch identity row #}
+            <div class="flex items-center gap-2 flex-wrap mb-2">
+                <span class="text-sm font-semibold text-gray-900">{{ node.name }}</span>
+
+                {% if node.isHq %}
+                    <span class="text-[10px] font-bold uppercase tracking-wide bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-md">HQ</span>
+                {% else %}
+                    <span class="text-[10px] font-bold uppercase tracking-wide bg-gray-100 text-gray-500 px-1.5 py-0.5 rounded-md">{{ node.type }}</span>
+                {% endif %}
+
+                {% if node.status != 'active' %}
+                    <span class="text-[10px] font-bold uppercase tracking-wide bg-amber-100 text-amber-700 px-1.5 py-0.5 rounded-md">Inactive</span>
+                {% endif %}
+
+                <span class="text-[11px] text-gray-400 font-mono">/{{ node.slug }}</span>
+            </div>
+
+            {# People assigned at this node #}
+            {% if assignments %}
+            <div class="flex flex-wrap gap-1.5">
+                {% for a in assignments %}
+                <div class="group inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-white border border-gray-150 shadow-xs hover:border-indigo-200 hover:shadow-sm transition-all"
+                     id="assignment-{{ node.id }}-{{ a.user_id }}-{{ a.role_id }}">
+
+                    {# Avatar #}
+                    <div class="w-5 h-5 rounded-full text-white text-[10px] font-bold flex items-center justify-center flex-shrink-0
+                                {% if a.role_name == 'Owner' %}bg-rose-500
+                                {% elseif a.role_name == 'Director' %}bg-fuchsia-500
+                                {% elseif a.role_name == 'Overall Manager' %}bg-purple-500
+                                {% elseif a.role_name == 'Regional Manager' %}bg-emerald-500
+                                {% elseif a.role_name == 'Branch Manager' %}bg-indigo-500
+                                {% else %}bg-blue-500{% endif %}">
+                        {{ a.user_name|first|upper }}
+                    </div>
+
+                    <span class="text-xs font-medium text-gray-800">{{ a.user_name }}</span>
+
+                    <span class="text-[10px] font-semibold px-1.5 py-0.5 rounded {{ m.roleBadge(a.role_name) }}">
+                        {{ a.role_name }}
+                    </span>
+
+                    {% if a.is_primary %}
+                    <span class="text-amber-400 text-[11px]" title="Primary / default login branch">★</span>
+                    {% endif %}
+
+                    {% if canManage and a.role_id in manageableRoleIds %}
+                    <div class="hidden group-hover:flex items-center gap-0.5 ml-0.5">
+                        {% if not a.is_primary %}
+                        <button onclick="setPrimary({{ a.user_id }}, {{ node.id }}, '{{ a.user_name|e('js') }}')"
+                                title="Set as primary branch"
+                                class="w-5 h-5 flex items-center justify-center rounded text-gray-300 hover:text-amber-500 hover:bg-amber-50 transition-colors">
+                            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        </button>
+                        {% endif %}
+                        {% if a.role_name != 'Owner' %}
+                        <button onclick="revokeAssignment({{ node.id }}, {{ a.user_id }}, {{ a.role_id }}, '{{ a.user_name|e('js') }}')"
+                                title="Remove from this branch"
+                                class="w-5 h-5 flex items-center justify-center rounded text-gray-300 hover:text-red-500 hover:bg-red-50 transition-colors">
+                            <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                        </button>
+                        {% endif %}
+                    </div>
+                    {% endif %}
+                </div>
+                {% endfor %}
+
+                {% if canManage %}
+                <button onclick="openAssignDrawer({{ node.id }}, '{{ node.name|e('js') }}')"
+                        class="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg border border-dashed border-gray-200 text-xs text-gray-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/50 transition-colors">
+                    <svg width="10" height="10" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    {{ assignments ? 'Manage' : 'Assign' }}
+                </button>
+                {% endif %}
+            </div>
+
+            {% else %}
+            {# No one assigned #}
+            <div class="flex items-center gap-2">
+                <span class="text-xs text-gray-300 italic">No branch head assigned here</span>
+                {% if canManage %}
+                <button onclick="openAssignDrawer({{ node.id }}, '{{ node.name|e('js') }}')"
+                        class="inline-flex items-center gap-1 px-2 py-1 rounded-lg border border-dashed border-gray-200 text-xs text-gray-400 hover:border-indigo-300 hover:text-indigo-500 hover:bg-indigo-50/50 transition-colors">
+                    <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Assign branch head
+                </button>
+                {% endif %}
+            </div>
+            {% endif %}
+
+        </div>{# /flex-1 #}
+    </div>{# /card #}
+
+    {# ── Children ── #}
+    {% if node.children %}
+    <div class="mt-1.5 space-y-1.5">
+        {% for child in node.children %}
+        {{ m.orgNode(child, byNode, canManage, manageableRoleIds, tenant_subdomain, tenant_domain, current_branch_slug) }}
+        {% endfor %}
+    </div>
+    {% endif %}
+
+</div>{# /node-wrap #}
+{% endmacro %}
+
+{# ─────────────────────────────────────────────────────────────────────────── #}
+{% import _self as macros %}
+
+{% block admin_content %}
+
+{# ── Summary bar ───────────────────────────────────────────────────────────── #}
+{% if roleSummary|length > 0 %}
+<div class="flex flex-wrap items-center gap-3 mb-4">
+    <div class="flex flex-wrap gap-2">
+        {% for roleName, count in roleSummary %}
+        <span class="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-white border border-gray-200 text-xs">
+            <span class="font-semibold text-gray-900">{{ count }}</span>
+            <span class="text-gray-500">{{ roleName }}{{ count != 1 ? 's' : '' }}</span>
+        </span>
+        {% endfor %}
+    </div>
+    <span class="ml-auto text-xs text-gray-400">{{ totalAssigned }} assignment{{ totalAssigned != 1 ? 's' : '' }} across {{ flat|length }} branch{{ flat|length != 1 ? 'es' : '' }}</span>
+</div>
+{% endif %}
+
+{# ── Legend ────────────────────────────────────────────────────────────────── #}
+<div class="flex items-center gap-3 mb-4 text-[11px] text-gray-400 flex-wrap">
+    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-rose-500 inline-block"></span>Owner</span>
+    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-fuchsia-500 inline-block"></span>Director</span>
+    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-purple-500 inline-block"></span>Overall Manager</span>
+    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-emerald-500 inline-block"></span>Regional Manager</span>
+    <span class="flex items-center gap-1"><span class="w-2.5 h-2.5 rounded-full bg-indigo-500 inline-block"></span>Branch Manager</span>
+    <span class="flex items-center gap-1 ml-2"><span class="text-amber-400">★</span> Primary branch</span>
+</div>
+
+{# ── Tree ──────────────────────────────────────────────────────────────────── #}
+{% if tree|length > 0 %}
+<div class="space-y-1.5">
+    {% for node in tree %}
+    {{ macros.orgNode(node, byNode, canManage, manageableRoleIds, tenant_subdomain, tenant_domain, current_branch_slug) }}
+    {% endfor %}
+</div>
+{% else %}
+<div class="bg-white rounded-xl border border-gray-200 px-4 py-16 text-center">
+    <p class="text-sm text-gray-400">No branches set up yet.</p>
+    <a href="{{ path('admin_branches', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch_slug}) }}"
+       class="mt-2 inline-block text-sm text-indigo-600 hover:underline">
+        Go to Branches to create the first one →
+    </a>
+</div>
+{% endif %}
+
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+const ORG_USERS          = {{ users|json_encode|raw }};
+const ORG_ROLES          = {{ roles|json_encode|raw }};
+const ORG_FLAT           = {{ flat|json_encode|raw }};
+const ORG_MANAGEABLE_IDS = {{ manageableRoleIds|default([])|json_encode|raw }};
+const ORG_OCCUPIED_ROLES = {{ occupiedRoles|default({})|json_encode|raw }};
+
+const ASSIGN_URL      = '{{ path('admin_org_assign', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch_slug}) }}';
+const REVOKE_URL_TPL  = '{{ path('admin_org_revoke',      {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch_slug, nodeId: '__N__', userId: '__U__', roleId: '__R__'}) }}';
+const PRIMARY_URL_TPL = '{{ path('admin_org_set_primary', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch_slug, userId: '__U__', nodeId: '__N__'}) }}';
+
+// ── OPEN ASSIGN DRAWER ──────────────────────────────────────────────────────
+function openAssignDrawer(preselectedNodeId = null, preselectedNodeName = null) {
+    const branchOpts = ORG_FLAT.map(b => {
+        const indent = '\u00a0'.repeat(b.depth * 3);
+        const sel    = b.id === preselectedNodeId ? 'selected' : '';
+        const tag    = b.isHq ? ' (HQ)' : '';
+        return `<option value="${b.id}" ${sel}>${indent}${b.name}${tag}</option>`;
+    }).join('');
+
+    const userOpts = ORG_USERS.map(u => {
+        let label = u.name;
+        if (u.email) label += ' — ' + u.email;
+        return `<option value="${u.id}">${label}</option>`;
+    }).join('');
+
+    // Determine node type for role filtering
+    // hq → only 'hq' or 'any' scoped roles
+    // region → only 'region' or 'any' scoped roles
+    // branch → only 'branch' or 'any' scoped roles
+    const selectedNode = preselectedNodeId ? ORG_FLAT.find(b => b.id === preselectedNodeId) : null;
+    const nodeType     = selectedNode ? (selectedNode.isHq ? 'hq' : selectedNode.type) : null;
+
+    function getLeadershipRoles(node) {
+        if (!node) return [];
+        const manageable = ORG_ROLES.filter(r => ORG_MANAGEABLE_IDS.includes(Number(r.id)));
+        if (node.isHq) return manageable.filter(r => ['Owner', 'Director', 'Overall Manager'].includes(r.name));
+        if (node.type === 'region') return manageable.filter(r => r.name === 'Regional Manager');
+        if (node.type === 'branch') return manageable.filter(r => r.name === 'Branch Manager');
+        return [];
+    }
+
+    function buildLeadershipRoleOpts(node) {
+        const eligible = getLeadershipRoles(node);
+        const occupied = ORG_OCCUPIED_ROLES[node?.id] || {};
+        if (!eligible.length) {
+            return '<option value="">No leadership roles available for this node</option>';
+        }
+
+        return [
+            '<option value="">Select role...</option>',
+            ...eligible.map(role => {
+                const slot = occupied[role.id];
+                const isSingleSlot = ['Owner', 'Overall Manager', 'Regional Manager', 'Branch Manager'].includes(role.name);
+                const suffix = slot && isSingleSlot ? ` - currently ${slot.user_name}` : '';
+                return `<option value="${role.id}" data-scope="${role.scope}">${role.name}${suffix}</option>`;
+            }),
+        ].join('');
+    }
+
+    function buildRoleOpts(type) {
+        let eligible = ORG_ROLES;
+        if (type !== null) eligible = ORG_ROLES.filter(r => r.scope === 'any' || r.scope === type);
+        const head   = eligible.filter(r => r.is_head_role == 1);
+        const sys    = eligible.filter(r => r.is_head_role != 1 && r.is_system_role == 1);
+        const custom = eligible.filter(r => r.is_head_role != 1 && r.is_system_role != 1);
+        const toOpts = arr => arr.map(r => `<option value="${r.id}" data-scope="${r.scope}">${r.name}</option>`).join('');
+        let opts = '<option value="">Select role…</option>';
+        if (head.length)   opts += `<optgroup label="Head Roles">${toOpts(head)}</optgroup>`;
+        if (sys.length)    opts += `<optgroup label="System Roles">${toOpts(sys)}</optgroup>`;
+        if (custom.length) opts += `<optgroup label="Custom Roles">${toOpts(custom)}</optgroup>`;
+        return opts;
+    }
+
+    let roleOpts = buildLeadershipRoleOpts(selectedNode);
+
+    const body = `
+        <div id="drawer-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+        <div id="drawer-replace" class="hidden mb-3 px-3 py-2 bg-amber-50 border border-amber-200 text-amber-700 text-sm rounded-lg"></div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Branch *</label>
+            <select id="f-node"
+                    class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <option value="">Select branch…</option>${branchOpts}
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Person *</label>
+            <select id="f-user"
+                    class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <option value="">Select user…</option>${userOpts}
+            </select>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Role *</label>
+            <select id="f-role"
+                    class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <option value="">Select role…</option>${roleOpts}
+            </select>
+        </div>
+
+        <p id="drawer-helper" class="text-xs text-gray-400 leading-relaxed">
+            ${nodeType === 'hq'
+                ? 'Head office can hold Owner, Director, and Overall Manager assignments.'
+                : 'Only the leadership role for this node level can be managed here.'}
+        </p>
+    `;
+
+    const footer = `
+        <button onclick="closeDrawer()"
+                class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">
+            Cancel
+        </button>
+        <button data-primary onclick="submitAssign()"
+                class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+            Assign
+        </button>
+    `;
+
+    openDrawer(
+        preselectedNodeName ? `Assign Leadership for ${preselectedNodeName}` : 'Assign Branch Head',
+        body,
+        footer
+    );
+
+    const nodeSelect = document.getElementById('f-node');
+    const roleSelect = document.getElementById('f-role');
+    const replaceBox = document.getElementById('drawer-replace');
+    const helper = document.getElementById('drawer-helper');
+    const submitBtn = document.querySelector('[data-primary]');
+
+    function updateRoleState() {
+        const node = ORG_FLAT.find(b => b.id == nodeSelect.value);
+        const roleId = roleSelect.value;
+        const role = ORG_ROLES.find(r => Number(r.id) === Number(roleId));
+        const isSingleSlot = !!role && ['Owner', 'Overall Manager', 'Regional Manager', 'Branch Manager'].includes(role.name);
+        const occupied = node && roleId && isSingleSlot ? (ORG_OCCUPIED_ROLES[node.id] || {})[roleId] : null;
+        const hasEligibleRoles = !!(node && getLeadershipRoles(node).length);
+
+        if (helper) {
+            helper.textContent = node?.isHq
+                ? 'Head office can hold Owner, Director, and Overall Manager assignments.'
+                : 'Only the leadership role for this node level can be managed here.';
+        }
+
+        if (replaceBox) {
+            if (occupied) {
+                replaceBox.classList.remove('hidden');
+                replaceBox.textContent = `${occupied.user_name} is currently assigned as ${occupied.role_name}. Saving will replace them.`;
+            } else {
+                replaceBox.classList.add('hidden');
+                replaceBox.textContent = '';
+            }
+        }
+
+        if (submitBtn) {
+            submitBtn.textContent = occupied ? 'Replace' : 'Assign';
+            submitBtn.disabled = !hasEligibleRoles;
+            submitBtn.classList.toggle('opacity-50', !hasEligibleRoles);
+            submitBtn.classList.toggle('cursor-not-allowed', !hasEligibleRoles);
+        }
+    }
+
+    if (nodeSelect && roleSelect) {
+        roleSelect.addEventListener('change', updateRoleState);
+        nodeSelect.addEventListener('change', () => {
+            const node = ORG_FLAT.find(b => b.id == nodeSelect.value);
+            const prev = roleSelect.value;
+            roleSelect.innerHTML = buildLeadershipRoleOpts(node);
+            if (prev && roleSelect.querySelector(`option[value="${prev}"]`)) {
+                roleSelect.value = prev;
+            }
+            updateRoleState();
+        });
+        updateRoleState();
+    }
+}
+
+// ── SUBMIT ASSIGN ───────────────────────────────────────────────────────────
+function submitAssign() {
+    const nodeId = document.getElementById('f-node').value;
+    const userId = document.getElementById('f-user').value;
+    const roleId = document.getElementById('f-role').value;
+
+    const errEl = document.getElementById('drawer-error');
+    if (!nodeId || !userId || !roleId) {
+        errEl.textContent = 'Please select a branch, person and role.';
+        errEl.classList.remove('hidden');
+        return;
+    }
+    errEl.classList.add('hidden');
+
+    adminFetch(ASSIGN_URL, { node_id: nodeId, user_id: userId, role_id: roleId }, () => turboReload());
+}
+
+// ── REVOKE ──────────────────────────────────────────────────────────────────
+function revokeAssignment(nodeId, userId, roleId, userName) {
+    const url = REVOKE_URL_TPL
+        .replace('__N__', nodeId)
+        .replace('__U__', userId)
+        .replace('__R__', roleId);
+
+    adminDelete(url, `Remove ${userName} from this branch?`, () => turboReload());
+}
+
+// ── SET PRIMARY ─────────────────────────────────────────────────────────────
+function setPrimary(userId, nodeId, userName) {
+    const url = PRIMARY_URL_TPL
+        .replace('__U__', userId)
+        .replace('__N__', nodeId);
+
+    adminConfirm({
+        title: 'Set primary branch?',
+        message: `Set this branch as ${userName}'s primary login branch?`,
+        confirmText: 'Set primary',
+        danger: false,
+        onConfirm: () => {
+            fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/x-www-form-urlencoded' } })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.success) turboReload();
+                    else adminAlert({ title: 'Could not update primary branch', message: d.message, type: 'error' });
+                })
+                .catch(() => {
+                    adminAlert({ title: 'Unexpected error', message: 'An unexpected error occurred.', type: 'error' });
+                });
+        }
+    });
+}
+</script>
+{% endblock %}

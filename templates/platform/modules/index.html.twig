@@ -23,10 +23,13 @@
 
 {# ── MODULE TREE ──────────────────────────────────────────────── #}
 {% for module in modules %}
-<div class="mb-3 bg-white border border-slate-200 rounded-2xl overflow-hidden" id="module-{{ module.id }}">
+<div class="mb-3 bg-white border rounded-2xl overflow-hidden
+            {{ module.platform_released ? 'border-slate-200' : 'border-amber-300' }}"
+     id="module-{{ module.id }}">
 
     {# Module row #}
-    <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+    <div class="flex items-center gap-3 px-5 py-3.5 border-b border-slate-100
+                {{ module.platform_released ? 'bg-slate-50' : 'bg-amber-50' }}">
         <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-indigo-50 flex-shrink-0">
             {% if module.icon %}
                 {{ ux_icon(module.icon, {width:14,height:14,class:'text-indigo-500'}) }}
@@ -47,6 +50,18 @@
             <span class="text-[10px] text-slate-400 hidden sm:inline">
                 {{ module.submodules|length }} submodule{{ module.submodules|length != 1 ? 's' : '' }}
             </span>
+            {# Module release toggle #}
+            <button onclick="toggleModuleRelease({{ module.id }}, {{ module.platform_released ? 'false' : 'true' }}, this)"
+                    title="{{ module.platform_released ? 'Released — click to unrelease entire module' : 'Unreleased — click to release entire module' }}"
+                    class="inline-flex items-center gap-1 rounded-lg px-2 py-1 text-[10px] font-semibold transition-colors
+                           {{ module.platform_released
+                              ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                              : 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-300' }}">
+                {{ module.platform_released
+                   ? ux_icon('lucide:check-circle', {width:10,height:10})
+                   : ux_icon('lucide:lock', {width:10,height:10}) }}
+                {{ module.platform_released ? 'Released' : 'Unreleased' }}
+            </button>
             <button onclick="openSubmoduleDrawer({{ module.id }}, '{{ module.name|e('js') }}')"
                     class="inline-flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1 text-[10.5px] font-medium text-slate-600 hover:bg-slate-50 transition-colors"
                     title="Add submodule">
@@ -105,12 +120,25 @@
             <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-2 px-5 py-3 pl-20 bg-slate-50/30">
                 {% for feature in submodule.features %}
                 <div id="feature-{{ feature.id }}"
-                     class="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-white px-3 py-2">
-                    <div class="min-w-0">
+                     class="flex items-center justify-between gap-2 rounded-lg border bg-white px-3 py-2
+                            {{ feature.platform_released ? 'border-slate-100' : 'border-amber-200 bg-amber-50/40' }}">
+                    <div class="min-w-0 flex-1">
                         <div class="text-xs font-medium text-slate-700 truncate">{{ feature.name }}</div>
                         <div class="font-mono text-[9.5px] text-slate-400">{{ feature.slug }}</div>
                     </div>
-                    <div class="flex gap-1 flex-shrink-0">
+                    <div class="flex items-center gap-1 flex-shrink-0">
+                        {# Release toggle #}
+                        <button onclick="toggleRelease({{ feature.id }}, {{ feature.platform_released ? 'false' : 'true' }}, this)"
+                                title="{{ feature.platform_released ? 'Click to unrelease' : 'Click to release' }}"
+                                class="inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[9px] font-semibold transition-colors
+                                       {{ feature.platform_released
+                                          ? 'bg-emerald-50 text-emerald-600 hover:bg-emerald-100 border border-emerald-200'
+                                          : 'bg-amber-50 text-amber-600 hover:bg-amber-100 border border-amber-200' }}">
+                            {{ feature.platform_released
+                               ? ux_icon('lucide:check-circle', {width:9,height:9})
+                               : ux_icon('lucide:lock', {width:9,height:9}) }}
+                            {{ feature.platform_released ? 'Released' : 'Unreleased' }}
+                        </button>
                         <button onclick="openEditFeatureDrawer({{ feature|json_encode|e('html_attr') }})"
                                 class="text-slate-400 hover:text-indigo-500 transition-colors p-0.5">
                             {{ ux_icon('lucide:pencil', {width:10,height:10}) }}
@@ -396,6 +424,60 @@
                     })
                     .catch(() => platformAlert({ message: 'Request failed. Please try again.' }));
             },
+        });
+    };
+
+    // ── MODULE RELEASE TOGGLE ────────────────────────────────────
+    window.toggleModuleRelease = function (moduleId, newReleased, btn) {
+        const label = newReleased ? 'release' : 'unrelease';
+        platformConfirm({
+            title:       (newReleased ? 'Release' : 'Unrelease') + ' module?',
+            message:     'This will ' + label + ' ALL features under this module for every tenant.',
+            confirmText: newReleased ? 'Release' : 'Unrelease',
+            onConfirm: function () {
+                btn.disabled = true;
+                fetch('/platform/modules/' + moduleId + '/release', {
+                    method: 'POST',
+                    body: new URLSearchParams({ released: newReleased ? '1' : '0' }),
+                    headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                })
+                .then(r => r.json())
+                .then(d => {
+                    if (d.ok) {
+                        Turbo.visit(window.location.href, { action: 'replace' });
+                    } else {
+                        platformAlert({ message: d.error || 'Could not update release status.' });
+                        btn.disabled = false;
+                    }
+                })
+                .catch(() => {
+                    platformAlert({ message: 'Request failed. Please try again.' });
+                    btn.disabled = false;
+                });
+            },
+        });
+    };
+
+    // ── FEATURE RELEASE TOGGLE ───────────────────────────────────
+    window.toggleRelease = function (featureId, newReleased, btn) {
+        btn.disabled = true;
+        fetch('/platform/modules/features/' + featureId + '/release', {
+            method: 'POST',
+            body: new URLSearchParams({ released: newReleased ? '1' : '0' }),
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        })
+        .then(r => r.json())
+        .then(d => {
+            if (d.ok) {
+                Turbo.visit(window.location.href, { action: 'replace' });
+            } else {
+                platformAlert({ message: d.error || 'Could not update release status.' });
+                btn.disabled = false;
+            }
+        })
+        .catch(() => {
+            platformAlert({ message: 'Request failed. Please try again.' });
+            btn.disabled = false;
         });
     };
 

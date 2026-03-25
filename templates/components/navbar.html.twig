@@ -1,5 +1,6 @@
 {% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
 {% set tenant_domain = currentDomain() %}
+{% set current_branch = session.branch is defined and session.branch ? session.branch.slug : app.request.attributes.get('branch') %}
 <header id="app-navbar">
 
     {# ── HAMBURGER — mobile only, inside navbar ───────────────────────────── #}
@@ -14,33 +15,33 @@
     {# ── BREADCRUMB + PAGE TITLE ──────────────────────────────────────────── #}
     <div class="flex-1 min-w-0">
         <div id="navbar-breadcrumb" class="flex items-center gap-1 overflow-hidden flex-nowrap" style="font-size:11px;margin-bottom:1px;">
-            <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;transition:color 0.15s;">Angavu</a>
+            <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;transition:color 0.15s;">Angavu</a>
             {% set route = app.request.attributes.get('_route') %}
             {% if route starts with 'admin_users' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Users</span>
             {% elseif route starts with 'admin_roles' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Roles</span>
             {% elseif route starts with 'admin_permissions' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Permissions</span>
             {% elseif route starts with 'admin_terminals' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">POS Terminals</span>
-            {% elseif route starts with 'admin_audit' %}
+            {% elseif route starts with 'admin_activity' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <a href="{{ path('admin_audit_logs', {subdomain: tenant_subdomain, domain: tenant_domain}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
+                <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}" style="color:#9ca3af;text-decoration:none;white-space:nowrap;">Admin</a>
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
-                <span class="bc-current" style="color:#374151;white-space:nowrap;">Audit Logs</span>
+                <span class="bc-current" style="color:#374151;white-space:nowrap;">Activity Logs</span>
             {% elseif route == 'app_customers' %}
                 <span class="bc-separator" style="color:#d1d5db;">›</span>
                 <span class="bc-current" style="color:#374151;white-space:nowrap;">Customers</span>
@@ -55,7 +56,7 @@
             {% elseif route starts with 'admin_roles' %}Roles
             {% elseif route starts with 'admin_permissions' %}Permissions
             {% elseif route starts with 'admin_terminals' %}POS Terminals
-            {% elseif route starts with 'admin_audit' %}Audit Logs
+            {% elseif route starts with 'admin_activity' %}Activity Logs
             {% elseif route == 'app_customers' %}Customers
             {% elseif route == 'app_dashboard' %}Dashboard
             {% else %}Angavu CRM
@@ -112,9 +113,20 @@
         </div>
     </div>
 
-    {# ── COMPANY BADGE — always present ───────────────────────────────────── #}
+    {# ── BRANCH + COMPANY BADGE ───────────────────────────────────────────── #}
     {% if session is defined and session.company is defined %}
-    <div class="navbar-company-badge">{{ session.company.name }}</div>
+    <div class="navbar-company-badge flex items-center gap-1.5">
+        {% if session.branch is defined and session.branch %}
+            <span style="opacity:0.55;">{{ session.company.name }}</span>
+            <span style="opacity:0.35;">/</span>
+            <span class="font-semibold">{{ session.branch.name }}</span>
+            {% if session.branch.isHq %}
+                <span style="font-size:9px;padding:1px 5px;background:rgba(255,255,255,0.15);border-radius:4px;font-weight:600;letter-spacing:0.03em;">HQ</span>
+            {% endif %}
+        {% else %}
+            {{ session.company.name }}
+        {% endif %}
+    </div>
     {% endif %}
 
     {# ── PROFILE ──────────────────────────────────────────────────────────── #}

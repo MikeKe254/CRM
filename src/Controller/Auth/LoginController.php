@@ -6,6 +6,9 @@ namespace App\Controller\Auth;
 
 use App\Services\Auth\AuthService;
 use App\Services\Auth\Exception\AuthException;
+use App\Services\Branch\BranchResolverService;
+use App\Services\Branch\Exception\NoBranchAssignmentException;
+use App\Services\Permission\PlatformCheckPermissionService;
 use App\Support\DomainHelper;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -23,13 +26,15 @@ use Symfony\Component\Routing\Attribute\Route;
  *   POST /login/auth -> authenticate -> redirect to app_dashboard
  *   POST /logout     -> revoke session
  */
-#[Route('', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin$)[A-Za-z0-9-]+', 'domain' => '.+'])]
+#[Route('', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
 class LoginController extends AbstractController
 {
     public function __construct(
         private readonly AuthService $auth,
         private readonly Connection $db,
         private readonly DomainHelper $domains,
+        private readonly BranchResolverService $branchResolver,
+        private readonly PlatformCheckPermissionService $platformCan,
     ) {}
 
     #[Route('/login', name: 'app_login', methods: ['GET'])]
@@ -51,10 +56,33 @@ class LoginController extends AbstractController
                 $session = $this->auth->validateSession($token);
 
                 if ($session->deviceType === 'dashboard') {
-                    return $this->redirectToRoute('app_dashboard', [
-                        'subdomain' => $subdomain,
-                        'domain' => $baseDomain,
-                    ]);
+                    // Platform admins bypass user_node_roles — but they still need
+                    // ACCESS_COMPANY_CONTEXT to enter a tenant dashboard.
+                    if ($session->user->isSuperAdmin) {
+                        if ($this->platformCan->check($session, 'access_company_context')) {
+                            return $this->redirectToRoute('app_dashboard', [
+                                'subdomain' => $subdomain,
+                                'domain'    => $baseDomain,
+                                'branch'    => BranchResolverService::OVERALL_SLUG,
+                            ]);
+                        }
+                        // Has no tenant access — fall through to login page
+                    }
+
+                    // Already logged in — redirect to appropriate branch
+                    try {
+                        $result = $this->branchResolver->resolvePostLogin($session->user->id, $session->company->id);
+                        if ($result->requiresPicker) {
+                            return $this->redirectToRoute('app_branch_picker', ['subdomain' => $subdomain, 'domain' => $baseDomain]);
+                        }
+                        return $this->redirectToRoute('app_dashboard', [
+                            'subdomain' => $subdomain,
+                            'domain'    => $baseDomain,
+                            'branch'    => $result->directBranch->slug,
+                        ]);
+                    } catch (NoBranchAssignmentException) {
+                        // No branches yet — fall through to login page so user can see an error
+                    }
                 }
             } catch (AuthException) {
                 // Invalid or expired token: continue to the login page.
@@ -98,11 +126,109 @@ class LoginController extends AbstractController
                 );
             }
 
+            // ── Multi-branch check (computed once, used twice below) ────────
+            $multiBranchEnabled = false;
+            if ($subdomain !== null && !$result->user->isSuperAdmin) {
+                $platformReleased = (bool) $this->db->fetchOne(
+                    'SELECT platform_released FROM modules WHERE slug = :slug LIMIT 1',
+                    ['slug' => 'multi_branch'],
+                );
+
+                $multiBranchEnabled = $platformReleased && (bool) $this->db->fetchOne(
+                    "SELECT 1
+                       FROM company_subscriptions cs
+                       JOIN plan_features pf     ON pf.plan_id    = cs.plan_id
+                       JOIN module_features mf   ON mf.id         = pf.feature_id
+                       JOIN module_submodules ms ON ms.id         = mf.submodule_id
+                       JOIN modules m            ON m.id          = ms.module_id
+                      WHERE cs.company_id = :cid
+                        AND m.slug        = 'multi_branch'
+                        AND cs.status    IN ('trial', 'active')
+                        AND (cs.ends_at IS NULL OR cs.ends_at > NOW())
+                      LIMIT 1",
+                    ['cid' => $result->company->id],
+                );
+
+                // Block login for hq/region-only roles when multi-branch is off
+                if (!$multiBranchEnabled) {
+                    $hasSingleBranchRole = (bool) $this->db->fetchOne(
+                        "SELECT 1
+                           FROM user_node_roles unr
+                           JOIN roles r ON r.id = unr.role_id
+                          WHERE unr.user_id = :uid
+                            AND (
+                                r.scope IN ('any', 'branch')
+                                OR r.name IN ('Owner', 'Director')
+                            )
+                            AND r.deleted_at IS NULL
+                          LIMIT 1",
+                        ['uid' => $result->user->id],
+                    );
+
+                    if (!$hasSingleBranchRole) {
+                        return $this->json([
+                            'success' => false,
+                            'message' => 'Your role (Overall Manager / Regional Manager) is only available when multi-branch is enabled. Please contact your administrator.',
+                        ], 403);
+                    }
+                }
+            }
+
+            // Resolve post-login redirect URL
+            if ($subdomain === null) {
+                $redirectUrl = $this->generateUrl('platform_dashboard', ['domain' => $baseDomain]);
+            } else {
+                if ($result->user->isSuperAdmin) {
+                    // Platform admins bypass resolvePostLogin — but they still need
+                    // ACCESS_COMPANY_CONTEXT to enter any tenant dashboard.
+                    if (!$this->platformCan->check($result, 'access_company_context')) {
+                        return $this->json([
+                            'success' => false,
+                            'message' => 'You do not have permission to access this company dashboard. Contact the platform owner.',
+                        ], 403);
+                    }
+
+                    // Even platform admins land on head-office-branch when the company
+                    // has multi-branch disabled — /overall/ is a multi-branch concept.
+                    $superMultiBranch = $result->company !== null && $this->isTenantMultiBranchEnabled($result->company->id);
+                    $redirectUrl = $this->generateUrl('app_dashboard', [
+                        'subdomain' => $subdomain,
+                        'domain'    => $baseDomain,
+                        'branch'    => $superMultiBranch
+                            ? BranchResolverService::OVERALL_SLUG
+                            : BranchResolverService::HEAD_OFFICE_SLUG,
+                    ]);
+                } else {
+                    // When multi-branch is disabled, always land on head-office-branch —
+                    // skip resolvePostLogin entirely (it would send Overall Managers to /overall/).
+                    if (!$multiBranchEnabled) {
+                        $redirectUrl = $this->generateUrl('app_dashboard', [
+                            'subdomain' => $subdomain,
+                            'domain'    => $baseDomain,
+                            'branch'    => BranchResolverService::HEAD_OFFICE_SLUG,
+                        ]);
+                    } else {
+                        try {
+                            $pickerResult = $this->branchResolver->resolvePostLogin($result->user->id, $result->company->id);
+                            if ($pickerResult->requiresPicker) {
+                                $redirectUrl = $this->generateUrl('app_branch_picker', ['subdomain' => $subdomain, 'domain' => $baseDomain]);
+                            } else {
+                                $redirectUrl = $this->generateUrl('app_dashboard', [
+                                    'subdomain' => $subdomain,
+                                    'domain'    => $baseDomain,
+                                    'branch'    => $pickerResult->directBranch->slug,
+                                ]);
+                            }
+                        } catch (NoBranchAssignmentException) {
+                            $redirectUrl = $this->generateUrl('app_branch_picker', ['subdomain' => $subdomain, 'domain' => $baseDomain]);
+                        }
+                    }
+                }
+            }
+
             $response = $this->json([
                 'success' => true,
-                'redirect' => $subdomain === null
-                    ? $this->generateUrl('platform_dashboard', ['domain' => $baseDomain])
-                    : $this->generateUrl('app_dashboard', ['subdomain' => $subdomain, 'domain' => $baseDomain]),
+                'redirect' => $redirectUrl,
                 'data' => $result->toArray(),
             ]);
 
@@ -142,6 +268,33 @@ class LoginController extends AbstractController
         $response->headers->clearCookie('angavu_token', '/');
 
         return $response;
+    }
+
+    private function isTenantMultiBranchEnabled(int $companyId): bool
+    {
+        $platformReleased = (bool) $this->db->fetchOne(
+            'SELECT platform_released FROM modules WHERE slug = :slug LIMIT 1',
+            ['slug' => 'multi_branch'],
+        );
+
+        if (!$platformReleased) {
+            return false;
+        }
+
+        return (bool) $this->db->fetchOne(
+            "SELECT 1
+               FROM company_subscriptions cs
+               JOIN plan_features pf     ON pf.plan_id    = cs.plan_id
+               JOIN module_features mf   ON mf.id         = pf.feature_id
+               JOIN module_submodules ms ON ms.id         = mf.submodule_id
+               JOIN modules m            ON m.id          = ms.module_id
+              WHERE cs.company_id = :cid
+                AND m.slug        = 'multi_branch'
+                AND cs.status    IN ('trial', 'active')
+                AND (cs.ends_at IS NULL OR cs.ends_at > NOW())
+              LIMIT 1",
+            ['cid' => $companyId],
+        );
     }
 
     private function resolveToken(Request $request): ?string

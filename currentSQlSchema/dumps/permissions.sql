@@ -33,6 +33,7 @@ CREATE TABLE `permissions` (
   `category` varchar(100) NOT NULL,
   `description` varchar(255) DEFAULT NULL,
   `action_key` varchar(120) NOT NULL,
+  `scope` enum('any','hq') NOT NULL DEFAULT 'any' COMMENT 'any=visible everywhere; hq=only relevant at HQ-level nodes',
   `created_at` timestamp NOT NULL DEFAULT current_timestamp()
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_general_ci;
 
@@ -78,7 +79,17 @@ INSERT INTO `permissions` (`id`, `name`, `category`, `description`, `action_key`
 (35, 'Delete Users', 'users', 'Delete users', 'DELETE_USERS', '2026-03-14 00:27:39'),
 (36, 'Authorize Pos Terminal', 'Point of Payment', 'Authorize or register a new POP terminal/device', 'AUTHORIZE_POS_TERMINAL', '2026-03-14 22:25:25'),
 (37, 'View Audit Logs', 'admin', 'Can view system audit logs and activity history', 'VIEW_AUDIT_LOGS', '2026-03-17 18:16:04'),
-(38, 'View User Activity', 'admin', 'View user activity logs and action history', 'VIEW_USER_ACTIVITY', '2026-03-20 00:00:00');
+(38, 'View User Activity', 'admin', 'View user activity logs and action history', 'VIEW_USER_ACTIVITY', '2026-03-20 00:00:00'),
+(39, 'View User Activity', 'admin', 'View user activity logs and action history', 'VIEW_USER_ACTIVITY', '2026-03-20 04:56:27'),
+(41, 'Manage Branches', 'branches', 'Create, rename, move, deactivate and delete branches within the user''s authority scope', 'MANAGE_BRANCHES', '2026-03-21 15:00:22'),
+(42, 'View Branch Reports', 'branches', 'View cross-branch reporting and subtree data aggregations', 'VIEW_BRANCH_REPORTS', '2026-03-21 15:00:22'),
+(43, 'Assign Users to Branches', 'branches', 'Assign users to branches within authority scope', 'ASSIGN_USERS_TO_BRANCHES', '2026-03-21 15:00:22'),
+(44, 'View All Branch Data', 'branches', 'See data in all descendant branches (inherited via node assignment)', 'VIEW_ALL_BRANCH_DATA', '2026-03-21 15:00:22'),
+(45, 'Assign Branch Heads', 'branches', 'Assign Regional Manager and Branch Manager roles to users', 'ASSIGN_BRANCH_HEADS', '2026-03-21 22:30:12'),
+(46, 'Cross-Branch Login', 'access', 'User can log into any branch in the company without an explicit assignment', 'CROSS_BRANCH_LOGIN', '2026-03-21 22:30:12'),
+(47, 'Cross-Branch Data View', 'access', 'User can view data from branches they are not directly assigned to', 'CROSS_BRANCH_VIEW', '2026-03-21 22:30:12'),
+(48, 'View Roles Hierarchy', 'roles', 'View the role hierarchy structure', 'VIEW_ROLES_HIERARCHY', '2026-03-24 00:00:00'),
+(49, 'Edit Roles Hierarchy', 'roles', 'Edit role hierarchy parent relationships and levels', 'EDIT_ROLES_HIERARCHY', '2026-03-24 00:00:00');
 
 --
 -- Indexes for dumped tables
@@ -99,7 +110,7 @@ ALTER TABLE `permissions`
 -- AUTO_INCREMENT for table `permissions`
 --
 ALTER TABLE `permissions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=40;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

@@ -1,0 +1,97 @@
+{# Office User Form #}
+{# Embedded form for creating/editing office users #}
+
+<form method="POST" class="space-y-6">
+  {# Basic Info #}
+  <div class="bg-white rounded-lg shadow-sm p-6">
+    <h2 class="text-lg font-bold text-gray-900 mb-4">Basic Information</h2>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Name</label>
+        <input
+          type="text"
+          name="name"
+          value="{{ user.name ?? '' }}"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          required
+        />
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+        <input
+          type="email"
+          name="email"
+          value="{{ user.email ?? '' }}"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          required
+        />
+      </div>
+    </div>
+
+    {% if not user %}
+      <div class="mt-4">
+        <label class="block text-sm font-medium text-gray-700 mb-1">Initial Password</label>
+        <input
+          type="password"
+          name="password"
+          class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm"
+          required
+        />
+        <p class="mt-1 text-xs text-gray-500">Minimum 8 characters. Share securely with the user.</p>
+      </div>
+    {% endif %}
+  </div>
+
+  {# Department & Status #}
+  <div class="bg-white rounded-lg shadow-sm p-6">
+    <h2 class="text-lg font-bold text-gray-900 mb-4">Organization</h2>
+
+    <div class="grid grid-cols-2 gap-4">
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Department</label>
+        <select name="department_id" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+          <option value="">Unassigned</option>
+          {% for dept in departments %}
+            <option value="{{ dept.id }}"
+              {% if user and user.department_id == dept.id %}selected{% endif %}
+            >
+              {{ dept.name }}
+            </option>
+          {% endfor %}
+        </select>
+      </div>
+
+      <div>
+        <label class="block text-sm font-medium text-gray-700 mb-1">Status</label>
+        <select name="status" class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm">
+          <option value="active" {% if not user or user.status == 'active' %}selected{% endif %}>Active</option>
+          <option value="inactive" {% if user and user.status == 'inactive' %}selected{% endif %}>Inactive</option>
+          <option value="suspended" {% if user and user.status == 'suspended' %}selected{% endif %}>Suspended</option>
+        </select>
+      </div>
+    </div>
+  </div>
+
+  {# User Type Info #}
+  <div class="bg-blue-50 border border-blue-200 rounded-lg p-4">
+    <h3 class="text-sm font-semibold text-blue-900 mb-2">User Type: {{ user.user_type ?? 'office' }}</h3>
+    <p class="text-sm text-blue-700">
+      Office-level users can be assigned to HQ and Regional nodes only.
+      {% if user and user.user_type == 'both' %}
+        <br/>This user can also access branch-level roles.
+      {% endif %}
+    </p>
+  </div>
+
+  {# Actions #}
+  <div class="flex gap-2">
+    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-medium">
+      {% if user %}Update User{% else %}Create User{% endif %}
+    </button>
+    <a href="{{ path('office_users_list') }}" class="px-4 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-medium">
+      Cancel
+    </a>
+  </div>
+</form>
