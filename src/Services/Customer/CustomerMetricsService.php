@@ -4,14 +4,14 @@ declare(strict_types=1);
 
 namespace App\Services\Customer;
 
-use Symfony\Component\DependencyInjection\Attribute\Autowire;
+use Doctrine\DBAL\Connection;
 
 /**
  * ╔══════════════════════════════════════════════════════════════════╗
  * ║               Angavu Customer Metrics Service                   ║
  * ╠══════════════════════════════════════════════════════════════════╣
- * ║  Loads metric definitions from src/Config/customer_metrics.php  ║
- * ║  and builds structured sections from a raw customer DB row.     ║
+ * ║  Loads metric definitions from the customer_metric_definitions  ║
+ * ║  table and builds structured sections from a raw customer row.  ║
  * ║                                                                  ║
  * ║  The output is identical to what the legacy customer_profile.php ║
  * ║  produced — so the existing Twig template works unchanged.       ║
@@ -27,15 +27,12 @@ use Symfony\Component\DependencyInjection\Attribute\Autowire;
  */
 final class CustomerMetricsService
 {
-    /** @var array<string, array<string, array{label: string, definition: string}>> */
-    private array $definitions;
+    /** @var array<string, array<string, array{label: string, definition: string}>>|null */
+    private ?array $definitions = null;
 
     public function __construct(
-        #[Autowire('%kernel.project_dir%')]
-        private readonly string $projectDir,
-    ) {
-        $this->definitions = require $this->projectDir . '/src/Config/customer_metrics.php';
-    }
+        private readonly Connection $db,
+    ) {}
 
     // =========================================================================
     // PUBLIC API
@@ -53,7 +50,7 @@ final class CustomerMetricsService
     {
         $sections = [];
 
-        foreach ($this->definitions as $sectionName => $metrics) {
+        foreach ($this->load() as $sectionName => $metrics) {
             $fields = [];
 
             foreach ($metrics as $key => $meta) {
@@ -82,7 +79,7 @@ final class CustomerMetricsService
     {
         $flat = [];
 
-        foreach ($this->definitions as $metrics) {
+        foreach ($this->load() as $metrics) {
             foreach ($metrics as $key => $meta) {
                 $flat[$key] = $meta;
             }
@@ -96,6 +93,46 @@ final class CustomerMetricsService
      */
     public function getSectionNames(): array
     {
-        return array_keys($this->definitions);
+        return array_keys($this->load());
+    }
+
+    // =========================================================================
+    // PRIVATE
+    // =========================================================================
+
+    /**
+     * Lazy-load metric definitions from the DB (once per request).
+     *
+     * @return array<string, array<string, array{label: string, definition: string}>>
+     */
+    private function load(): array
+    {
+        if ($this->definitions !== null) {
+            return $this->definitions;
+        }
+
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT section_name, metric_key, label, definition
+             FROM   customer_metric_definitions
+             WHERE  is_active = 1
+             ORDER BY section_sort ASC, metric_sort ASC',
+        );
+
+        $this->definitions = [];
+
+        foreach ($rows as $row) {
+            $section = $row['section_name'];
+
+            if (!isset($this->definitions[$section])) {
+                $this->definitions[$section] = [];
+            }
+
+            $this->definitions[$section][$row['metric_key']] = [
+                'label'      => $row['label'],
+                'definition' => $row['definition'],
+            ];
+        }
+
+        return $this->definitions;
     }
 }
