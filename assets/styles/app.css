@@ -1,7 +1,8 @@
 @import "tailwindcss";
+@source "../templates";
 
-/* Background */
-body {
+/* Background — admin/default pages only (not terminal) */
+body:not([data-patronr]) {
     background-color: rgb(248, 250, 252);
     background-image: linear-gradient(
         to bottom,

@@ -46,7 +46,7 @@ class AreaController extends AdminBaseController
         if ($session instanceof Response) return $session;
 
         $showInactive = (bool) $request->query->get('inactive', false);
-        $areas        = $this->areas->list($session->company->id, $showInactive);
+        $areas        = $this->areas->list($session->company->id, $session->branch->id, $showInactive);
 
         return $this->render('admin/areas/index.html.twig', [
             'session'      => $session,
@@ -82,17 +82,18 @@ class AreaController extends AdminBaseController
             return $this->error('Name must be 120 characters or fewer.');
         }
 
-        // Check uniqueness
+        // Check uniqueness within this branch
         $exists = $this->db->fetchOne(
-            'SELECT id FROM areas WHERE company_id = :cid AND name = :name AND deleted_at IS NULL LIMIT 1',
-            ['cid' => $session->company->id, 'name' => $name],
+            'SELECT id FROM areas
+              WHERE branch_id = :bid AND name = :name AND deleted_at IS NULL LIMIT 1',
+            ['bid' => $session->branch->id, 'name' => $name],
         );
 
         if ($exists) {
             return $this->error('An area with that name already exists.');
         }
 
-        $id = $this->areas->create($session->company->id, $name, $description, $isTransactional);
+        $id = $this->areas->create($session->company->id, $session->branch->id, $name, $description, $isTransactional);
 
         $this->activityLog->record($session, 'area.created', [
             'area_id'   => $id,
@@ -112,7 +113,7 @@ class AreaController extends AdminBaseController
         $session = $this->requireAdmin($request, 'edit_areas');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $area = $this->areas->findById($id, $session->company->id);
+        $area = $this->areas->findById($id, $session->company->id, $session->branch->id);
         if (!$area) {
             return $this->error('Area not found.', 404);
         }
@@ -129,17 +130,18 @@ class AreaController extends AdminBaseController
             return $this->error('Name must be 120 characters or fewer.');
         }
 
-        // Check uniqueness (exclude self)
+        // Check uniqueness within this branch (exclude self)
         $exists = $this->db->fetchOne(
-            'SELECT id FROM areas WHERE company_id = :cid AND name = :name AND id != :id AND deleted_at IS NULL LIMIT 1',
-            ['cid' => $session->company->id, 'name' => $name, 'id' => $id],
+            'SELECT id FROM areas
+              WHERE branch_id = :bid AND name = :name AND id != :id AND deleted_at IS NULL LIMIT 1',
+            ['bid' => $session->branch->id, 'name' => $name, 'id' => $id],
         );
 
         if ($exists) {
             return $this->error('An area with that name already exists.');
         }
 
-        $this->areas->update($id, $session->company->id, $name, $description, $isTransactional);
+        $this->areas->update($id, $session->company->id, $session->branch->id, $name, $description, $isTransactional);
 
         $this->activityLog->record($session, 'area.updated', [
             'area_id'   => $id,
@@ -159,13 +161,13 @@ class AreaController extends AdminBaseController
         $session = $this->requireAdmin($request, 'edit_areas');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $area = $this->areas->findById($id, $session->company->id);
+        $area = $this->areas->findById($id, $session->company->id, $session->branch->id);
         if (!$area) {
             return $this->error('Area not found.', 404);
         }
 
         $newStatus = $area['status'] === 'active' ? 'inactive' : 'active';
-        $this->areas->setStatus($id, $session->company->id, $newStatus);
+        $this->areas->setStatus($id, $session->company->id, $session->branch->id, $newStatus);
 
         $this->activityLog->record($session, 'area.status_changed', [
             'area_id'    => $id,
@@ -186,7 +188,7 @@ class AreaController extends AdminBaseController
         $session = $this->requireAdmin($request, 'delete_areas');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $area = $this->areas->findById($id, $session->company->id);
+        $area = $this->areas->findById($id, $session->company->id, $session->branch->id);
         if (!$area) {
             return $this->error('Area not found.', 404);
         }
@@ -195,7 +197,7 @@ class AreaController extends AdminBaseController
             return $this->error('System areas cannot be deleted. You can deactivate them instead.');
         }
 
-        $this->areas->delete($id, $session->company->id);
+        $this->areas->delete($id, $session->company->id, $session->branch->id);
 
         $this->activityLog->record($session, 'area.deleted', [
             'area_id'   => $id,

@@ -12,6 +12,8 @@ use Doctrine\DBAL\Connection;
  * Departments describe what staff do (Restaurant, Kitchen, Finance, etc.)
  * System departments (is_system=1) are platform defaults — they can be
  * deactivated but never deleted by tenant users.
+ *
+ * Every department is scoped to a specific branch via branch_id.
  */
 final class DepartmentService
 {
@@ -24,12 +26,11 @@ final class DepartmentService
     // =========================================================================
 
     /**
-     * Returns all active (and optionally inactive) departments for a company,
-     * system ones first, then alphabetically.
+     * Returns all departments for a branch, system ones first, then alphabetically.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function list(int $companyId, bool $includeInactive = false): array
+    public function list(int $companyId, int $branchId, bool $includeInactive = false): array
     {
         $statusFilter = $includeInactive ? '' : "AND d.status = 'active'";
 
@@ -39,19 +40,21 @@ final class DepartmentService
                FROM departments d
                LEFT JOIN users u ON u.department_id = d.id AND u.deleted_at IS NULL
               WHERE d.company_id = :company_id
+                AND d.branch_id  = :branch_id
                 AND d.deleted_at IS NULL
                 {$statusFilter}
               GROUP BY d.id
               ORDER BY d.is_system DESC, d.name ASC",
-            ['company_id' => $companyId],
+            ['company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
-    public function findById(int $id, int $companyId): ?array
+    public function findById(int $id, int $companyId, int $branchId): ?array
     {
         $row = $this->db->fetchAssociative(
-            'SELECT * FROM departments WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
-            ['id' => $id, 'company_id' => $companyId],
+            'SELECT * FROM departments
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id AND deleted_at IS NULL',
+            ['id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
 
         return $row ?: null;
@@ -61,10 +64,11 @@ final class DepartmentService
     // WRITES
     // =========================================================================
 
-    public function create(int $companyId, string $name, ?string $description): int
+    public function create(int $companyId, int $branchId, string $name, ?string $description): int
     {
         $this->db->insert('departments', [
             'company_id'  => $companyId,
+            'branch_id'   => $branchId,
             'name'        => $name,
             'description' => $description,
             'is_system'   => 0,
@@ -74,19 +78,23 @@ final class DepartmentService
         return (int) $this->db->lastInsertId();
     }
 
-    public function update(int $id, int $companyId, string $name, ?string $description): void
+    public function update(int $id, int $companyId, int $branchId, string $name, ?string $description): void
     {
         $this->db->executeStatement(
-            'UPDATE departments SET name = :name, description = :description WHERE id = :id AND company_id = :company_id',
-            ['name' => $name, 'description' => $description, 'id' => $id, 'company_id' => $companyId],
+            'UPDATE departments
+                SET name = :name, description = :description
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id',
+            ['name' => $name, 'description' => $description, 'id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
-    public function setStatus(int $id, int $companyId, string $status): void
+    public function setStatus(int $id, int $companyId, int $branchId, string $status): void
     {
         $this->db->executeStatement(
-            "UPDATE departments SET status = :status WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL",
-            ['status' => $status, 'id' => $id, 'company_id' => $companyId],
+            "UPDATE departments
+                SET status = :status
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id AND deleted_at IS NULL",
+            ['status' => $status, 'id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
@@ -94,7 +102,7 @@ final class DepartmentService
      * Soft-delete a department.
      * System departments cannot be deleted — callers must check is_system before calling.
      */
-    public function delete(int $id, int $companyId): void
+    public function delete(int $id, int $companyId, int $branchId): void
     {
         // Unassign users from this department first
         $this->db->executeStatement(
@@ -103,8 +111,9 @@ final class DepartmentService
         );
 
         $this->db->executeStatement(
-            'UPDATE departments SET deleted_at = NOW() WHERE id = :id AND company_id = :company_id',
-            ['id' => $id, 'company_id' => $companyId],
+            'UPDATE departments SET deleted_at = NOW()
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id',
+            ['id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
@@ -113,10 +122,10 @@ final class DepartmentService
     // =========================================================================
 
     /**
-     * Seed system departments for a freshly created company.
-     * Safe to call multiple times — skips duplicates via ON DUPLICATE KEY.
+     * Seed system departments for a freshly created company into its head-office branch.
+     * Safe to call multiple times — skips duplicates.
      */
-    public function bootstrapDefaults(int $companyId): void
+    public function bootstrapDefaults(int $companyId, int $branchId): void
     {
         $defaults = [
             ['Restaurant',              'Front-of-house restaurant service and dining operations'],
@@ -132,13 +141,15 @@ final class DepartmentService
 
         foreach ($defaults as [$name, $desc]) {
             $exists = $this->db->fetchOne(
-                'SELECT id FROM departments WHERE company_id = :cid AND name = :name AND deleted_at IS NULL LIMIT 1',
-                ['cid' => $companyId, 'name' => $name],
+                'SELECT id FROM departments
+                  WHERE branch_id = :bid AND name = :name AND deleted_at IS NULL LIMIT 1',
+                ['bid' => $branchId, 'name' => $name],
             );
 
             if (!$exists) {
                 $this->db->insert('departments', [
                     'company_id'  => $companyId,
+                    'branch_id'   => $branchId,
                     'name'        => $name,
                     'description' => $desc,
                     'is_system'   => 1,

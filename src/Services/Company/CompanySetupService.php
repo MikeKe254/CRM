@@ -58,7 +58,7 @@ final class CompanySetupService
         );
 
         // 2. Head Office Branch — the always-present default working branch
-        $this->hierarchy->createSystemNode(
+        $headOfficeBranch = $this->hierarchy->createSystemNode(
             companyId: $companyId,
             parentId:  $hq->id,
             name:      'Head Office',
@@ -66,8 +66,8 @@ final class CompanySetupService
             type:      'branch',
         );
 
-        // 3. Seed system departments and areas
-        $this->departments->bootstrapDefaults($companyId);
-        $this->areas->bootstrapDefaults($companyId);
+        // 3. Seed system departments and areas into the head-office branch
+        $this->departments->bootstrapDefaults($companyId, $headOfficeBranch->id);
+        $this->areas->bootstrapDefaults($companyId, $headOfficeBranch->id);
     }
 }

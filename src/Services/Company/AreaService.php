@@ -12,6 +12,8 @@ use Doctrine\DBAL\Connection;
  * Areas describe where staff work (Reception, Kitchen Area, Bar Area, etc.)
  * System areas (is_system=1) are platform defaults — they can be
  * deactivated but never deleted by tenant users.
+ *
+ * Every area is scoped to a specific branch via branch_id.
  */
 final class AreaService
 {
@@ -24,11 +26,11 @@ final class AreaService
     // =========================================================================
 
     /**
-     * Returns all areas for a company, system ones first, then alphabetically.
+     * Returns all areas for a branch, system ones first, then alphabetically.
      *
      * @return array<int, array<string, mixed>>
      */
-    public function list(int $companyId, bool $includeInactive = false): array
+    public function list(int $companyId, int $branchId, bool $includeInactive = false): array
     {
         $statusFilter = $includeInactive ? '' : "AND a.status = 'active'";
 
@@ -39,19 +41,21 @@ final class AreaService
                LEFT JOIN user_areas ua ON ua.area_id = a.id
                LEFT JOIN users u ON u.id = ua.user_id AND u.deleted_at IS NULL
               WHERE a.company_id = :company_id
+                AND a.branch_id  = :branch_id
                 AND a.deleted_at IS NULL
                 {$statusFilter}
               GROUP BY a.id
               ORDER BY a.is_system DESC, a.name ASC",
-            ['company_id' => $companyId],
+            ['company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
-    public function findById(int $id, int $companyId): ?array
+    public function findById(int $id, int $companyId, int $branchId): ?array
     {
         $row = $this->db->fetchAssociative(
-            'SELECT * FROM areas WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL',
-            ['id' => $id, 'company_id' => $companyId],
+            'SELECT * FROM areas
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id AND deleted_at IS NULL',
+            ['id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
 
         return $row ?: null;
@@ -61,10 +65,11 @@ final class AreaService
     // WRITES
     // =========================================================================
 
-    public function create(int $companyId, string $name, ?string $description, bool $isTransactional = false): int
+    public function create(int $companyId, int $branchId, string $name, ?string $description, bool $isTransactional = false): int
     {
         $this->db->insert('areas', [
             'company_id'       => $companyId,
+            'branch_id'        => $branchId,
             'name'             => $name,
             'description'      => $description,
             'is_system'        => 0,
@@ -75,19 +80,23 @@ final class AreaService
         return (int) $this->db->lastInsertId();
     }
 
-    public function update(int $id, int $companyId, string $name, ?string $description, bool $isTransactional = false): void
+    public function update(int $id, int $companyId, int $branchId, string $name, ?string $description, bool $isTransactional = false): void
     {
         $this->db->executeStatement(
-            'UPDATE areas SET name = :name, description = :description, is_transactional = :is_transactional WHERE id = :id AND company_id = :company_id',
-            ['name' => $name, 'description' => $description, 'is_transactional' => $isTransactional ? 1 : 0, 'id' => $id, 'company_id' => $companyId],
+            'UPDATE areas
+                SET name = :name, description = :description, is_transactional = :is_transactional
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id',
+            ['name' => $name, 'description' => $description, 'is_transactional' => $isTransactional ? 1 : 0, 'id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
-    public function setStatus(int $id, int $companyId, string $status): void
+    public function setStatus(int $id, int $companyId, int $branchId, string $status): void
     {
         $this->db->executeStatement(
-            "UPDATE areas SET status = :status WHERE id = :id AND company_id = :company_id AND deleted_at IS NULL",
-            ['status' => $status, 'id' => $id, 'company_id' => $companyId],
+            "UPDATE areas
+                SET status = :status
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id AND deleted_at IS NULL",
+            ['status' => $status, 'id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
@@ -95,12 +104,13 @@ final class AreaService
      * Soft-delete an area.
      * System areas cannot be deleted — callers must check is_system before calling.
      */
-    public function delete(int $id, int $companyId): void
+    public function delete(int $id, int $companyId, int $branchId): void
     {
         // user_areas rows are removed automatically by ON DELETE CASCADE
         $this->db->executeStatement(
-            'UPDATE areas SET deleted_at = NOW() WHERE id = :id AND company_id = :company_id',
-            ['id' => $id, 'company_id' => $companyId],
+            'UPDATE areas SET deleted_at = NOW()
+              WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id',
+            ['id' => $id, 'company_id' => $companyId, 'branch_id' => $branchId],
         );
     }
 
@@ -109,10 +119,10 @@ final class AreaService
     // =========================================================================
 
     /**
-     * Seed system areas for a freshly created company.
+     * Seed system areas for a freshly created company into its head-office branch.
      * Safe to call multiple times — skips duplicates.
      */
-    public function bootstrapDefaults(int $companyId): void
+    public function bootstrapDefaults(int $companyId, int $branchId): void
     {
         $defaults = [
             ['Reception / Front Desk',   'Main entrance, check-in, and front-desk customer touchpoint'],
@@ -137,13 +147,15 @@ final class AreaService
 
         foreach ($defaults as [$name, $desc]) {
             $exists = $this->db->fetchOne(
-                'SELECT id FROM areas WHERE company_id = :cid AND name = :name AND deleted_at IS NULL LIMIT 1',
-                ['cid' => $companyId, 'name' => $name],
+                'SELECT id FROM areas
+                  WHERE branch_id = :bid AND name = :name AND deleted_at IS NULL LIMIT 1',
+                ['bid' => $branchId, 'name' => $name],
             );
 
             if (!$exists) {
                 $this->db->insert('areas', [
                     'company_id'  => $companyId,
+                    'branch_id'   => $branchId,
                     'name'        => $name,
                     'description' => $desc,
                     'is_system'   => 1,

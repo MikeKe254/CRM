@@ -175,6 +175,10 @@ class LoginController extends AbstractController
             }
 
             // Resolve post-login redirect URL
+            // $branchSlug is captured here so we can set the angavu_branch cookie.
+            // Null means the destination doesn't have a fixed branch yet (picker, platform).
+            $branchSlug = null;
+
             if ($subdomain === null) {
                 $redirectUrl = $this->generateUrl('platform_dashboard', ['domain' => $baseDomain]);
             } else {
@@ -191,32 +195,36 @@ class LoginController extends AbstractController
                     // Even platform admins land on head-office-branch when the company
                     // has multi-branch disabled — /overall/ is a multi-branch concept.
                     $superMultiBranch = $result->company !== null && $this->isTenantMultiBranchEnabled($result->company->id);
+                    $branchSlug = $superMultiBranch
+                        ? BranchResolverService::OVERALL_SLUG
+                        : BranchResolverService::HEAD_OFFICE_SLUG;
                     $redirectUrl = $this->generateUrl('app_dashboard', [
                         'subdomain' => $subdomain,
                         'domain'    => $baseDomain,
-                        'branch'    => $superMultiBranch
-                            ? BranchResolverService::OVERALL_SLUG
-                            : BranchResolverService::HEAD_OFFICE_SLUG,
+                        'branch'    => $branchSlug,
                     ]);
                 } else {
                     // When multi-branch is disabled, always land on head-office-branch —
                     // skip resolvePostLogin entirely (it would send Overall Managers to /overall/).
                     if (!$multiBranchEnabled) {
+                        $branchSlug  = BranchResolverService::HEAD_OFFICE_SLUG;
                         $redirectUrl = $this->generateUrl('app_dashboard', [
                             'subdomain' => $subdomain,
                             'domain'    => $baseDomain,
-                            'branch'    => BranchResolverService::HEAD_OFFICE_SLUG,
+                            'branch'    => $branchSlug,
                         ]);
                     } else {
                         try {
                             $pickerResult = $this->branchResolver->resolvePostLogin($result->user->id, $result->company->id);
                             if ($pickerResult->requiresPicker) {
+                                // Branch picker will set the cookie after the user selects a branch.
                                 $redirectUrl = $this->generateUrl('app_branch_picker', ['subdomain' => $subdomain, 'domain' => $baseDomain]);
                             } else {
+                                $branchSlug  = $pickerResult->directBranch->slug;
                                 $redirectUrl = $this->generateUrl('app_dashboard', [
                                     'subdomain' => $subdomain,
                                     'domain'    => $baseDomain,
-                                    'branch'    => $pickerResult->directBranch->slug,
+                                    'branch'    => $branchSlug,
                                 ]);
                             }
                         } catch (NoBranchAssignmentException) {
@@ -242,6 +250,19 @@ class LoginController extends AbstractController
                     ->withSameSite('lax'),
             );
 
+            // Branch slug cookie — readable by JS (not httpOnly).
+            // Null when user needs the branch picker; the picker will set it after selection.
+            if ($branchSlug !== null) {
+                $response->headers->setCookie(
+                    Cookie::create('angavu_branch')
+                        ->withValue($branchSlug)
+                        ->withExpires($cookieTtl > 0 ? time() + $cookieTtl : 0)
+                        ->withPath('/')
+                        ->withHttpOnly(false)
+                        ->withSameSite('lax'),
+                );
+            }
+
             return $response;
         } catch (AuthException $e) {
             if ($subdomain === null) {
@@ -266,6 +287,7 @@ class LoginController extends AbstractController
 
         $response = $this->json(['success' => true, 'message' => 'Logged out.']);
         $response->headers->clearCookie('angavu_token', '/');
+        $response->headers->clearCookie('angavu_branch', '/');
 
         return $response;
     }

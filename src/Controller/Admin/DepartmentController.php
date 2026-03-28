@@ -46,7 +46,7 @@ class DepartmentController extends AdminBaseController
         if ($session instanceof Response) return $session;
 
         $showInactive = (bool) $request->query->get('inactive', false);
-        $departments  = $this->departments->list($session->company->id, $showInactive);
+        $departments  = $this->departments->list($session->company->id, $session->branch->id, $showInactive);
 
         return $this->render('admin/departments/index.html.twig', [
             'session'      => $session,
@@ -81,17 +81,18 @@ class DepartmentController extends AdminBaseController
             return $this->error('Name must be 120 characters or fewer.');
         }
 
-        // Check uniqueness
+        // Check uniqueness within this branch
         $exists = $this->db->fetchOne(
-            'SELECT id FROM departments WHERE company_id = :cid AND name = :name AND deleted_at IS NULL LIMIT 1',
-            ['cid' => $session->company->id, 'name' => $name],
+            'SELECT id FROM departments
+              WHERE branch_id = :bid AND name = :name AND deleted_at IS NULL LIMIT 1',
+            ['bid' => $session->branch->id, 'name' => $name],
         );
 
         if ($exists) {
             return $this->error('A department with that name already exists.');
         }
 
-        $id = $this->departments->create($session->company->id, $name, $description);
+        $id = $this->departments->create($session->company->id, $session->branch->id, $name, $description);
 
         $this->activityLog->record($session, 'department.created', [
             'department_id'   => $id,
@@ -111,7 +112,7 @@ class DepartmentController extends AdminBaseController
         $session = $this->requireAdmin($request, 'edit_departments');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $department = $this->departments->findById($id, $session->company->id);
+        $department = $this->departments->findById($id, $session->company->id, $session->branch->id);
         if (!$department) {
             return $this->error('Department not found.', 404);
         }
@@ -127,17 +128,18 @@ class DepartmentController extends AdminBaseController
             return $this->error('Name must be 120 characters or fewer.');
         }
 
-        // Check uniqueness (exclude self)
+        // Check uniqueness within this branch (exclude self)
         $exists = $this->db->fetchOne(
-            'SELECT id FROM departments WHERE company_id = :cid AND name = :name AND id != :id AND deleted_at IS NULL LIMIT 1',
-            ['cid' => $session->company->id, 'name' => $name, 'id' => $id],
+            'SELECT id FROM departments
+              WHERE branch_id = :bid AND name = :name AND id != :id AND deleted_at IS NULL LIMIT 1',
+            ['bid' => $session->branch->id, 'name' => $name, 'id' => $id],
         );
 
         if ($exists) {
             return $this->error('A department with that name already exists.');
         }
 
-        $this->departments->update($id, $session->company->id, $name, $description);
+        $this->departments->update($id, $session->company->id, $session->branch->id, $name, $description);
 
         $this->activityLog->record($session, 'department.updated', [
             'department_id'   => $id,
@@ -157,13 +159,13 @@ class DepartmentController extends AdminBaseController
         $session = $this->requireAdmin($request, 'edit_departments');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $department = $this->departments->findById($id, $session->company->id);
+        $department = $this->departments->findById($id, $session->company->id, $session->branch->id);
         if (!$department) {
             return $this->error('Department not found.', 404);
         }
 
         $newStatus = $department['status'] === 'active' ? 'inactive' : 'active';
-        $this->departments->setStatus($id, $session->company->id, $newStatus);
+        $this->departments->setStatus($id, $session->company->id, $session->branch->id, $newStatus);
 
         $this->activityLog->record($session, 'department.status_changed', [
             'department_id'   => $id,
@@ -184,7 +186,7 @@ class DepartmentController extends AdminBaseController
         $session = $this->requireAdmin($request, 'delete_departments');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $department = $this->departments->findById($id, $session->company->id);
+        $department = $this->departments->findById($id, $session->company->id, $session->branch->id);
         if (!$department) {
             return $this->error('Department not found.', 404);
         }
@@ -193,7 +195,7 @@ class DepartmentController extends AdminBaseController
             return $this->error('System departments cannot be deleted. You can deactivate them instead.');
         }
 
-        $this->departments->delete($id, $session->company->id);
+        $this->departments->delete($id, $session->company->id, $session->branch->id);
 
         $this->activityLog->record($session, 'department.deleted', [
             'department_id'   => $id,

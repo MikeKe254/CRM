@@ -231,17 +231,21 @@ final class CheckPermissionService
             return $this->cache[$cacheKey];
         }
 
-        // Query: does this user have this permission via any of their roles?
+        // Query: does this user have this permission via any of their node roles?
+        // Uses user_node_roles (branch-scoped assignments) — the canonical role table.
         $row = $this->db->fetchAssociative(
             'SELECT rp.id AS role_permission_id
-             FROM user_roles ur
-             JOIN role_permissions rp ON rp.role_id = ur.role_id
-             JOIN permissions p ON p.id = rp.permission_id
-             JOIN roles r ON r.id = rp.role_id
-             WHERE ur.user_id  = :user_id
-               AND r.company_id = :company_id
-               AND (p.name = :name OR p.action_key = :action_key)
-             LIMIT 1',
+               FROM user_node_roles unr
+               JOIN branches b  ON b.id  = unr.node_id
+                                AND b.company_id = :company_id
+                                AND b.deleted_at IS NULL
+               JOIN roles r     ON r.id  = unr.role_id
+                                AND r.deleted_at IS NULL
+               JOIN role_permissions rp ON rp.role_id = unr.role_id
+               JOIN permissions p ON p.id = rp.permission_id
+              WHERE unr.user_id = :user_id
+                AND (p.name = :name OR p.action_key = :action_key)
+              LIMIT 1',
             [
                 'user_id'    => $userId,
                 'company_id' => $companyId,
@@ -300,13 +304,16 @@ final class CheckPermissionService
                 p.category,
                 p.action_key,
                 rp.id AS role_permission_id
-             FROM user_roles ur
-             JOIN role_permissions rp ON rp.role_id = ur.role_id
-             JOIN permissions p ON p.id = rp.permission_id
-             JOIN roles r ON r.id = rp.role_id
-             WHERE ur.user_id   = :user_id
-               AND r.company_id = :company_id
-             ORDER BY p.category, p.name',
+               FROM user_node_roles unr
+               JOIN branches b  ON b.id  = unr.node_id
+                                AND b.company_id = :company_id
+                                AND b.deleted_at IS NULL
+               JOIN roles r     ON r.id  = unr.role_id
+                                AND r.deleted_at IS NULL
+               JOIN role_permissions rp ON rp.role_id = unr.role_id
+               JOIN permissions p ON p.id = rp.permission_id
+              WHERE unr.user_id = :user_id
+              ORDER BY p.category, p.name',
             ['user_id' => $userId, 'company_id' => $companyId],
         );
     }

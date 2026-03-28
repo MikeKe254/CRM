@@ -5,7 +5,7 @@
 {% block admin_subtitle %}View and manage authorized POS devices{% endblock %}
 
 {% block admin_actions %}
-<a href="{{ path('mpesa_login_page', {subdomain: tenant_subdomain, domain: tenant_domain}) }}"
+<a href="{{ path('terminal_login_page', {subdomain: tenant_subdomain, domain: tenant_domain, branch: app.request.attributes.get('branch')}) }}"
    class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors inline-flex items-center">
     + Authorize Terminal
 </a>

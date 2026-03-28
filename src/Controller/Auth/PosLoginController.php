@@ -12,6 +12,7 @@ use App\Services\Branch\DTO\BranchNode;
 use App\Services\Branch\BranchPermissionService;
 use App\Services\Permission\CheckPermissionService;
 use App\Services\Permission\PlatformCheckPermissionService;
+use App\Services\Terminal\TerminalBranchAccessService;
 use App\Support\DomainHelper;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
@@ -24,7 +25,7 @@ use Symfony\Component\Routing\Attribute\Route;
 /**
  * Handles POS terminal authorization.
  */
-#[Route('/mpesa', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
+#[Route('/{branch}/terminal', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+', 'branch' => '[A-Za-z0-9-]+'])]
 class PosLoginController extends AbstractController
 {
     private const TERMINAL_DAYS = 30;
@@ -35,19 +36,20 @@ class PosLoginController extends AbstractController
         private readonly BranchPermissionService $branchPermissions,
         private readonly PlatformCheckPermissionService $platformCan,
         private readonly UserActivityLogService $activityLog,
+        private readonly TerminalBranchAccessService $terminalBranchAccess,
         private readonly Connection $db,
         private readonly DomainHelper $domains,
     ) {}
 
-    #[Route('/login', name: 'mpesa_login_page', methods: ['GET'])]
-    public function loginPage(Request $request, string $domain): Response
+    #[Route('/login', name: 'terminal_login_page', methods: ['GET'])]
+    public function loginPage(Request $request, string $domain, string $branch): Response
     {
         $terminal = $request->cookies->get('angavu_terminal', '');
         $subdomain = $this->resolveSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 
         if ($subdomain === null) {
-            return $this->render('mpesa/pos_login.html.twig', [
+            return $this->render('terminal/pos_login.html.twig', [
                 'has_company_subdomain' => false,
                 'host_error_message' => 'Wrong URL. Please use the POS setup link provided for your company.',
             ]);
@@ -60,29 +62,35 @@ class PosLoginController extends AbstractController
             );
 
             if ($company) {
+                $branchNode = $this->terminalBranchAccess->resolveBranchNode((int) $company['id'], $branch);
                 $valid = $this->db->fetchOne(
                     'SELECT id FROM pos_terminals
                      WHERE  company_id          = :company_id
+                       AND  branch_id           = :branch_id
                        AND  terminal_identifier = :identifier
                        AND  revoked_at IS NULL
                        AND  (expires_at IS NULL OR expires_at > NOW())
                      LIMIT 1',
-                    ['company_id' => $company['id'], 'identifier' => $terminal],
+                    [
+                        'company_id' => $company['id'],
+                        'branch_id' => $branchNode?->id ?? 0,
+                        'identifier' => $terminal,
+                    ],
                 );
 
                 if ($valid) {
-                    return $this->redirectToRoute('mpesa_dashboard', ['subdomain' => $subdomain, 'domain' => $baseDomain]);
+                    return $this->redirectToRoute('terminal_dashboard', ['subdomain' => $subdomain, 'domain' => $baseDomain, 'branch' => $branch]);
                 }
             }
         }
 
-        return $this->render('mpesa/pos_login.html.twig', [
+        return $this->render('terminal/pos_login.html.twig', [
             'has_company_subdomain' => true,
             'host_error_message' => null,
         ]);
     }
 
-    #[Route('/login/verify-pos-auth', name: 'mpesa_login_verify_pos_auth', methods: ['POST'])]
+    #[Route('/login/verify-pos-auth', name: 'terminal_login_verify_pos_auth', methods: ['POST'])]
     public function verifyPosAuth(Request $request): JsonResponse
     {
         $subdomain = $this->resolveSubdomain($request);
@@ -102,6 +110,18 @@ class PosLoginController extends AbstractController
         }
 
         try {
+            $companyId = (int) $this->db->fetchOne(
+                'SELECT id FROM companies WHERE id <> 0 AND subdomain = :subdomain AND deleted_at IS NULL LIMIT 1',
+                ['subdomain' => $subdomain],
+            );
+            $branchNode = $this->terminalBranchAccess->resolveBranchNode(
+                $companyId,
+                (string) $request->attributes->get('branch', ''),
+            );
+            if ($branchNode === null) {
+                return $this->json(['success' => false, 'message' => 'Invalid branch terminal URL.'], 404);
+            }
+
             $result = $this->auth->loginDashboard(
                 subdomain: $subdomain,
                 email: $email,
@@ -111,8 +131,9 @@ class PosLoginController extends AbstractController
                 deviceName: 'POS Auth Verification',
                 terminalIdentifier: '',
             );
+            $result->branch = $branchNode;
 
-            if (!$this->canAuthorizePosTerminal($result)) {
+            if (!$this->canAuthorizePosTerminal($result) || !$this->canUseTerminalBranch($result, $branchNode->id)) {
                 $this->auth->logout($result->token);
 
                 return $this->json([
@@ -145,7 +166,7 @@ class PosLoginController extends AbstractController
         }
     }
 
-    #[Route('/login/authorize-terminal', name: 'mpesa_login_authorize_terminal', methods: ['POST'])]
+    #[Route('/login/authorize-terminal', name: 'terminal_login_authorize_terminal', methods: ['POST'])]
     public function authorizeTerminal(Request $request, string $domain): JsonResponse
     {
         $token = $request->cookies->get('angavu_pos_auth_token');
@@ -167,7 +188,16 @@ class PosLoginController extends AbstractController
             ], 401);
         }
 
-        if (!$this->canAuthorizePosTerminal($session)) {
+        $branchNode = $this->terminalBranchAccess->resolveBranchNode(
+            $session->company->id,
+            (string) $request->attributes->get('branch', ''),
+        );
+        if ($branchNode === null) {
+            return $this->json(['success' => false, 'message' => 'Invalid branch terminal URL.'], 404);
+        }
+        $session->branch = $branchNode;
+
+        if (!$this->canAuthorizePosTerminal($session) || !$this->canUseTerminalBranch($session, $branchNode->id)) {
             return $this->json(['success' => false, 'message' => 'Permission denied.'], 403);
         }
 
@@ -185,10 +215,7 @@ class PosLoginController extends AbstractController
         $expiresAt = (new \DateTimeImmutable())
             ->modify('+' . self::TERMINAL_DAYS . ' days')
             ->format('Y-m-d H:i:s');
-        $branchId = $this->resolveTerminalBranchId($session);
-        if ($branchId !== null) {
-            $session->branch = $this->loadBranchNode($branchId);
-        }
+        $branchId = $branchNode->id;
         $authorizedById = $session->user->isSuperAdmin
             ? -1 * $session->user->id
             : $session->user->id;
@@ -255,9 +282,10 @@ class PosLoginController extends AbstractController
             'success' => true,
             'message' => "Terminal \"{$deviceName}\" authorized until "
                 . (new \DateTimeImmutable())->modify('+' . self::TERMINAL_DAYS . ' days')->format('d M Y') . '.',
-            'redirect' => $this->generateUrl('mpesa_dashboard', [
+            'redirect' => $this->generateUrl('terminal_dashboard', [
                 'subdomain' => $session->company->subdomain,
                 'domain' => $baseDomain,
+                'branch' => $branchNode->slug,
             ]),
         ]);
 
@@ -299,6 +327,15 @@ class PosLoginController extends AbstractController
         );
     }
 
+    private function canUseTerminalBranch(AuthResult $session, int $branchId): bool
+    {
+        if ($session->user->isSuperAdmin) {
+            return true;
+        }
+
+        return $this->terminalBranchAccess->userAssignedToBranch($session->user->id, $branchId);
+    }
+
     private function resolvePermissionAnchorNodeId(AuthResult $session): ?int
     {
         $nodeId = $this->db->fetchOne(
@@ -319,86 +356,4 @@ class PosLoginController extends AbstractController
         return $nodeId !== false ? (int) $nodeId : null;
     }
 
-    private function resolveTerminalBranchId(AuthResult $session): ?int
-    {
-        if (!$this->isMultiBranchEnabled($session->company->id)) {
-            $singleBranchId = $this->db->fetchOne(
-                'SELECT id
-                   FROM branches
-                  WHERE company_id = :company_id
-                    AND slug = :slug
-                    AND deleted_at IS NULL
-                  LIMIT 1',
-                [
-                    'company_id' => $session->company->id,
-                    'slug' => 'head-office-branch',
-                ],
-            );
-
-            if ($singleBranchId !== false) {
-                return (int) $singleBranchId;
-            }
-        }
-
-        return $session->branch?->id ?? $this->resolvePermissionAnchorNodeId($session);
-    }
-
-    private function isMultiBranchEnabled(int $companyId): bool
-    {
-        $platformReleased = (bool) $this->db->fetchOne(
-            'SELECT platform_released FROM modules WHERE slug = :slug LIMIT 1',
-            ['slug' => 'multi_branch'],
-        );
-
-        if (!$platformReleased) {
-            return false;
-        }
-
-        $inPlan = (bool) $this->db->fetchOne(
-            'SELECT 1
-               FROM company_subscriptions cs
-               JOIN plan_features pf        ON pf.plan_id      = cs.plan_id
-               JOIN module_features mf      ON mf.id           = pf.feature_id
-               JOIN module_submodules ms    ON ms.id           = mf.submodule_id
-               JOIN modules m               ON m.id            = ms.module_id
-              WHERE cs.company_id = :cid
-                AND m.slug        = :module
-                AND cs.status    IN (\'trial\', \'active\')
-                AND (cs.ends_at IS NULL OR cs.ends_at > NOW())
-              LIMIT 1',
-            ['cid' => $companyId, 'module' => 'multi_branch'],
-        );
-
-        if ($inPlan) {
-            return true;
-        }
-
-        return (bool) $this->db->fetchOne(
-            'SELECT tfo.is_enabled
-               FROM tenant_feature_overrides tfo
-               JOIN module_features mf   ON mf.id  = tfo.feature_id
-               JOIN module_submodules ms ON ms.id  = mf.submodule_id
-               JOIN modules m            ON m.id   = ms.module_id
-              WHERE tfo.company_id = :cid
-                AND m.slug         = :module
-                AND tfo.is_enabled = 1
-                AND (tfo.expires_at IS NULL OR tfo.expires_at > NOW())
-              LIMIT 1',
-            ['cid' => $companyId, 'module' => 'multi_branch'],
-        );
-    }
-
-    private function loadBranchNode(int $branchId): ?BranchNode
-    {
-        $row = $this->db->fetchAssociative(
-            'SELECT id, company_id, parent_id, name, slug, type, path, depth, is_hq, status
-               FROM branches
-              WHERE id = :id
-                AND deleted_at IS NULL
-              LIMIT 1',
-            ['id' => $branchId],
-        );
-
-        return $row ? BranchNode::fromRow($row) : null;
-    }
 }
