@@ -1,0 +1,116 @@
+{# ── Patronr Lock Screen ─────────────────────────────────────────────────── #}
+{# Variables: is_locked (bool), unlock_url (string), login_url (string)       #}
+
+<div id="patronr-lock"
+     style="display:{{ is_locked ? 'flex' : 'none' }};position:fixed;inset:0;z-index:50;flex-direction:column;align-items:center;justify-content:center;background:#030712;padding:24px;">
+
+    <div style="width:100%;max-width:320px;display:flex;flex-direction:column;align-items:center;gap:24px;">
+
+        {# Icon + heading #}
+        <div style="text-align:center;">
+            <div style="width:64px;height:64px;background:#1f2937;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 16px;">
+                <svg width="32" height="32" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M16.5 10.5V6.75a4.5 4.5 0 10-9 0v3.75m-.75 11.25h10.5a2.25 2.25 0 002.25-2.25v-6.75a2.25 2.25 0 00-2.25-2.25H6.75a2.25 2.25 0 00-2.25 2.25v6.75a2.25 2.25 0 002.25 2.25z"/>
+                </svg>
+            </div>
+            <div style="color:#fff;font-size:22px;font-weight:700;">Terminal Locked</div>
+            <div style="color:#6b7280;font-size:14px;margin-top:4px;">Enter your PIN to continue</div>
+        </div>
+
+        {# PIN dots #}
+        <div id="lock-dots" style="display:flex;gap:12px;">
+            <div style="width:16px;height:16px;border-radius:50%;background:#374151;border:2px solid #4b5563;transition:background .1s;" data-dot="0"></div>
+            <div style="width:16px;height:16px;border-radius:50%;background:#374151;border:2px solid #4b5563;transition:background .1s;" data-dot="1"></div>
+            <div style="width:16px;height:16px;border-radius:50%;background:#374151;border:2px solid #4b5563;transition:background .1s;" data-dot="2"></div>
+            <div style="width:16px;height:16px;border-radius:50%;background:#374151;border:2px solid #4b5563;transition:background .1s;" data-dot="3"></div>
+        </div>
+
+        <div id="lock-error"
+             style="display:none;color:#f87171;font-size:13px;text-align:center;min-height:18px;"></div>
+
+        {# Keypad — fixed comfortable size since lock screen has no keypad-fill constraint #}
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:10px;width:100%;">
+            {% for n in [1,2,3,4,5,6,7,8,9] %}
+            <button class="lock-key keypad-btn" data-digit="{{ n }}"
+                    style="height:60px;background:#1f2937;border:none;border-radius:16px;color:#fff;font-size:24px;font-weight:600;">{{ n }}</button>
+            {% endfor %}
+            <button id="lock-clear" class="keypad-btn"
+                    style="height:60px;background:#1f2937;border:none;border-radius:16px;color:#9ca3af;font-size:13px;font-weight:600;">CLR</button>
+            <button class="lock-key keypad-btn" data-digit="0"
+                    style="height:60px;background:#1f2937;border:none;border-radius:16px;color:#fff;font-size:24px;font-weight:600;">0</button>
+            <button id="lock-back" class="keypad-btn"
+                    style="height:60px;background:#1f2937;border:none;border-radius:16px;color:#9ca3af;font-size:22px;">⌫</button>
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+(function () {
+    const screen    = document.getElementById('patronr-lock');
+    const dots      = document.querySelectorAll('[data-dot]');
+    const errEl     = document.getElementById('lock-error');
+    const unlockUrl = '{{ unlock_url ?? '' }}';
+    const loginUrl  = '{{ login_url ?? '' }}';
+    let pin = '';
+
+    function renderDots() {
+        dots.forEach((d, i) => {
+            d.style.background = i < pin.length ? '#fff' : '#374151';
+        });
+    }
+
+    function showError(msg) {
+        errEl.textContent = msg;
+        errEl.style.display = 'block';
+        pin = '';
+        renderDots();
+        screen.style.animation = 'none';
+        // Shake animation
+        screen.style.transition = 'transform 0.05s';
+        let n = 0;
+        const shake = setInterval(() => {
+            screen.style.transform = n % 2 === 0 ? 'translateX(6px)' : 'translateX(-6px)';
+            if (++n >= 6) { clearInterval(shake); screen.style.transform = ''; }
+        }, 50);
+    }
+
+    async function tryUnlock() {
+        if (!unlockUrl) { location.href = loginUrl; return; }
+        try {
+            const res = await fetch(unlockUrl, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: 'pin=' + encodeURIComponent(pin),
+            });
+            const data = await res.json();
+            if (data.success) {
+                screen.style.display = 'none';
+                const dash = document.getElementById('patronr-dashboard');
+                if (dash) dash.style.display = 'flex';
+            } else {
+                showError(data.message || 'Incorrect PIN');
+            }
+        } catch (e) {
+            showError('Connection error — try again');
+        }
+    }
+
+    document.querySelectorAll('.lock-key').forEach(btn => {
+        btn.addEventListener('click', () => {
+            if (pin.length >= 4) return;
+            pin += btn.dataset.digit;
+            errEl.style.display = 'none';
+            renderDots();
+            if (pin.length === 4) tryUnlock();
+        });
+    });
+
+    document.getElementById('lock-back')?.addEventListener('click', () => { pin = pin.slice(0,-1); renderDots(); });
+    document.getElementById('lock-clear')?.addEventListener('click', () => { pin = ''; renderDots(); errEl.style.display='none'; });
+
+    renderDots();
+})();
+</script>

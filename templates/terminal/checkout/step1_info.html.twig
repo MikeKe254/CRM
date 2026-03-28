@@ -1,0 +1,235 @@
+{% extends 'layouts/terminal_app.html.twig' %}
+{% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: app.request.attributes.get('branch')} %}
+
+{% block title %}Checkout — Amount{% endblock %}
+
+{% block body %}
+<div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">
+
+    {# ── Top bar ─────────────────────────────────────────────────────────── #}
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #1f2937;flex-shrink:0;">
+        <form method="post" action="{{ path('terminal_checkout_cancel', _p) }}" style="flex-shrink:0;">
+            <button type="submit" class="keypad-btn"
+                    style="width:38px;height:38px;border-radius:10px;background:#1f2937;border:none;display:flex;align-items:center;justify-content:center;">
+                <svg width="18" height="18" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+        </form>
+        <div style="flex:1;">
+            <div style="color:#fff;font-weight:700;font-size:15px;line-height:1.2;">New Checkout</div>
+            <div style="color:#6b7280;font-size:11px;">Step 1 of 5 — Amount &amp; Area</div>
+        </div>
+        <div style="display:flex;gap:5px;align-items:center;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+        </div>
+    </div>
+
+    <form method="post" action="{{ path('terminal_checkout_save1', _p) }}"
+          style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
+
+        {# ── Amount display ──────────────────────────────────────────────── #}
+        <div style="padding:16px 16px 8px;flex-shrink:0;text-align:center;">
+            <div style="color:#6b7280;font-size:12px;margin-bottom:2px;">Enter Amount (KES)</div>
+            <div id="amount-display"
+                 style="color:#fff;font-size:56px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-1px;">
+                {{ draft.get('amount', 0) > 0 ? draft.get('amount')|number_format(0,'.', ',') : '0' }}
+            </div>
+            <input type="hidden" name="amount" id="amount-input"
+                   value="{{ draft.get('amount', '') }}">
+        </div>
+
+        {# ── Quick-add row ───────────────────────────────────────────────── #}
+        <div style="display:flex;gap:8px;padding:0 16px 10px;flex-shrink:0;justify-content:center;">
+            {% for n in [500, 1000, 2000, 5000] %}
+            <button type="button" class="keypad-btn" onclick="quickAdd({{ n }})"
+                    style="background:#1f2937;border:1px solid #374151;border-radius:10px;color:#d1d5db;padding:7px 12px;font-size:13px;font-weight:600;flex:1;">
+                +{{ n >= 1000 ? (n/1000)|number_format(0)~'k' : n }}
+            </button>
+            {% endfor %}
+        </div>
+
+        {# ── Area chips — horizontal single-row scroll ───────────────────── #}
+        {% if areas|length > 0 %}
+        <div style="flex-shrink:0;border-top:1px solid #1f2937;border-bottom:1px solid #1f2937;">
+            <div style="display:flex;align-items:center;overflow-x:auto;padding:10px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;"
+                 class="area-scroll-row" id="area-scroll">
+                <input type="hidden" name="area_id" id="area-id-input" value="{{ draft.get('area_id', '') }}">
+                <button type="button" class="keypad-btn area-chip"
+                        data-area-id=""
+                        style="flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid #374151;background:#1f2937;color:#9ca3af;font-size:13px;font-weight:500;margin-right:8px;white-space:nowrap;
+                               {{ not draft.get('area_id') ? 'background:#374151;color:#fff;border-color:#4b5563;' : '' }}">
+                    No Area
+                </button>
+                {% for area in areas %}
+                <button type="button" class="keypad-btn area-chip"
+                        data-area-id="{{ area.id }}"
+                        style="flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid;font-size:13px;font-weight:600;margin-right:8px;white-space:nowrap;
+                               {{ draft.get('area_id') == area.id
+                                  ? 'background:#059669;border-color:#10b981;color:#fff;'
+                                  : 'background:#1f2937;border-color:#374151;color:#d1d5db;' }}">
+                    {{ area.name }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% endif %}
+
+        {# ── Description — single compact row ────────────────────────────── #}
+        <div style="flex-shrink:0;padding:8px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1f2937;">
+            <svg width="16" height="16" fill="none" stroke="#6b7280" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"/>
+            </svg>
+            <input type="text" name="description" id="desc-input"
+                   placeholder="Description (optional)…"
+                   value="{{ draft.get('description', '') }}"
+                   style="flex:1;background:transparent;border:none;color:#fff;font-size:14px;outline:none;padding:4px 0;"
+                   autocomplete="off">
+            <button type="button" id="desc-clear-btn"
+                    style="display:{{ draft.get('description') ? 'flex' : 'none' }};width:20px;height:20px;background:#374151;border:none;border-radius:50%;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;"
+                    onclick="document.getElementById('desc-input').value='';this.style.display='none';">
+                <svg width="10" height="10" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </button>
+
+            {# Quick-pick description dropdown #}
+            <button type="button" id="desc-pick-btn" onclick="toggleDescPicker()"
+                    style="background:#1f2937;border:1px solid #374151;border-radius:8px;padding:4px 10px;color:#9ca3af;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                Quick ▾
+            </button>
+        </div>
+
+        {# Description quick-pick overlay #}
+        <div id="desc-picker"
+             style="display:none;position:absolute;left:0;right:0;z-index:20;background:#111827;border-bottom:1px solid #1f2937;padding:10px 16px;flex-wrap:wrap;gap:8px;">
+            {% for label in ['Food & Beverages', 'Room Charges', 'Event', 'Conference', 'Spa', 'Other'] %}
+            <button type="button" class="keypad-btn"
+                    onclick="pickDesc('{{ label|e('html_attr') }}')"
+                    style="padding:8px 14px;border-radius:20px;background:#1f2937;border:1px solid #374151;color:#d1d5db;font-size:13px;font-weight:500;">
+                {{ label }}
+            </button>
+            {% endfor %}
+        </div>
+
+        {# ── Keypad — fills remaining space ──────────────────────────────── #}
+        <div style="flex:1;display:flex;flex-direction:column;padding:10px 16px 20px;min-height:0;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1;">
+                {% for n in [1,2,3,4,5,6,7,8,9] %}
+                <button type="button" class="keypad-btn"
+                        onclick="pressKey('{{ n }}')"
+                        style="background:#1f2937;border:none;border-radius:14px;color:#fff;font-size:24px;font-weight:600;cursor:pointer;">{{ n }}</button>
+                {% endfor %}
+                <button type="button" class="keypad-btn"
+                        onclick="clearKey()"
+                        style="background:#1f2937;border:none;border-radius:14px;color:#9ca3af;font-size:13px;font-weight:600;cursor:pointer;">CLR</button>
+                <button type="button" class="keypad-btn"
+                        onclick="pressKey('0')"
+                        style="background:#1f2937;border:none;border-radius:14px;color:#fff;font-size:24px;font-weight:600;cursor:pointer;">0</button>
+                <button type="button" class="keypad-btn"
+                        onclick="backspaceKey()"
+                        style="background:#1f2937;border:none;border-radius:14px;color:#9ca3af;font-size:22px;cursor:pointer;">⌫</button>
+            </div>
+
+            <button type="submit" id="next-btn"
+                    style="margin-top:10px;width:100%;height:54px;background:#059669;border:none;border-radius:14px;color:#fff;font-size:18px;font-weight:700;cursor:pointer;opacity:{{ draft.get('amount', 0) > 0 ? '1' : '0.4' }};"
+                    {% if draft.get('amount', 0) <= 0 %}disabled{% endif %}>
+                Next — Select Payment →
+            </button>
+        </div>
+
+    </form>
+</div>
+
+<script>
+(function () {
+    const display  = document.getElementById('amount-display');
+    const input    = document.getElementById('amount-input');
+    const nextBtn  = document.getElementById('next-btn');
+    let raw = '{{ draft.get('amount', 0) > 0 ? draft.get('amount') : '' }}';
+
+    function render() {
+        const n = parseInt(raw) || 0;
+        display.textContent = n > 0 ? n.toLocaleString('en-KE') : '0';
+        input.value = n > 0 ? n : '0';
+        const ok = n > 0;
+        nextBtn.disabled    = !ok;
+        nextBtn.style.opacity = ok ? '1' : '0.4';
+    }
+
+    window.pressKey     = k => { if (raw.length < 7) { raw += k; render(); } };
+    window.backspaceKey = () => { raw = raw.slice(0,-1); render(); };
+    window.clearKey     = () => { raw = ''; render(); };
+    window.quickAdd     = n => { raw = String(Math.min((parseInt(raw)||0) + n, 9999999)); render(); };
+    render();
+
+    // Area chips
+    const areaInput = document.getElementById('area-id-input');
+    document.querySelectorAll('.area-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.area-chip').forEach(b => {
+                b.style.background   = '#1f2937';
+                b.style.borderColor  = '#374151';
+                b.style.color        = '#d1d5db';
+            });
+            btn.style.background  = '#059669';
+            btn.style.borderColor = '#10b981';
+            btn.style.color       = '#fff';
+            areaInput.value = btn.dataset.areaId;
+        });
+    });
+
+    // Description clear button
+    document.getElementById('desc-input')?.addEventListener('input', function() {
+        const btn = document.getElementById('desc-clear-btn');
+        if (btn) btn.style.display = this.value ? 'flex' : 'none';
+    });
+
+    // Description quick-pick
+    window.toggleDescPicker = () => {
+        const p = document.getElementById('desc-picker');
+        p.style.display = p.style.display === 'flex' ? 'none' : 'flex';
+    };
+    window.pickDesc = label => {
+        document.getElementById('desc-input').value = label;
+        document.getElementById('desc-clear-btn').style.display = 'flex';
+        document.getElementById('desc-picker').style.display = 'none';
+    };
+
+    // Mouse-drag scroll on area row
+    const areaRow = document.getElementById('area-scroll');
+    if (areaRow) {
+        let isDown = false, startX, scrollLeft;
+        areaRow.addEventListener('mousedown', e => {
+            isDown = true;
+            startX = e.pageX - areaRow.offsetLeft;
+            scrollLeft = areaRow.scrollLeft;
+            areaRow.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mouseup', () => {
+            isDown = false;
+            areaRow.style.cursor = 'grab';
+        });
+        areaRow.addEventListener('mousemove', e => {
+            if (!isDown) return;
+            e.preventDefault();
+            areaRow.scrollLeft = scrollLeft - (e.pageX - areaRow.offsetLeft - startX);
+        });
+        areaRow.style.cursor = 'grab';
+    }
+
+    // Close picker on outside tap
+    document.addEventListener('pointerdown', e => {
+        const picker = document.getElementById('desc-picker');
+        const btn    = document.getElementById('desc-pick-btn');
+        if (picker && !picker.contains(e.target) && e.target !== btn) {
+            picker.style.display = 'none';
+        }
+    });
+})();
+</script>
+{% endblock %}

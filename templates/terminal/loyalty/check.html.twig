@@ -1,0 +1,189 @@
+{% extends 'layouts/terminal_app.html.twig' %}
+{% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: app.request.attributes.get('branch')} %}
+
+{% block title %}Loyalty — Check Points{% endblock %}
+
+{% block body %}
+<div style="display:flex;flex-direction:column;height:100%;">
+
+    {# ── Header ──────────────────────────────────────────────────────────── #}
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #1f2937;flex-shrink:0;">
+        <a href="{{ path('terminal_dashboard', _p) }}" class="action-btn"
+           style="width:40px;height:40px;background:#1f2937;border-radius:12px;display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0;">
+            <svg width="20" height="20" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+            </svg>
+        </a>
+        <div style="flex:1;">
+            <div style="color:#fff;font-weight:700;font-size:15px;">Points Checker</div>
+            <div style="color:#6b7280;font-size:12px;">{% if program %}{{ program.program_name }}{% else %}Loyalty Program{% endif %}</div>
+        </div>
+        <div style="width:40px;height:40px;background:rgba(234,179,8,0.15);border-radius:12px;display:flex;align-items:center;justify-content:center;">
+            <svg width="20" height="20" fill="#eab308" viewBox="0 0 24 24">
+                <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
+            </svg>
+        </div>
+    </div>
+
+    {% if not program %}
+
+    <div style="flex:1;display:flex;flex-direction:column;align-items:center;justify-content:center;padding:32px;gap:12px;text-align:center;color:#6b7280;">
+        <svg width="48" height="48" fill="none" stroke="#374151" stroke-width="1.5" viewBox="0 0 24 24">
+            <path stroke-linecap="round" stroke-linejoin="round"
+                  d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
+        </svg>
+        <div style="font-size:14px;">No loyalty program configured for this company.</div>
+    </div>
+
+    {% else %}
+
+    <div style="display:flex;flex-direction:column;flex:1;overflow:hidden;min-height:0;padding:8px 16px 0;">
+
+        {# ── Phone display ───────────────────────────────────────────────── #}
+        <div style="flex-shrink:0;margin-bottom:8px;">
+            <div style="color:#9ca3af;font-size:10px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:4px;">Customer Phone</div>
+            <div style="background:#111827;border:1px solid #1f2937;border-radius:12px;padding:10px;text-align:center;">
+                <div id="check-phone-display"
+                     style="color:#fff;font-size:24px;font-family:ui-monospace,monospace;letter-spacing:.12em;font-weight:600;">
+                    0___ ___ ___
+                </div>
+                <div id="check-status" style="font-size:11px;min-height:14px;margin-top:2px;color:#4b5563;"></div>
+            </div>
+        </div>
+
+        {# ── Result card ─────────────────────────────────────────────────── #}
+        <div id="check-result" style="display:none;flex-shrink:0;margin-bottom:8px;">
+
+            {# Enrolled result #}
+            <div id="check-enrolled" style="display:none;background:#111827;border:1px solid #1f2937;border-radius:14px;padding:14px 16px;">
+                <div style="display:flex;align-items:center;gap:12px;margin-bottom:12px;">
+                    <div style="width:42px;height:42px;background:rgba(234,179,8,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        <svg width="20" height="20" fill="#eab308" viewBox="0 0 24 24">
+                            <path d="M11.48 3.499a.562.562 0 011.04 0l2.125 5.111a.563.563 0 00.475.345l5.518.442c.499.04.701.663.321.988l-4.204 3.602a.563.563 0 00-.182.557l1.285 5.385a.562.562 0 01-.84.61l-4.725-2.885a.563.563 0 00-.586 0L6.982 20.54a.562.562 0 01-.84-.61l1.285-5.386a.562.562 0 00-.182-.557l-4.204-3.602a.562.562 0 01.321-.988l5.518-.442a.563.563 0 00.475-.345L11.48 3.5z"/>
+                        </svg>
+                    </div>
+                    <div>
+                        <div id="check-name" style="color:#fff;font-size:16px;font-weight:700;"></div>
+                        <div style="color:#10b981;font-size:11px;font-weight:600;margin-top:1px;">Enrolled</div>
+                    </div>
+                </div>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;">
+                    <div style="background:#0f172a;border-radius:10px;padding:10px;text-align:center;">
+                        <div style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Balance</div>
+                        <div id="check-pts" style="color:#eab308;font-size:18px;font-weight:800;"></div>
+                        <div id="check-sym" style="color:#9ca3af;font-size:10px;margin-top:1px;"></div>
+                    </div>
+                    <div style="background:#0f172a;border-radius:10px;padding:10px;text-align:center;">
+                        <div style="color:#6b7280;font-size:10px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">Worth</div>
+                        <div id="check-kes" style="color:#10b981;font-size:18px;font-weight:800;"></div>
+                        <div style="color:#9ca3af;font-size:10px;margin-top:1px;">KES</div>
+                    </div>
+                </div>
+            </div>
+
+            {# Not enrolled result #}
+            <div id="check-not-enrolled" style="display:none;background:rgba(239,68,68,0.08);border:1px solid rgba(239,68,68,0.2);border-radius:14px;padding:14px 16px;display:none;align-items:center;gap:10px;">
+                <svg width="18" height="18" fill="none" stroke="#f87171" stroke-width="2" viewBox="0 0 24 24" style="flex-shrink:0;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+                </svg>
+                <div style="color:#f87171;font-size:13px;font-weight:600;">Not enrolled in loyalty program</div>
+            </div>
+
+        </div>
+
+        {# ── Keypad ──────────────────────────────────────────────────────── #}
+        <div style="flex:1;min-height:0;display:flex;flex-direction:column;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:4px;flex:1;min-height:0;overflow:hidden;">
+                {% for n in [1,2,3,4,5,6,7,8,9] %}
+                <button type="button" class="keypad-btn" onclick="chkKey('{{ n }}')"
+                        style="background:#1f2937;border:none;border-radius:10px;color:#fff;font-size:19px;font-weight:600;min-height:0;cursor:pointer;">{{ n }}</button>
+                {% endfor %}
+                <button type="button" class="keypad-btn" onclick="chkClear()"
+                        style="background:#1f2937;border:none;border-radius:10px;color:#9ca3af;font-size:11px;font-weight:600;min-height:0;cursor:pointer;">CLR</button>
+                <button type="button" class="keypad-btn" onclick="chkKey('0')"
+                        style="background:#1f2937;border:none;border-radius:10px;color:#fff;font-size:19px;font-weight:600;min-height:0;cursor:pointer;">0</button>
+                <button type="button" class="keypad-btn" onclick="chkBack()"
+                        style="background:#1f2937;border:none;border-radius:10px;color:#9ca3af;font-size:18px;min-height:0;cursor:pointer;">⌫</button>
+            </div>
+        </div>
+
+        {# ── Footer spacer ───────────────────────────────────────────────── #}
+        <div style="flex-shrink:0;height:18px;"></div>
+
+    </div>
+
+    <script>
+    (function() {
+        const checkUrl  = '{{ path('terminal_loyalty_check_phone', _p) }}';
+        const kesPerPt  = {{ program.kes_per_point ?? 1 }};
+
+        const display   = document.getElementById('check-phone-display');
+        const statusEl  = document.getElementById('check-status');
+        const resultBox = document.getElementById('check-result');
+        const enrolledBox    = document.getElementById('check-enrolled');
+        const notEnrolledBox = document.getElementById('check-not-enrolled');
+
+        let raw = '';
+        let checkTimer = null;
+
+        function render() {
+            const d = raw.padEnd(10, '_');
+            display.textContent = d.slice(0,4)+' '+d.slice(4,7)+' '+d.slice(7,10);
+            if (raw.length < 10) {
+                clearTimeout(checkTimer);
+                hideResult();
+                statusEl.textContent = '';
+            } else {
+                clearTimeout(checkTimer);
+                checkTimer = setTimeout(doCheck, 300);
+            }
+        }
+
+        function hideResult() {
+            resultBox.style.display = 'none';
+            enrolledBox.style.display    = 'none';
+            notEnrolledBox.style.display = 'none';
+        }
+
+        async function doCheck() {
+            statusEl.textContent = 'Checking\u2026';
+            statusEl.style.color = '#6b7280';
+            hideResult();
+            try {
+                const res  = await fetch(checkUrl + '?phone=' + encodeURIComponent(raw));
+                const data = await res.json();
+                statusEl.textContent = '';
+                resultBox.style.display = '';
+                if (data.enrolled) {
+                    const name  = data.first_name || raw;
+                    const pts   = data.points_balance ?? 0;
+                    const worth = (pts * kesPerPt).toLocaleString('en-KE', {minimumFractionDigits:0, maximumFractionDigits:0});
+                    document.getElementById('check-name').textContent = name;
+                    document.getElementById('check-pts').textContent  = pts.toLocaleString();
+                    document.getElementById('check-sym').textContent  = data.points_symbol ?? 'pts';
+                    document.getElementById('check-kes').textContent  = worth;
+                    enrolledBox.style.display    = '';
+                    notEnrolledBox.style.display = 'none';
+                } else {
+                    enrolledBox.style.display    = 'none';
+                    notEnrolledBox.style.display = 'flex';
+                }
+            } catch(e) {
+                statusEl.textContent = 'Lookup failed';
+                statusEl.style.color = '#f87171';
+                hideResult();
+            }
+        }
+
+        window.chkKey   = k => { if (raw.length < 10) { raw += k; render(); } };
+        window.chkBack  = () => { raw = raw.slice(0,-1); render(); };
+        window.chkClear = () => { raw = ''; render(); };
+
+        render();
+    })();
+    </script>
+
+    {% endif %}
+
+</div>
+{% endblock %}

@@ -1,0 +1,152 @@
+{% extends 'layouts/terminal_app.html.twig' %}
+{% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: app.request.attributes.get('branch')} %}
+
+{% block title %}Transactions{% endblock %}
+
+{% block body %}
+<div style="display:flex;flex-direction:column;height:100%;">
+
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #1f2937;flex-shrink:0;">
+        <a href="{{ path('terminal_dashboard', _p) }}" class="action-btn"
+           style="width:40px;height:40px;background:#1f2937;border-radius:12px;display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0;">
+            <svg width="20" height="20" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+            </svg>
+        </a>
+        <div style="flex:1;">
+            <div style="color:#fff;font-weight:700;font-size:15px;">My Transactions</div>
+            <div style="color:#6b7280;font-size:12px;">{{ user_name ?? 'This session' }} · last 50</div>
+        </div>
+    </div>
+
+    <div style="flex:1;overflow-y:auto;padding:12px 16px;">
+
+        {% if transactions|length == 0 %}
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:12px;text-align:center;color:#6b7280;">
+            <svg width="48" height="48" fill="none" stroke="#374151" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round"
+                      d="M9 12h3.75M9 15h3.75M9 18h3.75m3 .75H18a2.25 2.25 0 002.25-2.25V6.108c0-1.135-.845-2.098-1.976-2.192a48.424 48.424 0 00-1.123-.08m-5.801 0c-.065.21-.1.433-.1.664 0 .414.336.75.75.75h4.5a.75.75 0 00.75-.75 2.25 2.25 0 00-.1-.664m-5.8 0A2.251 2.251 0 0113.5 2.25H15c1.012 0 1.867.668 2.15 1.586m-5.8 0c-.376.023-.75.05-1.124.08C9.095 4.01 8.25 4.973 8.25 6.108V8.25m0 0H4.875c-.621 0-1.125.504-1.125 1.125v11.25c0 .621.504 1.125 1.125 1.125h9.75c.621 0 1.125-.504 1.125-1.125V9.375c0-.621-.504-1.125-1.125-1.125H8.25z"/>
+            </svg>
+            <div style="font-size:14px;">No transactions yet.</div>
+        </div>
+        {% else %}
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            {% for txn in transactions %}
+
+            {# ── Helpers ──────────────────────────────────────────────────── #}
+            {% set dot_color    = txn.status == 'complete'   ? '#10b981'
+                                : txn.status == 'processing' ? '#3b82f6'
+                                : txn.status == 'cancelled'  ? '#374151' : '#f59e0b' %}
+            {% set status_color = txn.status == 'complete'   ? '#34d399'
+                                : txn.status == 'processing' ? '#93c5fd'
+                                : txn.status == 'cancelled'  ? '#6b7280' : '#fbbf24' %}
+
+            {# Mask phone: last 3 digits only #}
+            {% set masked_phone = txn.msisdn ? ('···' ~ txn.msisdn|slice(-3)) : null %}
+
+            {# Date line: show full date if not today #}
+            {% set txn_date = txn.created_at|date('Y-m-d') %}
+            {% set today    = 'now'|date('Y-m-d') %}
+            {% set time_str = txn.created_at|date('H:i') %}
+            {% set date_str = txn_date == today ? time_str : txn.created_at|date('d M, H:i') %}
+
+            <div style="background:#111827;border:1px solid #1f2937;border-radius:16px;padding:12px 14px;">
+
+                {# ── Top row: amount + time + status ─────────────────────── #}
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <div style="width:8px;height:8px;border-radius:50%;background:{{ dot_color }};flex-shrink:0;margin-top:1px;"></div>
+                    <span style="color:#fff;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;flex:1;">
+                        KES {{ txn.amount|number_format(0, '.', ',') }}
+                    </span>
+                    <span style="color:#6b7280;font-size:11px;">{{ date_str }}</span>
+                    <span style="color:{{ status_color }};font-size:11px;font-weight:600;text-transform:capitalize;">{{ txn.status }}</span>
+                </div>
+
+                {# ── Transaction ID row ───────────────────────────────────── #}
+                <div style="padding-left:16px;margin-bottom:7px;display:flex;align-items:center;gap:8px;flex-wrap:wrap;">
+                    {% if txn.pos_id %}
+                    <span style="color:#4b5563;font-size:10px;font-family:ui-monospace,monospace;font-weight:700;letter-spacing:.06em;">#{{ txn.pos_id }}</span>
+                    {% endif %}
+                    {% if txn.mpesa_code %}
+                    <span style="color:#34d399;font-size:10px;font-family:ui-monospace,monospace;letter-spacing:.04em;">{{ txn.mpesa_code }}</span>
+                    {% elseif txn.method_key == 'mpesa' %}
+                    <span style="color:#374151;font-size:10px;font-family:ui-monospace,monospace;">No code</span>
+                    {% endif %}
+                </div>
+
+                {# ── Detail chips row ─────────────────────────────────────── #}
+                <div style="display:flex;flex-wrap:wrap;gap:5px;padding-left:16px;">
+
+                    {# Payment method(s) — show split legs if available, else single method #}
+                    {% if txn.splits|length > 0 %}
+                        {% for leg in txn.splits %}
+                        <span style="background:#1f2937;border-radius:6px;padding:3px 8px;font-size:11px;color:#d1d5db;font-weight:600;">
+                            {{ leg.method_key|capitalize }}
+                            <span style="color:#6b7280;font-weight:400;"> KES {{ leg.amount|number_format(0,'.', ',') }}</span>
+                        </span>
+                        {% if leg.api_receipt %}
+                        <span style="color:#34d399;font-size:10px;font-family:ui-monospace,monospace;align-self:center;">{{ leg.api_receipt }}</span>
+                        {% endif %}
+                        {% endfor %}
+                    {% else %}
+                    <span style="background:#1f2937;border-radius:6px;padding:3px 8px;font-size:11px;color:#d1d5db;font-weight:600;">
+                        {{ txn.payment_method_name ?? txn.method_key ?? '—' }}
+                    </span>
+                    {% endif %}
+
+                    {# Area / table #}
+                    {% if txn.area_name %}
+                    <span style="background:#1f2937;border-radius:6px;padding:3px 8px;font-size:11px;color:#9ca3af;">
+                        {{ txn.area_name }}
+                    </span>
+                    {% endif %}
+
+                    {# Description / bill ref #}
+                    {% if txn.description %}
+                    <span style="background:#1f2937;border-radius:6px;padding:3px 8px;font-size:11px;color:#9ca3af;max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">
+                        {{ txn.description }}
+                    </span>
+                    {% endif %}
+
+                    {# Customer #}
+                    {% if txn.customer_first_name %}
+                    <span style="background:rgba(99,102,241,0.15);border-radius:6px;padding:3px 8px;font-size:11px;color:#a5b4fc;">
+                        {{ txn.customer_first_name }}{% if masked_phone %} {{ masked_phone }}{% endif %}
+                    </span>
+                    {% elseif masked_phone %}
+                    <span style="background:rgba(99,102,241,0.15);border-radius:6px;padding:3px 8px;font-size:11px;color:#a5b4fc;">
+                        {{ masked_phone }}
+                    </span>
+                    {% endif %}
+
+                    {# Mode badge — only show 'api' since manual is the default #}
+                    {% if txn.mode == 'api' %}
+                    <span style="background:rgba(59,130,246,0.12);border-radius:6px;padding:3px 8px;font-size:11px;color:#93c5fd;">
+                        STK
+                    </span>
+                    {% endif %}
+
+                </div>
+
+                {# ── Loyalty points ───────────────────────────────────────── #}
+                {% if txn.loyalty_points_awarded and txn.loyalty_points_awarded > 0 %}
+                <div style="margin-top:6px;padding-left:16px;color:#eab308;font-size:11px;font-weight:600;">
+                    +{{ txn.loyalty_points_awarded }} pts awarded
+                </div>
+                {% endif %}
+
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+    </div>
+
+    <div style="padding:12px 16px 24px;flex-shrink:0;border-top:1px solid #1f2937;">
+        <a href="{{ path('terminal_checkout_start', _p) }}" class="action-btn"
+           style="display:flex;align-items:center;justify-content:center;height:52px;background:#059669;border-radius:14px;color:#fff;font-size:17px;font-weight:700;text-decoration:none;">
+            New Checkout
+        </a>
+    </div>
+
+</div>
+{% endblock %}

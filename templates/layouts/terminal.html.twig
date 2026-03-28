@@ -1,0 +1,63 @@
+{% extends 'base.html.twig' %}
+
+{% block title %}
+    Koma Gardens & Resort | MPesa Dashboard
+{% endblock %}
+
+{% block stylesheets %}
+    {{ parent() }}
+
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+
+     <style>
+        html,
+        body {
+            height: 100%;
+            margin: 0;
+        }
+
+        .loader {
+            display: none;
+        }
+
+        .card-enter {
+            transform: translateY(20px);
+            opacity: 0;
+            transition: all 0.25s ease;
+        }
+
+        .card-enter-active {
+            transform: translateY(0);
+            opacity: 1;
+        }
+
+        .pin-key,
+        #pin-clear,
+        #pin-back {
+            background: #1f2937;
+            padding: 14px;
+            border-radius: 8px;
+            font-size: 18px;
+            font-weight: bold;
+            color: white;
+        }
+
+        .pin-key:hover,
+        #pin-clear:hover,
+        #pin-back:hover {
+            background: #374151;
+        }
+		
+		.info-modal-backdrop {
+        background: rgba(0,0,0,0.45);
+    }
+    </style>
+
+{% endblock %}
+
+
+
+{% block body %}
+    {% block mpesa_content %}{% endblock %}
+{% endblock %}

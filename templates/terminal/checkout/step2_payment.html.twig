@@ -1,0 +1,567 @@
+{% extends 'layouts/terminal_app.html.twig' %}
+{% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: app.request.attributes.get('branch')} %}
+
+{% block title %}Checkout — Payment{% endblock %}
+
+{% block body %}
+<div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">
+
+    {# ── Top bar ─────────────────────────────────────────────────────────── #}
+    <div style="display:flex;align-items:center;gap:12px;padding:14px 18px;border-bottom:1px solid #1f2937;flex-shrink:0;">
+        <a href="{{ path('terminal_checkout_step1', _p) }}" class="action-btn"
+           style="width:38px;height:38px;background:#1f2937;border-radius:11px;display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0;">
+            <svg width="18" height="18" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+            </svg>
+        </a>
+        <div style="flex:1;">
+            <div style="color:#fff;font-weight:700;font-size:15px;">Payment Method</div>
+            <div style="color:#6b7280;font-size:12px;">Step 2 of 5 — Choose how to pay</div>
+        </div>
+        <div style="display:flex;gap:5px;">
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+        </div>
+    </div>
+
+    {# ── Amount + splits summary (always visible) ─────────────────────────── #}
+    <div style="padding:10px 18px 0;flex-shrink:0;">
+        <div style="background:#111827;border:1px solid #1f2937;border-radius:16px;padding:12px 16px;">
+            <div style="display:flex;align-items:baseline;justify-content:space-between;">
+                <div style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:.06em;">Total</div>
+                <div style="color:#fff;font-size:26px;font-weight:800;font-variant-numeric:tabular-nums;">
+                    KES {{ draft.get('amount', 0)|number_format(0, '.', ',') }}
+                </div>
+            </div>
+            {% if draft.get('description') %}
+            <div style="color:#6b7280;font-size:12px;margin-top:1px;">{{ draft.get('description') }}</div>
+            {% endif %}
+            <div id="splits-list" style="margin-top:8px;"></div>
+            <div id="remaining-row" style="margin-top:6px;padding-top:6px;border-top:1px solid #1f2937;justify-content:space-between;align-items:center;display:none;">
+                <div style="color:#6b7280;font-size:12px;">Remaining</div>
+                <div id="remaining-val" style="font-size:13px;font-weight:700;color:#ef4444;">KES 0</div>
+            </div>
+        </div>
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════════════════
+       VIEW: METHOD LIST
+       ═══════════════════════════════════════════════════════════════════════ #}
+    <div id="view-methods" style="flex:1;overflow-y:auto;padding:8px 18px 10px;">
+
+        {% if methods|length == 0 %}
+        <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:10px;text-align:center;color:#6b7280;">
+            <svg width="40" height="40" fill="none" stroke="#374151" stroke-width="1.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/>
+            </svg>
+            <div style="font-size:13px;">No payment methods configured for this branch.</div>
+        </div>
+        {% else %}
+
+        <div style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:8px;" id="methods-label">Select payment method</div>
+
+        <div style="display:flex;flex-direction:column;gap:8px;">
+            {% for method in methods %}
+            {% set accent = {
+                'mpesa':   '#16a34a',
+                'cash':    '#059669',
+                'bank':    '#2563eb',
+                'pesapal': '#7c3aed',
+                'loyalty': '#d97706',
+            }[method.methodKey] ?? '#374151' %}
+
+            <div class="method-row" data-method-key="{{ method.methodKey }}"
+                 style="display:flex;gap:6px;align-items:stretch;">
+
+                {# Main tap area — adds full/remaining amount #}
+                <button type="button" class="action-btn pay-card-main"
+                        data-config-id="{{ method.configId }}"
+                        data-method-key="{{ method.methodKey }}"
+                        data-label="{{ method.label }}"
+                        data-kes-per-point="{{ method.cfg('kes_per_point', 0) }}"
+                        data-max-pct="{{ method.cfg('max_redemption_pct', 100) }}"
+                        style="flex:1;display:flex;align-items:center;gap:12px;background:#111827;border:1px solid #1f2937;border-radius:16px;padding:14px;text-align:left;cursor:pointer;min-width:0;">
+                    <div style="width:40px;height:40px;background:{{ accent }}22;border-radius:11px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                        {% if method.methodKey == 'mpesa' %}
+                        <svg width="22" height="22" fill="{{ accent }}" viewBox="0 0 24 24"><path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-1 14H9V8h2v8zm4 0h-2V8h2v8z"/></svg>
+                        {% elseif method.methodKey == 'loyalty' %}
+                        <svg width="22" height="22" fill="{{ accent }}" viewBox="0 0 24 24"><path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/></svg>
+                        {% elseif method.methodKey == 'cash' %}
+                        <svg width="22" height="22" fill="none" stroke="{{ accent }}" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 18.75a60.07 60.07 0 0115.797 2.101c.727.198 1.453-.342 1.453-1.096V18.75M3.75 4.5v.75A.75.75 0 013 6h-.75m0 0v-.375c0-.621.504-1.125 1.125-1.125H20.25M2.25 6v9m18-10.5v.75c0 .414.336.75.75.75h.75m-1.5-1.5h.375c.621 0 1.125.504 1.125 1.125v9.75c0 .621-.504 1.125-1.125 1.125h-.375m1.5-1.5H21a.75.75 0 00-.75.75v.75m0 0H3.75m0 0h-.375a1.125 1.125 0 01-1.125-1.125V15m1.5 1.5v-.75A.75.75 0 003 15h-.75M15 10.5a3 3 0 11-6 0 3 3 0 016 0zm3 0h.008v.008H18V10.5zm-12 0h.008v.008H6V10.5z"/></svg>
+                        {% elseif method.methodKey == 'bank' %}
+                        <svg width="22" height="22" fill="none" stroke="{{ accent }}" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 21v-8.25M15.75 21v-8.25M8.25 21v-8.25M3 9l9-6 9 6m-1.5 12V10.332A48.36 48.36 0 0012 9.75c-2.551 0-5.056.2-7.5.582V21M3 21h18M12 6.75h.008v.008H12V6.75z"/></svg>
+                        {% else %}
+                        <svg width="22" height="22" fill="none" stroke="{{ accent }}" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/></svg>
+                        {% endif %}
+                    </div>
+                    <div style="flex:1;min-width:0;">
+                        <div style="color:#fff;font-size:15px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{ method.label }}</div>
+                        <div style="color:#6b7280;font-size:11px;margin-top:1px;">
+                            {% if method.methodKey == 'loyalty' %}Redeem points as payment
+                            {% elseif method.isApi() %}API Automated{% if method.methodKey == 'mpesa' and method.mpesaType %} · {{ method.mpesaType|upper }}{% endif %}
+                            {% else %}Manual{% if method.methodKey == 'mpesa' and method.mpesaType %} · {{ method.mpesaType|upper }}{% endif %}{% endif %}
+                        </div>
+                    </div>
+                    <svg width="16" height="16" fill="none" stroke="#4b5563" stroke-width="2.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
+                    </svg>
+                </button>
+
+                {# Custom amount button — only for non-loyalty, shown when in split mode #}
+                {% if method.methodKey != 'loyalty' %}
+                <button type="button" class="action-btn pay-card-custom"
+                        data-config-id="{{ method.configId }}"
+                        data-method-key="{{ method.methodKey }}"
+                        data-label="{{ method.label }}"
+                        title="Custom amount"
+                        style="display:none;width:44px;background:#1f2937;border:1px solid #374151;border-radius:16px;flex-shrink:0;align-items:center;justify-content:center;cursor:pointer;">
+                    <svg width="16" height="16" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L10.582 16.07a4.5 4.5 0 01-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 011.13-1.897l8.932-8.931zm0 0L19.5 7.125"/>
+                    </svg>
+                </button>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+
+        {% endif %}
+    </div>
+
+    {# ── Pinned footer — always visible when on view-methods ─────────────── #}
+    <div id="methods-footer" style="flex-shrink:0;padding:8px 18px 16px;display:flex;flex-direction:column;gap:8px;border-top:1px solid #1f2937;">
+        <button id="split-toggle-btn" onclick="toggleSplitMode()"
+                style="width:100%;padding:10px;background:transparent;border:1px dashed #374151;border-radius:12px;color:#6b7280;font-size:13px;cursor:pointer;">
+            ➕ Split payment across methods
+        </button>
+        <div id="proceed-area" style="display:none;">
+            <button onclick="submitSplits()"
+                    style="width:100%;height:52px;background:#059669;border:none;border-radius:14px;color:#fff;font-size:16px;font-weight:700;cursor:pointer;">
+                Proceed → Process Payment
+            </button>
+        </div>
+        <form method="post" action="{{ path('terminal_checkout_cancel', _p) }}">
+            <button type="submit" style="width:100%;padding:8px;background:transparent;border:none;color:#6b7280;font-size:13px;cursor:pointer;">
+                Cancel checkout
+            </button>
+        </form>
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════════════════
+       VIEW: CUSTOM AMOUNT PICKER
+       ═══════════════════════════════════════════════════════════════════════ #}
+    <div id="view-amount" style="display:none;flex-direction:column;flex:1;padding:8px 18px 10px;overflow:hidden;">
+        <button onclick="showMethods()"
+                style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#6b7280;font-size:13px;cursor:pointer;padding:0;margin-bottom:8px;flex-shrink:0;">
+            <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+            </svg>
+            Back
+        </button>
+        <div id="picker-title" style="color:#9ca3af;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:6px;flex-shrink:0;"></div>
+        <div style="background:#111827;border:1px solid #1f2937;border-radius:12px;padding:8px;text-align:center;margin-bottom:6px;flex-shrink:0;">
+            <div id="picker-display" style="color:#fff;font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;">KES 0</div>
+            <div id="picker-hint" style="color:#6b7280;font-size:11px;margin-top:2px;min-height:14px;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;flex:1;min-height:0;">
+            {% for n in [1,2,3,4,5,6,7,8,9] %}
+            <button type="button" class="keypad-btn" onclick="pkKey('{{ n }}')"
+                    style="background:#1f2937;border:none;border-radius:11px;color:#fff;font-size:20px;font-weight:600;">{{ n }}</button>
+            {% endfor %}
+            <button type="button" class="keypad-btn" onclick="pkClear()" style="background:#1f2937;border:none;border-radius:11px;color:#9ca3af;font-size:11px;font-weight:600;">CLR</button>
+            <button type="button" class="keypad-btn" onclick="pkKey('0')" style="background:#1f2937;border:none;border-radius:11px;color:#fff;font-size:20px;font-weight:600;">0</button>
+            <button type="button" class="keypad-btn" onclick="pkBack()" style="background:#1f2937;border:none;border-radius:11px;color:#9ca3af;font-size:20px;">⌫</button>
+        </div>
+        <button id="picker-confirm-btn" onclick="pickerConfirm()"
+                style="width:100%;height:48px;background:#059669;border:none;border-radius:13px;color:#fff;font-size:15px;font-weight:700;margin-top:6px;flex-shrink:0;opacity:0.4;cursor:not-allowed;">
+            Add
+        </button>
+    </div>
+
+    {# ═══════════════════════════════════════════════════════════════════════
+       VIEW: LOYALTY PHONE LOOKUP
+       ═══════════════════════════════════════════════════════════════════════ #}
+    <div id="view-loyalty" style="display:none;flex-direction:column;flex:1;padding:8px 18px 10px;overflow:hidden;">
+        <button onclick="showMethods()"
+                style="display:flex;align-items:center;gap:6px;background:none;border:none;color:#6b7280;font-size:13px;cursor:pointer;padding:0;margin-bottom:6px;flex-shrink:0;">
+            <svg width="15" height="15" fill="none" stroke="#6b7280" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+            </svg>
+            Back
+        </button>
+        <div style="color:#d97706;font-size:11px;text-transform:uppercase;letter-spacing:.08em;margin-bottom:5px;flex-shrink:0;">Loyalty — Customer Phone</div>
+        <div style="background:#111827;border:1px solid #1f2937;border-radius:12px;padding:8px 10px;text-align:center;margin-bottom:5px;flex-shrink:0;">
+            <div id="loy-display" style="color:#fff;font-size:24px;font-family:ui-monospace,monospace;letter-spacing:.1em;font-weight:600;">0___ ___ ___</div>
+            <div id="loy-status" style="color:#6b7280;font-size:12px;margin-top:3px;min-height:16px;"></div>
+        </div>
+        <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:5px;flex:1;min-height:0;">
+            {% for n in [1,2,3,4,5,6,7,8,9] %}
+            <button type="button" class="keypad-btn" onclick="loyKey('{{ n }}')"
+                    style="background:#1f2937;border:none;border-radius:11px;color:#fff;font-size:20px;font-weight:600;">{{ n }}</button>
+            {% endfor %}
+            <button type="button" class="keypad-btn" onclick="loyClear()" style="background:#1f2937;border:none;border-radius:11px;color:#9ca3af;font-size:11px;font-weight:600;">CLR</button>
+            <button type="button" class="keypad-btn" onclick="loyKey('0')" style="background:#1f2937;border:none;border-radius:11px;color:#fff;font-size:20px;font-weight:600;">0</button>
+            <button type="button" class="keypad-btn" onclick="loyBack()" style="background:#1f2937;border:none;border-radius:11px;color:#9ca3af;font-size:20px;">⌫</button>
+        </div>
+        <button id="loy-confirm-btn" onclick="loyConfirm()"
+                style="width:100%;height:48px;background:#d97706;border:none;border-radius:13px;color:#fff;font-size:15px;font-weight:700;margin-top:6px;flex-shrink:0;opacity:0.4;cursor:not-allowed;">
+            Checking…
+        </button>
+    </div>
+
+    {# ── Hidden form + cancel ─────────────────────────────────────────────── #}
+    <form id="splits-form" method="post" action="{{ path('terminal_checkout_save2', _p) }}" style="display:none;">
+        <input type="hidden" name="splits_json" id="splits-json-input">
+    </form>
+
+
+</div>
+
+<script>
+(function() {
+    const totalAmount   = {{ draft.get('amount', 0)|number_format(0, '.', '') }};
+    const balanceUrl    = '{{ path('terminal_checkout_redemption_balance', _p) }}';
+    {% set _loyMethod = methods|filter(m => m.methodKey == 'loyalty')|first %}
+    const loyConfigId   = {{ _loyMethod is not null ? _loyMethod.configId : 0 }};
+
+    let splits      = [];   // [{config_id, method_key, label, amount, loy_phone?}]
+    let splitMode   = false;
+    let editIndex   = null; // index of split being edited (null = adding new)
+    let pickerData  = null; // {configId, methodKey, label}
+    let pkStr       = '';
+    let loyRaw      = '';
+    let loyData     = null;  // result from balance check
+    let loyChecked  = false; // true once a lookup has completed (success or fail)
+    let loyTimer    = null;
+
+    // ── Utilities ─────────────────────────────────────────────────────────
+    function remaining() {
+        return totalAmount - splits.reduce((s, x) => s + x.amount, 0);
+    }
+
+    function showView(id) {
+        ['view-methods','view-amount','view-loyalty'].forEach(v => {
+            const el = document.getElementById(v);
+            if (el) el.style.display = v === id ? (id === 'view-methods' ? 'block' : 'flex') : 'none';
+        });
+        // Footer only visible on the methods list view
+        const footer = document.getElementById('methods-footer');
+        if (footer) footer.style.display = id === 'view-methods' ? 'flex' : 'none';
+    }
+
+    function showMethods() {
+        editIndex = null;
+        pickerData = null;
+        loyRaw = ''; loyData = null;
+        showView('view-methods');
+        renderSplits();
+    }
+
+    // ── Split list render ──────────────────────────────────────────────────
+    function renderSplits() {
+        const list = document.getElementById('splits-list');
+        const remRow = document.getElementById('remaining-row');
+        const remVal = document.getElementById('remaining-val');
+        const proceedArea = document.getElementById('proceed-area');
+        const methodsLabel = document.getElementById('methods-label');
+
+        if (splits.length === 0) {
+            list.innerHTML = '';
+            remRow.style.display = 'none';
+            proceedArea.style.display = 'none';
+        } else {
+            const colors = {mpesa:'#16a34a',cash:'#059669',bank:'#2563eb',pesapal:'#7c3aed',loyalty:'#d97706'};
+            list.innerHTML = splits.map((s, i) => {
+                const c = colors[s.method_key] || '#6b7280';
+                return `<div style="display:flex;align-items:center;gap:8px;background:#1f2937;border-radius:9px;padding:7px 10px;margin-top:5px;">
+                    <div style="flex:1;color:#d1d5db;font-size:13px;font-weight:600;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${s.label}</div>
+                    <button onclick="editSplit(${i})" style="background:none;border:none;color:${c};font-size:12px;font-weight:700;cursor:pointer;padding:0 4px;white-space:nowrap;">KES ${s.amount.toLocaleString()} ✎</button>
+                    <button onclick="removeSplit(${i})" style="background:none;border:none;color:#6b7280;cursor:pointer;font-size:16px;line-height:1;padding:0;">×</button>
+                </div>`;
+            }).join('');
+            remRow.style.display = 'flex';
+            const rem = remaining();
+            remVal.textContent = 'KES ' + Math.abs(rem).toLocaleString() + (rem < 0 ? ' over' : '');
+            remVal.style.color = rem <= 0 ? '#10b981' : '#ef4444';
+            proceedArea.style.display = rem <= 0 ? 'block' : 'none';
+        }
+
+        if (methodsLabel) {
+            methodsLabel.textContent = splits.length === 0
+                ? 'Select payment method'
+                : (remaining() > 0 ? 'Add another method' : 'All covered — proceed when ready');
+        }
+
+        // Dim method cards already used (in split mode)
+        const usedKeys = new Set(splits.map(s => s.method_key));
+        document.querySelectorAll('.method-row').forEach(row => {
+            const used = usedKeys.has(row.dataset.methodKey);
+            row.style.opacity = (splitMode && used) ? '0.3' : '1';
+            row.style.pointerEvents = (splitMode && used) ? 'none' : 'auto';
+        });
+
+        // Show/hide custom amount buttons
+        document.querySelectorAll('.pay-card-custom').forEach(btn => {
+            btn.style.display = splitMode ? 'flex' : 'none';
+        });
+    }
+
+    window.removeSplit = function(i) {
+        splits.splice(i, 1);
+        renderSplits();
+    };
+
+    window.editSplit = function(i) {
+        editIndex = i;
+        const s = splits[i];
+        pickerData = {configId: s.config_id, methodKey: s.method_key, label: s.label};
+        pkStr = String(s.amount);
+        openPicker(s.label, s.amount);
+    };
+
+    // ── Split mode toggle ─────────────────────────────────────────────────
+    window.toggleSplitMode = function() {
+        splitMode = !splitMode;
+        const btn = document.getElementById('split-toggle-btn');
+        if (splitMode) {
+            btn.textContent = '✕ Cancel split mode';
+            btn.style.color = '#ef4444';
+            btn.style.borderColor = '#ef4444';
+        } else {
+            btn.textContent = '➕ Split payment across methods';
+            btn.style.color = '#6b7280';
+            btn.style.borderColor = '#374151';
+            // Clear any partial splits if exiting split mode
+            if (splits.length > 0 && remaining() > 0) {
+                splits = [];
+            }
+        }
+        renderSplits();
+    };
+
+    // ── Method card click ──────────────────────────────────────────────────
+    document.querySelectorAll('.pay-card-main').forEach(card => {
+        card.addEventListener('click', () => {
+            const configId  = parseInt(card.dataset.configId, 10);
+            const methodKey = card.dataset.methodKey;
+            const label     = card.dataset.label;
+
+            // Loyalty always goes to phone lookup
+            if (methodKey === 'loyalty') {
+                loyRaw = ''; loyData = null;
+                renderLoyPhone();
+                showView('view-loyalty');
+                return;
+            }
+
+            if (splitMode) {
+                // In split mode: add with REMAINING amount, then stay on methods
+                const rem = remaining();
+                if (rem <= 0) return;
+                addOrUpdateSplit({config_id: configId, method_key: methodKey, label, amount: rem});
+                renderSplits();
+            } else {
+                // Single payment: submit immediately
+                splits = [{config_id: configId, method_key: methodKey, label, amount: totalAmount}];
+                submitSplits();
+            }
+        });
+    });
+
+    // Custom amount button (split mode only)
+    document.querySelectorAll('.pay-card-custom').forEach(card => {
+        card.addEventListener('click', () => {
+            const configId  = parseInt(card.dataset.configId, 10);
+            const methodKey = card.dataset.methodKey;
+            const label     = card.dataset.label;
+            pickerData = {configId, methodKey, label};
+            pkStr = '';
+            editIndex = null;
+            openPicker(label, remaining());
+        });
+    });
+
+    // ── Amount picker ──────────────────────────────────────────────────────
+    function openPicker(label, defaultAmt) {
+        document.getElementById('picker-title').textContent = label.toUpperCase();
+        pkStr = defaultAmt > 0 ? String(defaultAmt) : '';
+        renderPicker();
+        showView('view-amount');
+    }
+
+    window.pkKey   = k => { if (pkStr.length < 7) { pkStr += k; renderPicker(); } };
+    window.pkBack  = ()  => { pkStr = pkStr.slice(0, -1); renderPicker(); };
+    window.pkClear = ()  => { pkStr = ''; renderPicker(); };
+
+    function renderPicker() {
+        const amt = parseInt(pkStr || '0', 10);
+        const rem = editIndex !== null
+            ? remaining() + splits[editIndex].amount  // add back the old amount when editing
+            : remaining();
+        document.getElementById('picker-display').textContent = 'KES ' + (amt > 0 ? amt.toLocaleString() : '0');
+        document.getElementById('picker-hint').textContent = `Remaining: KES ${rem.toLocaleString()}`;
+        const valid = amt > 0 && amt <= rem + 0.5;
+        const btn = document.getElementById('picker-confirm-btn');
+        btn.style.opacity = valid ? '1' : '0.4';
+        btn.style.cursor  = valid ? 'pointer' : 'not-allowed';
+        btn.textContent   = amt > 0
+            ? `Add KES ${amt.toLocaleString()} via ${pickerData?.label ?? ''}`
+            : 'Enter amount';
+    }
+
+    window.pickerConfirm = function() {
+        const amt = parseInt(pkStr || '0', 10);
+        if (!pickerData || amt <= 0) return;
+        const rem = editIndex !== null
+            ? remaining() + splits[editIndex].amount
+            : remaining();
+        if (amt > rem + 0.5) return;
+
+        const split = {config_id: pickerData.configId, method_key: pickerData.methodKey, label: pickerData.label, amount: amt};
+        addOrUpdateSplit(split);
+        pickerData = null; pkStr = '';
+        showMethods();
+    };
+
+    function addOrUpdateSplit(split) {
+        if (editIndex !== null) {
+            splits[editIndex] = split;
+            editIndex = null;
+        } else {
+            splits.push(split);
+        }
+        renderSplits();
+    }
+
+    // ── Loyalty phone ──────────────────────────────────────────────────────
+    function renderLoyPhone() {
+        const d = loyRaw.padEnd(10, '_');
+        document.getElementById('loy-display').textContent =
+            d.slice(0,4)+' '+d.slice(4,7)+' '+d.slice(7,10);
+        updateLoyBtn();
+        if (loyRaw.length === 10) scheduleLoyLookup();
+        else {
+            clearTimeout(loyTimer);
+            loyData = null; loyChecked = false;
+            document.getElementById('loy-status').textContent = '';
+            document.getElementById('loy-status').style.color = '#6b7280';
+        }
+    }
+
+    window.loyKey   = k => { if (loyRaw.length < 10) { loyRaw += k; renderLoyPhone(); } };
+    window.loyBack  = ()  => { loyRaw = loyRaw.slice(0, -1); renderLoyPhone(); };
+    window.loyClear = ()  => { loyRaw = ''; renderLoyPhone(); };
+
+    function scheduleLoyLookup() {
+        clearTimeout(loyTimer);
+        loyTimer = setTimeout(async () => {
+            const statusEl = document.getElementById('loy-status');
+            const btn = document.getElementById('loy-confirm-btn');
+            statusEl.textContent = 'Checking…';
+            statusEl.style.color = '#6b7280';
+            btn.textContent = 'Checking…';
+            try {
+                // Always pass the full checkout total so the % cap is calculated on the whole bill
+                const url = balanceUrl + '?phone=' + encodeURIComponent(loyRaw) + '&amount=' + totalAmount;
+                const data = await (await fetch(url)).json();
+                loyData = data;
+
+                if (!data.enrolled) {
+                    statusEl.textContent = 'Not enrolled in loyalty';
+                    statusEl.style.color = '#ef4444';
+                    loyData = null;
+                } else if (!data.can_redeem) {
+                    const sym = data.points_symbol;
+                    const bal = data.balance.toLocaleString();
+                    let msg;
+                    if (data.deny_reason === 'amount_too_low') {
+                        msg = `Bill too small — ${data.max_pct}% limit gives KES 0`;
+                    } else if (data.deny_reason === 'no_points') {
+                        msg = `No redeemable points (0 ${sym})`;
+                    } else {
+                        msg = `${bal} ${sym} available — not enough for this bill`;
+                    }
+                    statusEl.textContent = msg;
+                    statusEl.style.color = '#ef4444';
+                    loyData = null;
+                } else {
+                    // How much will actually be applied = capped at remaining balance
+                    const kes = data.redeemable_kes;
+                    const applied = Math.min(kes, remaining());
+                    statusEl.textContent = applied >= remaining()
+                        ? `${data.balance.toLocaleString()} ${data.points_symbol} · covers full KES ${applied.toLocaleString()}`
+                        : `${data.balance.toLocaleString()} ${data.points_symbol} · applying KES ${applied.toLocaleString()} of ${kes.toLocaleString()} available`;
+                    statusEl.style.color = '#10b981';
+                }
+            } catch(e) {
+                document.getElementById('loy-status').textContent = 'Lookup failed — retry';
+                document.getElementById('loy-status').style.color = '#ef4444';
+                loyData = null;
+            }
+            loyChecked = true;
+            updateLoyBtn();
+        }, 400);
+    }
+
+    function updateLoyBtn() {
+        const btn = document.getElementById('loy-confirm-btn');
+        if (!loyData) {
+            btn.style.opacity = '0.4';
+            btn.style.cursor  = 'not-allowed';
+            btn.textContent   = loyRaw.length < 10 ? 'Enter phone number'
+                              : loyChecked          ? 'Cannot redeem'
+                              :                       'Checking…';
+            return;
+        }
+        // Cap what we apply at the remaining balance (can't redeem more than what's left)
+        const kes = Math.min(loyData.redeemable_kes ?? loyData.available_kes ?? 0, remaining());
+        const pts = Math.ceil(kes / (loyData.kes_per_point || 1));
+        btn.style.opacity = kes > 0 ? '1' : '0.4';
+        btn.style.cursor  = kes > 0 ? 'pointer' : 'not-allowed';
+        btn.textContent   = kes > 0
+            ? `Use ${pts.toLocaleString()} pts · KES ${kes.toLocaleString()}`
+            : 'Insufficient points';
+    }
+
+    window.loyConfirm = function() {
+        if (!loyData) return;
+        // Apply up to remaining balance only — % cap was already enforced by the API against the full total
+        const kes = Math.min(loyData.redeemable_kes ?? loyData.available_kes ?? 0, remaining());
+        if (kes <= 0) return;
+
+        addOrUpdateSplit({
+            config_id:  loyConfigId,
+            method_key: 'loyalty',
+            label:      'Loyalty Points',
+            amount:     kes,
+            loy_phone:  loyRaw,
+        });
+
+        loyRaw = ''; loyData = null;
+
+        if (remaining() <= 0.5 && !splitMode) {
+            submitSplits();
+        } else {
+            splitMode = true; // auto-enter split mode if loyalty doesn't cover all
+            showMethods();
+        }
+    };
+
+    // ── Submit ─────────────────────────────────────────────────────────────
+    window.submitSplits = function() {
+        if (remaining() > 1) return;
+        document.getElementById('splits-json-input').value = JSON.stringify(splits);
+        const f = document.getElementById('splits-form');
+        (f.requestSubmit ? f.requestSubmit() : f.submit());
+    };
+
+    // ── Expose local functions to global scope (needed by inline onclick) ─
+    window.showMethods = showMethods;
+
+    // ── Init ──────────────────────────────────────────────────────────────
+    renderSplits();
+})();
+</script>
+{% endblock %}
