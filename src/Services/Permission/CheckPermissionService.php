@@ -121,12 +121,25 @@ final class CheckPermissionService
      * Get a specific constraint value for a permission.
      * Returns the default if the constraint is not set.
      *
+     * When $session->branch is set this uses the same branch-aware role resolution
+     * as check() — it walks the ancestor chain, collects all role IDs that grant
+     * the permission at that branch, then takes the most permissive (highest numeric)
+     * constraint value across all of those roles.
+     *
+     * This matches the semantics of permission resolution: permissions are a union
+     * of every role the user holds, so limits should also resolve to the least
+     * restrictive value across all applicable roles.
+     *
+     * When $session->branch is null (login, branch picker, platform routes) the
+     * older flat resolver is used as a fallback.
+     *
      * @param AuthResult  $session
      * @param string      $permission    Permission name or action_key
      * @param string      $constraintKey e.g. 'max_hours_history'
-     * @param mixed       $default       Returned when constraint is not set
+     * @param mixed       $default       Returned when permission is not granted or
+     *                                   constraint is not set on any role
      *
-     * @return mixed The constraint value (always a string from DB) or $default
+     * @return mixed The constraint value (string from DB) or $default
      *
      * Example:
      *   $hours = $this->can->constraint($session, 'view_transactions', 'max_hours_history', 24);
@@ -142,6 +155,18 @@ final class CheckPermissionService
             return $default;
         }
 
+        // Branch-aware path: mirrors the same resolution strategy as check()
+        if ($session->branch !== null) {
+            return $this->constraintViaBranch(
+                $session->user->id,
+                $session->branch->id,
+                $permission,
+                $constraintKey,
+                $default,
+            );
+        }
+
+        // Flat fallback for non-branch contexts (login redirect, etc.)
         $resolved = $this->resolve($session, $permission);
 
         if (!$resolved['granted']) {
@@ -212,6 +237,65 @@ final class CheckPermissionService
     // =========================================================================
     // PRIVATE — RESOLUTION
     // =========================================================================
+
+    /**
+     * Branch-aware constraint lookup.
+     *
+     * Uses BranchPermissionService to get the effective role IDs at the given
+     * branch (ancestor walk, same as check()). Then queries for constraint values
+     * on all role_permissions rows that (a) belong to those roles and (b) are for
+     * the requested permission.
+     *
+     * For numeric constraints the MOST PERMISSIVE (highest) value across all
+     * matching roles is returned — consistent with union-based permission semantics.
+     * For non-numeric constraints the first value found is returned.
+     *
+     * Returns $default when:
+     *   - the user has no effective roles at this branch
+     *   - none of those roles carry the permission
+     *   - the permission exists on those roles but has no constraint value set
+     */
+    private function constraintViaBranch(
+        int    $userId,
+        int    $branchId,
+        string $permission,
+        string $constraintKey,
+        mixed  $default,
+    ): mixed {
+        $roleIds = $this->branchPermissions->getUserEffectiveRoles($userId, $branchId);
+
+        if (empty($roleIds)) {
+            return $default;
+        }
+
+        $permName    = $this->normalizePermission($permission);
+        $rolePh      = implode(',', array_fill(0, count($roleIds), '?'));
+
+        $rows = $this->db->fetchFirstColumn(
+            "SELECT rpc.constraint_value
+               FROM role_permissions rp
+               JOIN permissions p  ON p.id  = rp.permission_id
+               JOIN role_permission_constraints rpc ON rpc.role_permission_id = rp.id
+               JOIN constraints c  ON c.id  = rpc.constraint_id
+              WHERE rp.role_id IN ({$rolePh})
+                AND (p.name = ? OR p.action_key = ?)
+                AND c.constraint_key = ?",
+            array_merge($roleIds, [$permName, strtoupper($permName), $constraintKey]),
+        );
+
+        if (empty($rows)) {
+            return $default;
+        }
+
+        // For numeric constraints take the most permissive value across all roles.
+        // (A user with two roles — one allowing 8h and another 48h — gets 48h.)
+        $numeric = array_filter($rows, 'is_numeric');
+        if (!empty($numeric)) {
+            return (string) max(array_map('floatval', $numeric));
+        }
+
+        return $rows[0] ?? $default;
+    }
 
     /**
      * Core resolver. Checks the DB once per unique (user, company, permission)

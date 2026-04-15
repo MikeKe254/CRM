@@ -106,6 +106,49 @@ window.addEventListener('resize', () => {
     }
 });
 
+// ── COLLAPSIBLE GROUPS ────────────────────────────────────────────────────────
+
+window.toggleGroup = function(id) {
+    const btn     = document.querySelector(`.sidebar-group-btn[data-group="${id}"]`);
+    const content = document.getElementById('sg-' + id);
+    if (!btn || !content) return;
+
+    const isOpen = content.classList.contains('open');
+    if (isOpen) {
+        content.classList.remove('open');
+        btn.classList.remove('open');
+        localStorage.setItem('sg_' + id, '0');
+    } else {
+        content.classList.add('open');
+        btn.classList.add('open');
+        localStorage.setItem('sg_' + id, '1');
+    }
+};
+
+function initGroups() {
+    document.querySelectorAll('.sidebar-group-btn[data-group]').forEach(btn => {
+        const id      = btn.dataset.group;
+        const content = document.getElementById('sg-' + id);
+        if (!id || !content) return;
+
+        const hasActive = !!content.querySelector('.sidebar-sublink.active, .sidebar-link.active');
+        const stored    = localStorage.getItem('sg_' + id);
+
+        if (hasActive || stored === '1') {
+            content.classList.add('open');
+            btn.classList.add('open');
+        } else {
+            content.classList.remove('open');
+            btn.classList.remove('open');
+        }
+
+        // Mark group header when a child is active
+        if (hasActive) {
+            btn.classList.add('has-active');
+        }
+    });
+}
+
 // ── INIT — runs on every Turbo navigation AND the first page load ─────────────
 //
 // Turbo does not re-execute cached JS modules on navigation, so a bare init()
@@ -128,6 +171,7 @@ function init() {
         sidebar.classList.remove('collapsed', 'mobile-open');
         if (overlay) overlay.classList.remove('visible');
         if (main) main.classList.remove('collapsed');
+        initGroups();
         return;
     }
 
@@ -139,6 +183,8 @@ function init() {
         sidebar.classList.remove('collapsed');
         if (main) main.classList.remove('collapsed');
     }
+
+    initGroups();
 }
 
 document.addEventListener('turbo:load', init);

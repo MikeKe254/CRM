@@ -1,0 +1,599 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1">
+    <title>M-Pesa Simulator — Dev</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        body {
+            background: linear-gradient(180deg, #030712 0%, #06111f 100%);
+            color: #e5e7eb;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            min-height: 100vh;
+            padding: 24px 16px 48px;
+        }
+        .wrap { max-width: 1200px; margin: 0 auto; }
+        .hero {
+            display: flex;
+            align-items: flex-end;
+            justify-content: space-between;
+            gap: 24px;
+            margin-bottom: 24px;
+        }
+        .eyebrow {
+            color: #22c55e;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .12em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .title {
+            color: #fff;
+            font-size: 30px;
+            line-height: 1.1;
+            font-weight: 800;
+            letter-spacing: -.03em;
+        }
+        .subtitle {
+            color: #94a3b8;
+            font-size: 14px;
+            line-height: 1.6;
+            max-width: 760px;
+            margin-top: 8px;
+        }
+        .meta-chip {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: rgba(15, 23, 42, .9);
+            border: 1px solid #1f2937;
+            color: #cbd5e1;
+            border-radius: 999px;
+            padding: 8px 12px;
+            font-size: 12px;
+        }
+        .grid {
+            display: grid;
+            grid-template-columns: 1.15fr .85fr;
+            gap: 18px;
+        }
+        .stack {
+            display: flex;
+            flex-direction: column;
+            gap: 18px;
+        }
+        .card {
+            background: rgba(15, 23, 42, .92);
+            border: 1px solid #1f2937;
+            border-radius: 20px;
+            padding: 20px;
+            box-shadow: 0 20px 40px rgba(0, 0, 0, .22);
+        }
+        .card-head {
+            display: flex;
+            align-items: flex-start;
+            justify-content: space-between;
+            gap: 16px;
+            margin-bottom: 16px;
+        }
+        .card-title {
+            color: #fff;
+            font-size: 18px;
+            font-weight: 750;
+            letter-spacing: -.02em;
+        }
+        .card-copy {
+            color: #94a3b8;
+            font-size: 13px;
+            line-height: 1.55;
+            margin-top: 4px;
+        }
+        .pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            border-radius: 999px;
+            padding: 6px 10px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        .pill.green { background: rgba(22, 163, 74, .12); color: #4ade80; }
+        .pill.blue { background: rgba(59, 130, 246, .12); color: #60a5fa; }
+        .pill.amber { background: rgba(245, 158, 11, .14); color: #fbbf24; }
+        .pill.red { background: rgba(239, 68, 68, .12); color: #f87171; }
+        .alert {
+            border-radius: 14px;
+            padding: 14px 16px;
+            margin-bottom: 16px;
+            font-size: 13px;
+            line-height: 1.55;
+        }
+        .alert.error { background: rgba(127, 29, 29, .3); border: 1px solid #7f1d1d; color: #fca5a5; }
+        .alert.success { background: rgba(5, 46, 22, .6); border: 1px solid #166534; color: #86efac; }
+        .form-grid {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 12px;
+        }
+        .form-grid.three { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+        .full { grid-column: 1 / -1; }
+        label {
+            display: block;
+            color: #94a3b8;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            margin-bottom: 6px;
+        }
+        input, select, textarea {
+            width: 100%;
+            background: #0b1220;
+            border: 1px solid #334155;
+            border-radius: 12px;
+            color: #fff;
+            padding: 12px 14px;
+            font-size: 14px;
+            outline: none;
+        }
+        input:focus, select:focus, textarea:focus { border-color: #60a5fa; }
+        textarea {
+            min-height: 170px;
+            resize: vertical;
+            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+            line-height: 1.45;
+        }
+        .hint {
+            color: #64748b;
+            font-size: 12px;
+            line-height: 1.55;
+            margin-top: 6px;
+        }
+        .btn-row {
+            display: flex;
+            gap: 10px;
+            margin-top: 16px;
+            flex-wrap: wrap;
+        }
+        .btn {
+            border: none;
+            border-radius: 14px;
+            padding: 14px 18px;
+            font-size: 14px;
+            font-weight: 800;
+            cursor: pointer;
+            transition: .18s ease;
+        }
+        .btn.primary { background: linear-gradient(135deg, #16a34a, #15803d); color: #fff; }
+        .btn.primary:hover { transform: translateY(-1px); }
+        .btn.secondary { background: #111827; border: 1px solid #334155; color: #e5e7eb; }
+        .config-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .config-item {
+            border: 1px solid #1f2937;
+            border-radius: 16px;
+            padding: 14px 15px;
+            background: rgba(2, 6, 23, .55);
+        }
+        .config-row {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 12px;
+            flex-wrap: wrap;
+        }
+        .config-code {
+            color: #fff;
+            font-size: 18px;
+            font-weight: 800;
+            letter-spacing: -.02em;
+        }
+        .config-meta {
+            color: #94a3b8;
+            font-size: 12px;
+            margin-top: 3px;
+        }
+        .target-list, .result-list {
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .target-item, .result-item {
+            border: 1px solid #1f2937;
+            border-radius: 14px;
+            padding: 12px 14px;
+            background: rgba(2, 6, 23, .55);
+        }
+        .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+        .target-url, .result-url {
+            color: #cbd5e1;
+            font-size: 12px;
+            line-height: 1.55;
+            word-break: break-all;
+        }
+        .target-url { margin-top: 6px; }
+        .payload-meta {
+            display: grid;
+            grid-template-columns: repeat(2, minmax(0, 1fr));
+            gap: 10px;
+            margin-bottom: 14px;
+        }
+        .meta-block {
+            background: rgba(2, 6, 23, .6);
+            border: 1px solid #1f2937;
+            border-radius: 14px;
+            padding: 12px 14px;
+        }
+        .meta-label {
+            color: #64748b;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+        }
+        .meta-value {
+            color: #fff;
+            font-size: 14px;
+            font-weight: 700;
+            margin-top: 6px;
+            word-break: break-all;
+        }
+        table { width: 100%; border-collapse: collapse; }
+        th {
+            color: #64748b;
+            font-size: 11px;
+            text-transform: uppercase;
+            letter-spacing: .08em;
+            text-align: left;
+            padding: 0 10px 10px;
+            border-bottom: 1px solid #1f2937;
+        }
+        td {
+            padding: 11px 10px;
+            border-bottom: 1px solid #1f2937;
+            font-size: 13px;
+        }
+        tbody tr:last-child td { border-bottom: none; }
+        @media (max-width: 1024px) {
+            .grid { grid-template-columns: 1fr; }
+        }
+        @media (max-width: 720px) {
+            .hero, .card-head, .config-row { flex-direction: column; align-items: stretch; }
+            .form-grid, .form-grid.three, .payload-meta { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+<div class="wrap">
+    <div class="hero">
+        <div>
+            <div class="eyebrow">Dev Tool</div>
+            <h1 class="title">M-Pesa Simulator</h1>
+            <p class="subtitle">
+                Generate fake <span class="mono">mpesa_payments</span> rows for claim-flow testing, or send real webhook-style JSON
+                payloads to the configured URLs for a selected shortcode. C2B payloads hash the MSISDN with SHA-256 before sending.
+            </p>
+        </div>
+        <div class="meta-chip">Default sample phone: <span class="mono">254796763792</span></div>
+    </div>
+
+    <div style="display:flex;gap:10px;flex-wrap:wrap;margin-bottom:20px;">
+        <a href="{{ path('dev_mpesa_sim') }}" class="pill {{ not show_dispatch_tools ? 'green' : 'blue' }}" style="text-decoration:none;">Legacy row generator</a>
+        <a href="{{ path('dev_mpesa_webhook_sim') }}" class="pill {{ show_dispatch_tools ? 'green' : 'blue' }}" style="text-decoration:none;">Webhook simulator</a>
+    </div>
+
+    {% if error %}
+        <div class="alert error">{{ error }}</div>
+    {% endif %}
+
+    <div class="grid">
+        <div class="stack">
+            {% if show_dispatch_tools %}
+                <div class="card">
+                    <div class="card-head">
+                        <div>
+                            <div class="card-title">Webhook Payload Simulator</div>
+                            <div class="card-copy">Choose a shortcode, build a Safaricom-like payload, hash the C2B MSISDN, and send JSON directly to the configured targets.</div>
+                        </div>
+                        <span class="pill blue">Live URL caller</span>
+                    </div>
+
+                    <form method="post">
+                        <input type="hidden" name="action" value="dispatch">
+
+                        <div class="form-grid">
+                            <div class="full">
+                                <label>Selected Shortcode</label>
+                                <select name="config_id" required>
+                                    <option value="">Select an M-Pesa config…</option>
+                                    {% for cfg in configs %}
+                                        <option value="{{ cfg.id }}" {% if form.config_id == cfg.id %}selected{% endif %}>
+                                            {{ cfg.shortcode }} · Company {{ cfg.company_id }} · Branch {{ cfg.branch_id ?? '—' }} · {{ cfg.integration_mode|replace({'_':' '})|title }}
+                                        </option>
+                                    {% endfor %}
+                                </select>
+                                <div class="hint">The simulator sends to this config’s callback/confirmation URL and any forwarded URLs already stored in the system.</div>
+                            </div>
+
+                            <div>
+                                <label>Payload Type</label>
+                                <select name="payload_type">
+                                    <option value="c2b" {% if form.payload_type == 'c2b' %}selected{% endif %}>C2B Confirmation</option>
+                                    <option value="stk" {% if form.payload_type == 'stk' %}selected{% endif %}>STK Callback</option>
+                                </select>
+                            </div>
+
+                            <div>
+                                <label>Amount (KES)</label>
+                                <input type="number" name="dispatch_amount" value="{{ form.dispatch_amount }}" min="1" step="1" required>
+                            </div>
+
+                            <div>
+                                <label>MSISDN</label>
+                                <input type="text" name="msisdn" value="{{ form.msisdn }}" list="sample-msisdns" required>
+                                <datalist id="sample-msisdns">
+                                    {% for phone in sample_phones %}
+                                        <option value="{{ phone }}"></option>
+                                    {% endfor %}
+                                </datalist>
+                            </div>
+
+                            <div>
+                                <label>Bill / Account Ref</label>
+                                <input type="text" name="bill_ref" value="{{ form.bill_ref }}" placeholder="SIM-ORDER-001">
+                            </div>
+
+                            <div>
+                                <label>Receipt / TransID</label>
+                                <input type="text" name="receipt" value="{{ form.receipt }}" placeholder="Optional — auto generated if blank">
+                            </div>
+
+                            <div>
+                                <label>STK CheckoutRequestID</label>
+                                <input type="text" name="checkout_request_id" value="{{ form.checkout_request_id }}" placeholder="Optional — useful when matching a real pending STK push">
+                                <div class="hint">Only used for STK callbacks. Leave blank to generate a fresh request id.</div>
+                            </div>
+                        </div>
+
+                        <div class="btn-row">
+                            <button class="btn primary" type="submit">Send Payload</button>
+                        </div>
+                    </form>
+                </div>
+            {% endif %}
+
+            {% if show_dispatch_tools and dispatch_result %}
+                <div class="card">
+                    <div class="card-head">
+                        <div>
+                            <div class="card-title">Dispatch Result</div>
+                            <div class="card-copy">The payload below is what was sent. C2B hashes the phone into the <span class="mono">MSISDN</span> field; STK keeps <span class="mono">PhoneNumber</span> plain because your current callback processor expects that shape.</div>
+                        </div>
+                        <span class="pill {{ dispatch_result.results|filter(r => r.ok)|length == dispatch_result.results|length ? 'green' : 'amber' }}">
+                            {{ dispatch_result.payload_type|upper }}
+                        </span>
+                    </div>
+
+                    <div class="payload-meta">
+                        <div class="meta-block">
+                            <div class="meta-label">Shortcode</div>
+                            <div class="meta-value mono">{{ dispatch_result.config.shortcode }}</div>
+                        </div>
+                        <div class="meta-block">
+                            <div class="meta-label">Receipt</div>
+                            <div class="meta-value mono">{{ dispatch_result.receipt }}</div>
+                        </div>
+                        <div class="meta-block">
+                            <div class="meta-label">Plain MSISDN</div>
+                            <div class="meta-value mono">{{ dispatch_result.msisdn }}</div>
+                        </div>
+                        <div class="meta-block">
+                            <div class="meta-label">SHA-256 MSISDN</div>
+                            <div class="meta-value mono">{{ dispatch_result.hashed_msisdn }}</div>
+                        </div>
+                    </div>
+
+                    <div class="card-copy" style="margin-bottom:10px;">Target URLs</div>
+                    <div class="target-list" style="margin-bottom:16px;">
+                        {% for target in dispatch_result.targets %}
+                            <div class="target-item">
+                                <div class="pill blue">{{ dispatch_result.payload_type == 'stk' ? 'callback' : 'confirmation / forward' }}</div>
+                                <div class="target-url mono">{{ target }}</div>
+                            </div>
+                        {% endfor %}
+                    </div>
+
+                    <label>JSON Payload Sent</label>
+                    <textarea readonly>{{ dispatch_result.payload_json }}</textarea>
+
+                    <div class="card-copy" style="margin:16px 0 10px;">HTTP results</div>
+                    <div class="result-list">
+                        {% for result in dispatch_result.results %}
+                            <div class="result-item">
+                                <div class="config-row">
+                                    <div>
+                                        <div class="result-url mono">{{ result.url }}</div>
+                                        {% if result.error %}
+                                            <div class="hint" style="color:#fca5a5;">{{ result.error }}</div>
+                                        {% endif %}
+                                    </div>
+                                    <span class="pill {{ result.ok ? 'green' : 'red' }}">
+                                        {{ result.status ?: 'NO HTTP' }}
+                                    </span>
+                                </div>
+                                {% if result.body %}
+                                    <div class="hint mono" style="margin-top:10px;white-space:pre-wrap;">{{ result.body }}</div>
+                                {% endif %}
+                            </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            {% endif %}
+
+            <div class="card">
+                <div class="card-head">
+                    <div>
+                        <div class="card-title">Recent Fake Payments</div>
+                        <div class="card-copy">Last 30 rows in <span class="mono">mpesa_payments</span> for the chosen company. Useful when testing the callback claim flow.</div>
+                    </div>
+                    <span class="pill amber">DB generator</span>
+                </div>
+
+                <div style="overflow-x:auto;">
+                    <table>
+                        <thead>
+                        <tr>
+                            <th>ID</th>
+                            <th>Name</th>
+                            <th>Phone</th>
+                            <th>Amount</th>
+                            <th>Created</th>
+                            <th>Status</th>
+                        </tr>
+                        </thead>
+                        <tbody>
+                        {% for r in recent %}
+                            <tr>
+                                <td class="mono" style="color:#94a3b8;">{{ r.id }}</td>
+                                <td style="color:#fff;font-weight:700;">{{ r.first_name }} {{ r.last_name }}</td>
+                                <td class="mono" style="color:#94a3b8;">···{{ (r.msisdn ?? '')|slice(-3) }}</td>
+                                <td style="color:#4ade80;font-weight:800;">KES {{ r.amount|number_format(0, '.', ',') }}</td>
+                                <td class="mono" style="color:#64748b;">{{ r.created_at }}</td>
+                                <td>
+                                    <span class="pill {{ r.claimed ? 'blue' : 'green' }}">{{ r.claimed ? 'claimed' : 'unclaimed' }}</span>
+                                </td>
+                            </tr>
+                        {% else %}
+                            <tr>
+                                <td colspan="6" style="color:#64748b;">No recent simulated rows found.</td>
+                            </tr>
+                        {% endfor %}
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </div>
+
+        <div class="stack">
+            <div class="card">
+                <div class="card-head">
+                    <div>
+                        <div class="card-title">Fake Payment Row Generator</div>
+                        <div class="card-copy">This is the original simulator behavior for quick claim-flow tests by inserting rows directly into <span class="mono">mpesa_payments</span>.</div>
+                    </div>
+                    <span class="pill green">Legacy sim</span>
+                </div>
+
+                {% if generated %}
+                    <div class="alert success">
+                        Generated {{ generated|length }} payment{{ generated|length == 1 ? '' : 's' }} for testing.
+                    </div>
+                {% endif %}
+
+                <form method="post">
+                    <input type="hidden" name="action" value="generate">
+
+                    <div class="form-grid">
+                        <div>
+                            <label>Amount (KES)</label>
+                            <input type="number" name="amount" value="{{ form.amount }}" placeholder="e.g. 700" step="1" min="1" required>
+                        </div>
+                        <div>
+                            <label>Number of transactions</label>
+                            <input type="number" name="count" value="{{ form.count }}" min="1" max="10">
+                        </div>
+                    </div>
+
+                    <div class="form-grid three" style="margin-top:12px;">
+                        <div>
+                            <label>Company ID</label>
+                            <input type="number" name="company_id" value="{{ form.company_id }}" min="1">
+                        </div>
+                        <div>
+                            <label>Branch ID</label>
+                            <input type="number" name="branch_id" value="{{ form.branch_id }}" min="1">
+                        </div>
+                        <div>
+                            <label>Shortcode</label>
+                            <input type="text" name="shortcode" value="{{ form.shortcode }}">
+                        </div>
+                    </div>
+
+                    <div class="btn-row">
+                        <button class="btn primary" type="submit">Generate Payments</button>
+                    </div>
+                </form>
+
+                {% if generated %}
+                    <div class="card-copy" style="margin:16px 0 10px;">Latest generated rows</div>
+                    <div class="result-list">
+                        {% for g in generated %}
+                            <div class="result-item">
+                                <div class="config-row">
+                                    <div>
+                                        <div style="color:#fff;font-weight:800;">{{ g.name }}</div>
+                                        <div class="hint mono">{{ g.msisdn }} · {{ g.created_at }}</div>
+                                    </div>
+                                    <div style="text-align:right;">
+                                        <div style="color:#4ade80;font-weight:800;">KES {{ g.amount|number_format(0, '.', ',') }}</div>
+                                        <div class="hint mono">{{ g.txn_id }}</div>
+                                    </div>
+                                </div>
+                            </div>
+                        {% endfor %}
+                    </div>
+                {% endif %}
+            </div>
+
+            {% if show_dispatch_tools %}
+            <div class="card">
+                <div class="card-head">
+                    <div>
+                        <div class="card-title">Configured Shortcodes</div>
+                        <div class="card-copy">A quick view of the active URLs the simulator can target.</div>
+                    </div>
+                    <span class="pill blue">{{ configs|length }} configs</span>
+                </div>
+
+                <div class="config-list">
+                    {% for cfg in configs %}
+                        <div class="config-item">
+                            <div class="config-row">
+                                <div>
+                                    <div class="config-code">{{ cfg.shortcode }}</div>
+                                    <div class="config-meta">
+                                        Company {{ cfg.company_id }} · Branch {{ cfg.branch_id ?? '—' }} · {{ cfg.integration_mode|replace({'_':' '})|title }}
+                                    </div>
+                                </div>
+                                <div style="display:flex;gap:8px;flex-wrap:wrap;">
+                                    <span class="pill {{ cfg.is_active ? 'green' : 'red' }}">{{ cfg.is_active ? 'active' : 'inactive' }}</span>
+                                    <span class="pill {{ cfg.integration_enabled ? 'green' : 'amber' }}">{{ cfg.integration_enabled ? 'integration on' : 'integration off' }}</span>
+                                </div>
+                            </div>
+
+                            {% if cfg.callback_url %}
+                                <div class="target-url mono">STK callback: {{ cfg.callback_url }}</div>
+                            {% endif %}
+                            {% if cfg.confirmation_url %}
+                                <div class="target-url mono">C2B confirmation: {{ cfg.confirmation_url }}</div>
+                            {% endif %}
+                            {% for url in cfg.forward_urls %}
+                                <div class="target-url mono">Forward: {{ url }}</div>
+                            {% endfor %}
+                        </div>
+                    {% else %}
+                        <div class="hint">No M-Pesa configs found.</div>
+                    {% endfor %}
+                </div>
+            </div>
+            {% endif %}
+        </div>
+    </div>
+</div>
+</body>
+</html>

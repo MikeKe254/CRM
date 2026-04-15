@@ -12,10 +12,12 @@ use Doctrine\DBAL\Connection;
  * Loads and decrypts payment method configurations for a company/branch.
  *
  * Sources:
- *   mpesa_configs       → methodKey 'mpesa'
- *   cash_configs        → methodKey 'cash'
+ *   mpesa_configs         → methodKey 'mpesa'
+ *   cash_configs          → methodKey 'cash'
+ *   card_configs          → methodKey 'card'
  *   bank_transfer_configs → methodKey 'bank'
- *   pesapal_configs     → methodKey 'pesapal'
+ *   pesapal_configs       → methodKey 'pesapal'
+ *   other_configs         → methodKey 'other'  (singleton per company, always released)
  *
  * Every config row is always scoped to a specific branch (branch_id NOT NULL).
  */
@@ -54,6 +56,12 @@ final class PaymentConfigService
             }
         }
 
+        if (in_array('card', $allowed, true)) {
+            foreach ($this->loadCardConfigs($companyId, $branchId) as $cfg) {
+                $configs[] = $cfg;
+            }
+        }
+
         if (in_array('bank', $allowed, true)) {
             $bank = $this->loadBankConfig($companyId, $branchId);
             if ($bank !== null) {
@@ -75,31 +83,60 @@ final class PaymentConfigService
             }
         }
 
+        // Other is appended last only if the branch has not disabled it
+        if (in_array('other', $allowed, true)) {
+            $configs[] = $this->loadOtherConfig();
+        }
+
         return $configs;
     }
 
     /**
-     * Returns method keys that are both patronr-approved AND branch-enabled.
-     * Falls back to all methods if no rows exist (branch not yet configured).
+     * Returns method keys that are available for a branch.
+     *
+     * Resolution order:
+     *  1. Platform-released methods (released_to_tenants = 1 on payment_methods)
+     *     are available by default.
+     *  2. A branch_payment_methods row with branch_enabled = 0 explicitly disables
+     *     a released method for that branch.
+     *  3. A branch_payment_methods row with patronr_approved = 1 AND branch_enabled = 1
+     *     enables a non-released method for that branch.
+     *  4. Loyalty is always checked regardless (controlled by loyalty_programs).
      *
      * @return string[]
      */
     private function loadAllowedMethodKeys(int $companyId, int $branchId): array
     {
-        $rows = $this->db->fetchAllAssociative(
-            'SELECT method_key FROM branch_payment_methods
-              WHERE company_id       = :cid
-                AND branch_id        = :bid
-                AND patronr_approved = 1
-                AND branch_enabled   = 1',
+        // All platform-released method keys
+        $releasedRows = $this->db->fetchAllAssociative(
+            'SELECT method_key FROM payment_methods WHERE released_to_tenants = 1',
+        );
+        $released = array_flip(array_column($releasedRows, 'method_key'));
+
+        // All branch_payment_methods rows for this branch
+        $branchRows = $this->db->fetchAllAssociative(
+            'SELECT method_key, patronr_approved, branch_enabled
+               FROM branch_payment_methods
+              WHERE company_id = :cid AND branch_id = :bid',
             ['cid' => $companyId, 'bid' => $branchId],
         );
 
-        if (empty($rows)) {
-            return ['mpesa', 'cash', 'bank', 'pesapal', 'loyalty'];
+        // Apply branch overrides
+        foreach ($branchRows as $row) {
+            $key = $row['method_key'];
+            if ((bool) $row['branch_enabled'] === false) {
+                // Explicit branch disable — remove from released set
+                unset($released[$key]);
+            } elseif ((bool) $row['patronr_approved'] && (bool) $row['branch_enabled']) {
+                // Branch-approved non-released method — add it
+                $released[$key] = true;
+            }
         }
 
-        return array_column($rows, 'method_key');
+        // Loyalty always checked (controlled by loyalty_programs, not this table)
+        $released['loyalty'] = true;
+
+        return array_keys($released);
     }
 
     /**
@@ -115,8 +152,10 @@ final class PaymentConfigService
         return match ($methodKey) {
             'mpesa'   => $this->loadMpesaConfigById($configId),
             'cash'    => $this->loadCashConfigById($configId),
+            'card'    => $this->loadCardConfigById($configId),
             'bank'    => $this->loadBankConfigById($configId),
             'pesapal' => $this->loadPesapalConfigById($configId),
+            'other'   => $this->loadOtherConfig(),
             default   => null,
         };
     }
@@ -167,7 +206,9 @@ final class PaymentConfigService
             default    => $row['account_name'] ?: 'M-Pesa',
         };
 
-        $integrationMode = $row['integration_mode'] ?? 'manual';
+        $integrationModes = array_values(array_filter(
+            array_map('trim', explode(',', (string) ($row['integration_mode'] ?? 'manual')))
+        )) ?: ['manual'];
 
         return new PaymentConfig(
             configId:            (int) $row['id'],
@@ -177,7 +218,7 @@ final class PaymentConfigService
             mode:                $mode,
             integrationEnabled:  (bool) $row['integration_enabled'],
             mpesaType:           $row['type'],
-            integrationMode:     $integrationMode,
+            integrationModes:    $integrationModes,
             credentials: [
                 'consumer_key'    => $this->encryption->read((string) ($row['consumer_key']    ?? ''), $encrypted),
                 'consumer_secret' => $this->encryption->read((string) ($row['consumer_secret'] ?? ''), $encrypted),
@@ -240,7 +281,7 @@ final class PaymentConfigService
             mode:               'manual',
             integrationEnabled: false,
             mpesaType:          null,
-            integrationMode:    null,
+            integrationModes:   [],
             credentials:        [],
             config: [
                 'currency'           => $row['currency']           ?? 'KES',
@@ -249,6 +290,76 @@ final class PaymentConfigService
                 'approval_threshold' => $row['approval_threshold'] ?? null,
             ],
             branchId: (int) $row['branch_id'],
+        );
+    }
+
+    // =========================================================================
+    // CARD
+    // =========================================================================
+
+    /** @return PaymentConfig[] — one per active card_config row */
+    private function loadCardConfigs(int $companyId, int $branchId): array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT cc.*, \'card\' AS method_key, COALESCE(pm.id, 0) AS pm_id
+               FROM card_configs cc
+               LEFT JOIN payment_methods pm ON pm.method_key = \'card\'
+              WHERE cc.company_id = :company_id
+                AND cc.is_active = 1
+                AND cc.branch_id = :branch_id
+              ORDER BY cc.id ASC',
+            ['company_id' => $companyId, 'branch_id' => $branchId],
+        );
+
+        return array_map(fn(array $row) => $this->hydrateCard($row), $rows);
+    }
+
+    private function loadCardConfigById(int $id): ?PaymentConfig
+    {
+        $row = $this->db->fetchAssociative(
+            'SELECT cc.*, \'card\' AS method_key, COALESCE(pm.id, 0) AS pm_id
+               FROM card_configs cc
+               LEFT JOIN payment_methods pm ON pm.method_key = \'card\'
+              WHERE cc.id = :id LIMIT 1',
+            ['id' => $id],
+        );
+
+        return $row ? $this->hydrateCard($row) : null;
+    }
+
+    private function hydrateCard(array $row): PaymentConfig
+    {
+        $acceptedCards = [];
+        if (!empty($row['accepted_cards'])) {
+            $acceptedCards = json_decode((string) $row['accepted_cards'], true) ?? [];
+        }
+
+        $type = $row['type'] ?? 'pdq';
+        $typeLabels = ['pdq' => 'PDQ Machine', 'mpos' => 'Mobile POS', 'tap' => 'Tap & Pay', 'virtual' => 'Virtual Terminal'];
+        $label = $row['account_name'] ?: ($typeLabels[$type] ?? 'Card');
+
+        return new PaymentConfig(
+            configId:           (int) $row['id'],
+            paymentMethodId:    (int) $row['pm_id'],
+            methodKey:          'card',
+            label:              $label,
+            mode:               'manual',
+            integrationEnabled: false,
+            mpesaType:          null,
+            integrationModes:   [],
+            credentials:        [],
+            config: [
+                'type'                      => $type,
+                'acquiring_bank'            => $row['acquiring_bank']            ?? '',
+                'merchant_id'               => $row['merchant_id']               ?? '',
+                'terminal_id'               => $row['terminal_id']               ?? '',
+                'accepted_cards'            => $acceptedCards,
+                'currency'                  => $row['currency']                  ?? 'KES',
+                'requires_receipt'          => (bool) ($row['requires_receipt']          ?? false),
+                'transaction_code_required' => (bool) ($row['transaction_code_required'] ?? false),
+                'notes'                     => $row['notes']                     ?? '',
+            ],
+            branchId: isset($row['branch_id']) ? (int) $row['branch_id'] : null,
         );
     }
 
@@ -296,7 +407,7 @@ final class PaymentConfigService
             mode:               'manual',
             integrationEnabled: (bool) ($row['auto_confirm'] ?? false),
             mpesaType:          null,
-            integrationMode:    null,
+            integrationModes:   [],
             credentials:        [],
             config: [
                 'bank_name'            => $row['bank_name']            ?? '',
@@ -358,7 +469,7 @@ final class PaymentConfigService
             mode:               $mode,
             integrationEnabled: (bool) $row['integration_enabled'],
             mpesaType:          null,
-            integrationMode:    null,
+            integrationModes:   [],
             credentials: [
                 'consumer_key'    => $this->encryption->read((string) ($row['consumer_key']    ?? ''), $encrypted),
                 'consumer_secret' => $this->encryption->read((string) ($row['consumer_secret'] ?? ''), $encrypted),
@@ -375,6 +486,37 @@ final class PaymentConfigService
                 'accepts_mpesa'     => (bool) ($row['accepts_mpesa']  ?? true),
             ],
             branchId: isset($row['branch_id']) ? (int) $row['branch_id'] : null,
+        );
+    }
+
+    // =========================================================================
+    // OTHER — synthetic method, always available, no config table
+    // =========================================================================
+
+    /**
+     * "Other" is a permanent catch-all for ad-hoc payments.
+     * It has no config table — a synthetic PaymentConfig is returned directly.
+     * configId = 0 signals to the checkout that there is no config row.
+     */
+    private function loadOtherConfig(): PaymentConfig
+    {
+        $pmId = (int) ($this->db->fetchOne(
+            'SELECT id FROM payment_methods WHERE method_key = :key LIMIT 1',
+            ['key' => 'other'],
+        ) ?: 0);
+
+        return new PaymentConfig(
+            configId:           0,
+            paymentMethodId:    $pmId,
+            methodKey:          'other',
+            label:              'Other',
+            mode:               'manual',
+            integrationEnabled: false,
+            mpesaType:          null,
+            integrationModes:   [],
+            credentials:        [],
+            config:             [],
+            branchId:           null,
         );
     }
 
@@ -410,7 +552,7 @@ final class PaymentConfigService
             mode:               'manual',
             integrationEnabled: false,
             mpesaType:          null,
-            integrationMode:    null,
+            integrationModes:   [],
             credentials:        [],
             config: [
                 'points_name'        => (string) ($row['points_name']       ?? 'Points'),

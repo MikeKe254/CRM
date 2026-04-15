@@ -160,7 +160,7 @@ window.adminFetch = async function(url, body, onSuccess) {
         const res  = await fetch(url, {
             method: 'POST',
             headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-            body: new URLSearchParams(body).toString(),
+            body: body instanceof URLSearchParams ? body.toString() : new URLSearchParams(body).toString(),
         });
         const data = await res.json();
         if (data.success) { window.closeDrawer(); onSuccess(data); }

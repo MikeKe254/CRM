@@ -7,9 +7,11 @@ namespace App\Controller\Terminal;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\Exception\AuthException;
 use App\Services\Customer\CustomerService;
+use App\Services\Feature\TenantFeatureAccessService;
 use App\Services\Loyalty\LoyaltyService;
 use App\Services\Terminal\TerminalBranchAccessService;
 use App\Support\DomainHelper;
+use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\JsonResponse;
 use Symfony\Component\HttpFoundation\Request;
@@ -27,9 +29,22 @@ class LoyaltyController extends AbstractController
         private readonly AuthService $auth,
         private readonly DomainHelper $domains,
         private readonly LoyaltyService $loyalty,
+        private readonly TenantFeatureAccessService $features,
         private readonly CustomerService $customers,
         private readonly TerminalBranchAccessService $terminalBranchAccess,
+        private readonly Connection $db,
     ) {}
+
+    private function isLoyaltyEnabled(int $companyId, int $branchId): bool
+    {
+        return $this->features->canAny(
+            $companyId,
+            TenantFeatureAccessService::FEATURE_EARN_POINTS,
+            TenantFeatureAccessService::FEATURE_REDEEM_POINTS,
+            TenantFeatureAccessService::FEATURE_REWARD_SETUP,
+            TenantFeatureAccessService::FEATURE_LOYALTY_BALANCE,
+        ) && $this->loyalty->getProgram($companyId, $branchId) !== null;
+    }
 
     #[Route('/check-phone', name: 'terminal_loyalty_check_phone', methods: ['GET'])]
     public function checkPhone(Request $request, string $branch): JsonResponse
@@ -56,6 +71,10 @@ class LoyaltyController extends AbstractController
             return new JsonResponse(['error' => 'unauthenticated'], 401);
         }
 
+        if (!$this->isLoyaltyEnabled($session->company->id, $branchNode->id)) {
+            return new JsonResponse(['error' => 'Loyalty module not enabled.'], 403);
+        }
+
         $phone     = trim((string) $request->query->get('phone', ''));
         $normalised = $this->customers->normalizePhone($phone);
 
@@ -64,8 +83,8 @@ class LoyaltyController extends AbstractController
         }
 
         $companyId = $session->company->id;
-        $account   = $this->loyalty->getAccount($companyId, $normalised);
-        $program   = $this->loyalty->getProgram($companyId);
+        $account   = $this->loyalty->getAccount($companyId, $normalised, $branchNode->id);
+        $program   = $this->loyalty->getProgram($companyId, $branchNode->id);
 
         if ($account === null) {
             return new JsonResponse(['enrolled' => false, 'valid' => true]);
@@ -114,7 +133,11 @@ class LoyaltyController extends AbstractController
             return $this->redirectToRoute('terminal_login_page', $routeParams);
         }
 
-        $program = $this->loyalty->getProgram($session->company->id);
+        if (!$this->isLoyaltyEnabled($session->company->id, $branchNode->id)) {
+            return $this->redirectToRoute('terminal_dashboard', $routeParams);
+        }
+
+        $program = $this->loyalty->getProgram($session->company->id, $branchNode->id);
 
         return $this->render('terminal/loyalty/check.html.twig', [
             'program'      => $program,
@@ -154,8 +177,12 @@ class LoyaltyController extends AbstractController
             return $this->redirectToRoute('terminal_login_page', $routeParams);
         }
 
+        if (!$this->isLoyaltyEnabled($session->company->id, $branchNode->id)) {
+            return $this->redirectToRoute('terminal_dashboard', $routeParams);
+        }
+
         $companyId = $session->company->id;
-        $program   = $this->loyalty->getProgram($companyId);
+        $program   = $this->loyalty->getProgram($companyId, $branchNode->id);
 
         $enrolled     = null;
         $account      = null;
@@ -185,8 +212,8 @@ class LoyaltyController extends AbstractController
                     );
                 }
 
-                $existing = $this->loyalty->getAccount($companyId, $normalised);
-                $account  = $this->loyalty->findOrEnroll($companyId, $normalised, $firstName !== '' ? $firstName : null);
+                $existing = $this->loyalty->getAccount($companyId, $normalised, $branchNode->id);
+                $account  = $this->loyalty->findOrEnroll($companyId, $normalised, $firstName !== '' ? $firstName : null, $branchNode->id);
                 $enrolled = $this->customers->findByMsisdn($companyId, $normalised);
 
                 if ($existing === null) {

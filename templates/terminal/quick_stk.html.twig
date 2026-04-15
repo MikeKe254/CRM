@@ -1,0 +1,331 @@
+{% extends 'layouts/terminal_app.html.twig' %}
+{% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: app.request.attributes.get('branch')} %}
+
+{% block title %}Quick STK{% endblock %}
+
+{% block body %}
+<div style="display:flex;flex-direction:column;height:100%;">
+
+    {# ── Header ──────────────────────────────────────────────────────────── #}
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #1f2937;flex-shrink:0;">
+        <a href="{{ path('terminal_dashboard', _p) }}" id="qstk-back-btn" class="action-btn"
+           style="width:40px;height:40px;background:#1f2937;border-radius:12px;display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0;">
+            <svg width="20" height="20" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+            </svg>
+        </a>
+        <div style="flex:1;">
+            <div style="color:#fff;font-weight:700;font-size:15px;" id="qstk-title">Quick STK</div>
+            <div style="color:#6b7280;font-size:12px;">Send M-Pesa payment request</div>
+        </div>
+    </div>
+
+    {# ── Body ────────────────────────────────────────────────────────────── #}
+    <div style="flex:1;overflow-y:auto;padding:20px 16px;">
+
+        {# ══ PANEL A — Form ══════════════════════════════════════════════════ #}
+        <div id="qstk-panel-form">
+
+            {# Area #}
+            {% if areas|length > 0 %}
+            <div style="margin-bottom:14px;">
+                <label style="display:block;color:#9ca3af;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Area</label>
+                <select id="qstk-area"
+                        style="width:100%;background:#1f2937;border:1px solid #374151;border-radius:12px;color:#fff;font-size:15px;padding:14px 16px;outline:none;appearance:none;-webkit-appearance:none;">
+                    <option value="">— Select area —</option>
+                    {% for area in areas %}
+                    <option value="{{ area.id }}">{{ area.name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% endif %}
+
+            {# Amount #}
+            <div style="margin-bottom:14px;">
+                <label style="display:block;color:#9ca3af;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Amount (KES)</label>
+                <input id="qstk-amount" type="number" min="1" step="1" inputmode="numeric" placeholder="0"
+                       style="width:100%;box-sizing:border-box;background:#1f2937;border:1px solid #374151;border-radius:12px;color:#fff;font-size:22px;font-weight:700;font-variant-numeric:tabular-nums;padding:14px 16px;outline:none;"/>
+            </div>
+
+            {# Shortcode / Config (only shown if >1) #}
+            {% if mpesa_configs|length > 1 %}
+            <div style="margin-bottom:14px;">
+                <label style="display:block;color:#9ca3af;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Shortcode</label>
+                <select id="qstk-config"
+                        style="width:100%;background:#1f2937;border:1px solid #374151;border-radius:12px;color:#fff;font-size:15px;padding:14px 16px;outline:none;appearance:none;-webkit-appearance:none;">
+                    {% for cfg in mpesa_configs %}
+                    <option value="{{ cfg.id }}">{{ cfg.label }} · {{ cfg.shortcode }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            {% else %}
+            {# Single config — auto-selected, show as static info pill #}
+            <input type="hidden" id="qstk-config" value="{{ mpesa_configs[0].id }}"/>
+            <div style="margin-bottom:14px;">
+                <label style="display:block;color:#9ca3af;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Shortcode</label>
+                <div style="background:#1f2937;border:1px solid #374151;border-radius:12px;padding:14px 16px;color:#9ca3af;font-size:15px;">
+                    {{ mpesa_configs[0].label }}
+                    <span style="color:#6b7280;margin-left:8px;font-size:13px;">{{ mpesa_configs[0].shortcode }}</span>
+                </div>
+            </div>
+            {% endif %}
+
+            {# Phone #}
+            <div style="margin-bottom:24px;">
+                <label style="display:block;color:#9ca3af;font-size:11px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:6px;">Phone Number</label>
+                <input id="qstk-phone" type="tel" inputmode="tel" placeholder="07XXXXXXXX"
+                       style="width:100%;box-sizing:border-box;background:#1f2937;border:1px solid #374151;border-radius:12px;color:#fff;font-size:18px;font-weight:600;padding:14px 16px;outline:none;letter-spacing:.04em;"/>
+            </div>
+
+            {# Error message #}
+            <div id="qstk-form-error"
+                 style="display:none;background:rgba(239,68,68,0.12);border:1px solid rgba(239,68,68,0.3);border-radius:12px;padding:12px 16px;color:#fca5a5;font-size:13px;margin-bottom:16px;"></div>
+
+            {# Send button #}
+            <button id="qstk-send-btn" class="action-btn"
+                    style="width:100%;height:56px;background:#059669;border:none;border-radius:14px;color:#fff;font-size:17px;font-weight:700;cursor:pointer;display:flex;align-items:center;justify-content:center;gap:10px;">
+                <svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+                </svg>
+                Send STK Push
+            </button>
+
+        </div>{# end panel-form #}
+
+        {# ══ PANEL B — Waiting ════════════════════════════════════════════════ #}
+        <div id="qstk-panel-waiting" style="display:none;text-align:center;padding:40px 0;">
+
+            {# Spinner #}
+            <div style="width:72px;height:72px;border-radius:50%;border:3px solid #1f2937;border-top-color:#059669;animation:qstk-spin 0.9s linear infinite;margin:0 auto 24px;"></div>
+
+            <div id="qstk-wait-amount" style="color:#fff;font-size:26px;font-weight:800;margin-bottom:4px;"></div>
+            <div id="qstk-wait-phone"  style="color:#6b7280;font-size:14px;margin-bottom:28px;"></div>
+            <div style="color:#9ca3af;font-size:14px;">Waiting for payment on M-Pesa…</div>
+
+            <button id="qstk-cancel-btn" class="action-btn"
+                    style="margin-top:32px;background:transparent;border:1px solid #374151;border-radius:12px;color:#6b7280;font-size:13px;padding:10px 24px;cursor:pointer;">
+                Cancel
+            </button>
+        </div>
+
+        {# ══ PANEL C — Success ════════════════════════════════════════════════ #}
+        <div id="qstk-panel-success" style="display:none;text-align:center;padding:32px 0;">
+
+            {# Check circle #}
+            <div style="width:72px;height:72px;background:#059669;border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+                <svg width="36" height="36" fill="none" stroke="#fff" stroke-width="2.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M4.5 12.75l6 6 9-13.5"/>
+                </svg>
+            </div>
+
+            <div style="color:#34d399;font-size:13px;font-weight:600;letter-spacing:.06em;text-transform:uppercase;margin-bottom:12px;">Payment Received</div>
+
+            <div id="qstk-success-amount"
+                 style="color:#fff;font-size:30px;font-weight:800;font-variant-numeric:tabular-nums;margin-bottom:16px;"></div>
+
+            <div style="background:#1f2937;border-radius:14px;padding:16px 20px;display:inline-block;min-width:220px;text-align:left;margin-bottom:24px;">
+                <div style="color:#6b7280;font-size:11px;text-transform:uppercase;letter-spacing:.06em;margin-bottom:4px;">M-Pesa Code</div>
+                <div id="qstk-success-receipt"
+                     style="font-family:ui-monospace,monospace;font-size:18px;font-weight:700;letter-spacing:.06em;color:#34d399;"></div>
+                <div id="qstk-success-phone"
+                     style="color:#9ca3af;font-size:13px;margin-top:6px;"></div>
+            </div>
+
+            <br/>
+            <button id="qstk-new-btn" class="action-btn"
+                    style="width:100%;height:56px;background:#059669;border:none;border-radius:14px;color:#fff;font-size:17px;font-weight:700;cursor:pointer;">
+                New Transaction
+            </button>
+
+        </div>
+
+        {# ══ PANEL D — Error ══════════════════════════════════════════════════ #}
+        <div id="qstk-panel-error" style="display:none;text-align:center;padding:40px 0;">
+            <div style="width:64px;height:64px;background:rgba(239,68,68,0.15);border-radius:50%;display:flex;align-items:center;justify-content:center;margin:0 auto 20px;">
+                <svg width="28" height="28" fill="none" stroke="#f87171" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
+                </svg>
+            </div>
+            <div style="color:#f87171;font-size:15px;font-weight:600;margin-bottom:8px;">Payment Failed</div>
+            <div id="qstk-error-msg" style="color:#6b7280;font-size:13px;margin-bottom:28px;"></div>
+            <button id="qstk-retry-btn" class="action-btn"
+                    style="width:100%;height:56px;background:#1f2937;border:1px solid #374151;border-radius:14px;color:#fff;font-size:16px;font-weight:600;cursor:pointer;">
+                Try Again
+            </button>
+        </div>
+
+    </div>{# end body scroll #}
+</div>
+
+<style>
+@keyframes qstk-spin { to { transform: rotate(360deg); } }
+#qstk-amount:focus, #qstk-phone:focus, #qstk-area:focus, #qstk-config:focus {
+    border-color: #059669 !important;
+}
+</style>
+
+<script>
+(function () {
+    if (typeof window.__qstkCleanup === 'function') { window.__qstkCleanup(); }
+
+    const sendUrl   = '{{ path('terminal_quick_stk_send',   _p) }}';
+    const statusUrl = '{{ path('terminal_quick_stk_status', _p) }}';
+
+    const panelForm    = document.getElementById('qstk-panel-form');
+    const panelWaiting = document.getElementById('qstk-panel-waiting');
+    const panelSuccess = document.getElementById('qstk-panel-success');
+    const panelError   = document.getElementById('qstk-panel-error');
+
+    const areaEl      = document.getElementById('qstk-area');
+    const amountEl    = document.getElementById('qstk-amount');
+    const configEl    = document.getElementById('qstk-config');
+    const phoneEl     = document.getElementById('qstk-phone');
+    const formError   = document.getElementById('qstk-form-error');
+    const sendBtn     = document.getElementById('qstk-send-btn');
+    const cancelBtn   = document.getElementById('qstk-cancel-btn');
+    const retryBtn    = document.getElementById('qstk-retry-btn');
+    const newBtn      = document.getElementById('qstk-new-btn');
+    const titleEl     = document.getElementById('qstk-title');
+    const backBtn     = document.getElementById('qstk-back-btn');
+
+    let pollTimer     = null;
+    let checkoutId    = null;
+
+    // ── Panel switcher ────────────────────────────────────────────────────
+    function showPanel(name) {
+        panelForm.style.display    = name === 'form'    ? '' : 'none';
+        panelWaiting.style.display = name === 'waiting' ? '' : 'none';
+        panelSuccess.style.display = name === 'success' ? '' : 'none';
+        panelError.style.display   = name === 'error'   ? '' : 'none';
+        // Back button: hide during waiting (cancel is there instead)
+        backBtn.style.opacity      = name === 'waiting' ? '0.3' : '1';
+        backBtn.style.pointerEvents = name === 'waiting' ? 'none' : '';
+    }
+
+    // ── Polling ───────────────────────────────────────────────────────────
+    function stopPolling() {
+        clearTimeout(pollTimer);
+        pollTimer = null;
+    }
+
+    async function poll() {
+        if (!checkoutId) return;
+        try {
+            const res  = await fetch(statusUrl + '?checkout_id=' + encodeURIComponent(checkoutId), { credentials: 'same-origin' });
+            const data = await res.json();
+
+            if (data.status === 'complete') {
+                stopPolling();
+                document.getElementById('qstk-success-amount').textContent  = 'KES ' + Math.round(data.amount).toLocaleString('en-KE');
+                document.getElementById('qstk-success-receipt').textContent = data.receipt || '—';
+                document.getElementById('qstk-success-phone').textContent   = data.masked_phone || '';
+                showPanel('success');
+                return;
+            }
+
+            if (data.status === 'failed' || data.status === 'cancelled') {
+                stopPolling();
+                document.getElementById('qstk-error-msg').textContent = data.message || 'Payment was not completed.';
+                showPanel('error');
+                return;
+            }
+        } catch (e) { /* network hiccup — keep polling */ }
+
+        pollTimer = setTimeout(poll, 3000);
+    }
+
+    // ── Send ──────────────────────────────────────────────────────────────
+    sendBtn.addEventListener('click', async () => {
+        formError.style.display = 'none';
+
+        const amount   = parseFloat(amountEl.value);
+        const phone    = phoneEl.value.trim();
+        const configId = configEl.value;
+        const areaId   = areaEl ? areaEl.value : '';
+
+        if (!amount || amount < 1) {
+            formError.textContent = 'Please enter a valid amount (minimum KES 1).';
+            formError.style.display = '';
+            return;
+        }
+        if (!phone) {
+            formError.textContent = 'Please enter a phone number.';
+            formError.style.display = '';
+            return;
+        }
+
+        sendBtn.disabled = true;
+        sendBtn.innerHTML = `<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#fff" stroke-width="2.2" style="animation:qstk-spin .8s linear infinite;flex-shrink:0;"><path stroke-linecap="round" stroke-linejoin="round" d="M12 3v3m0 12v3m9-9h-3M6 12H3m15.364-6.364l-2.121 2.121M8.757 15.243l-2.121 2.121m0-12.728l2.121 2.121M15.243 15.243l2.121 2.121"/></svg> Sending…`;
+
+        try {
+            const body = new FormData();
+            body.append('phone',     phone);
+            body.append('amount',    amount);
+            body.append('config_id', configId);
+            if (areaId) body.append('area_id', areaId);
+
+            const res  = await fetch(sendUrl, { method: 'POST', body, credentials: 'same-origin' });
+            const data = await res.json();
+
+            if (!data.success) {
+                formError.textContent = data.message || JSON.stringify(data.raw) || 'Failed to send STK push.';
+                formError.style.display = '';
+                return;
+            }
+
+            checkoutId = data.checkout_request_id;
+
+            document.getElementById('qstk-wait-amount').textContent = 'KES ' + Math.round(data.amount).toLocaleString('en-KE');
+            document.getElementById('qstk-wait-phone').textContent  = data.masked_phone;
+            showPanel('waiting');
+            poll();
+
+        } catch (e) {
+            formError.textContent = 'Network error. Please try again.';
+            formError.style.display = '';
+        } finally {
+            sendBtn.disabled = false;
+            sendBtn.innerHTML = `<svg width="20" height="20" fill="none" stroke="#fff" stroke-width="2.2" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/></svg> Send STK Push`;
+        }
+    });
+
+    // ── Cancel ────────────────────────────────────────────────────────────
+    cancelBtn.addEventListener('click', () => {
+        stopPolling();
+        checkoutId = null;
+        showPanel('form');
+    });
+
+    // ── Retry ─────────────────────────────────────────────────────────────
+    retryBtn.addEventListener('click', () => {
+        showPanel('form');
+    });
+
+    // ── New Transaction ───────────────────────────────────────────────────
+    newBtn.addEventListener('click', () => {
+        checkoutId = null;
+        amountEl.value = '';
+        phoneEl.value  = '';
+        if (areaEl) areaEl.value = '';
+        showPanel('form');
+        amountEl.focus();
+    });
+
+    // ── Cleanup on Turbo navigate away ────────────────────────────────────
+    function stop() {
+        stopPolling();
+        document.removeEventListener('turbo:before-cache', onBeforeCache);
+        window.removeEventListener('pagehide', onStop);
+        window.__qstkCleanup = null;
+    }
+    function onBeforeCache() { stop(); }
+    function onStop()        { stop(); }
+
+    document.addEventListener('turbo:before-cache', onBeforeCache);
+    window.addEventListener('pagehide', onStop);
+    window.__qstkCleanup = stop;
+
+})();
+</script>
+{% endblock %}

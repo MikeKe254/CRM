@@ -4,16 +4,21 @@ declare(strict_types=1);
 
 namespace App\Controller\Terminal;
 
+use App\Services\ActivityLog\UserActivityLogService;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\DTO\AuthResult;
 use App\Services\Auth\Exception\AuthException;
 use App\Services\Customer\CustomerService;
+use App\Services\Feature\TenantFeatureAccessService;
 use App\Services\Loyalty\LoyaltyService;
 use App\Services\Patronr\CheckoutService;
 use App\Services\Patronr\DTO\CheckoutDraft;
 use App\Services\Patronr\TransactionRecordService;
 use App\Services\Payment\MpesaApiService;
 use App\Services\Payment\PaymentConfigService;
+use App\Services\Revenue\CatalogService;
+use App\Services\Revenue\EventService;
+use App\Services\Permission\CheckPermissionService;
 use App\Services\Terminal\TerminalBranchAccessService;
 use App\Support\DomainHelper;
 use Doctrine\DBAL\Connection;
@@ -47,10 +52,15 @@ class CheckoutController extends AbstractController
         private readonly TransactionRecordService $transactions,
         private readonly PaymentConfigService $paymentConfigs,
         private readonly LoyaltyService $loyalty,
+        private readonly TenantFeatureAccessService $features,
         private readonly CustomerService $customers,
         private readonly MpesaApiService $mpesa,
         private readonly Connection $db,
         private readonly TerminalBranchAccessService $terminalBranchAccess,
+        private readonly UserActivityLogService $activityLog,
+        private readonly CheckPermissionService $can,
+        private readonly CatalogService $catalog,
+        private readonly EventService $eventService,
     ) {}
 
     // =========================================================================
@@ -97,10 +107,16 @@ class CheckoutController extends AbstractController
             ['branch_id' => $ctx['session']->branch->id],
         );
 
+        $catalogItems  = $this->catalog->listActiveForTerminal($ctx['session']->branch->id);
+        $activeEvents  = $this->eventService->findAllActive($ctx['session']->branch->id);
+
         return $this->render('terminal/checkout/step1_info.html.twig', [
-            'draft'         => $draft,
-            'areas'         => $areas,
-            'route_params'  => $ctx['route_params'],
+            'draft'          => $draft,
+            'areas'          => $areas,
+            'catalog_items'  => $catalogItems,
+            'active_events'  => $activeEvents,
+            'can_discount'   => $this->can->check($ctx['session'], 'apply_discount'),
+            'route_params'   => $ctx['route_params'],
         ]);
     }
 
@@ -112,9 +128,27 @@ class CheckoutController extends AbstractController
             return $ctx;
         }
 
-        $amount      = (int) $request->request->get('amount', 0);
-        $areaId      = $request->request->get('area_id') ? (int) $request->request->get('area_id') : null;
-        $description = trim((string) $request->request->get('description', ''));
+        $amount         = (int) $request->request->get('amount', 0);
+        $areaId         = $request->request->get('area_id') ? (int) $request->request->get('area_id') : null;
+        $description    = trim((string) $request->request->get('description', ''));
+        $catalogItemId  = $request->request->get('catalog_item_id') ? (int) $request->request->get('catalog_item_id') : null;
+        $eventId        = $request->request->get('event_id') ? (int) $request->request->get('event_id') : null;
+        $coversRaw      = $request->request->get('covers', '');
+        $covers         = ($coversRaw !== '' && ctype_digit((string) $coversRaw)) ? (int) $coversRaw : null;
+
+        // Discount (permission-gated; validated server-side regardless of what the UI sends)
+        $grossAmountRaw = (int) $request->request->get('gross_amount', 0);
+        $grossAmount    = $grossAmountRaw > 0 ? $grossAmountRaw : $amount;
+        $discountAmount = 0;
+        $discountReason = null;
+        $discountRaw    = (int) $request->request->get('discount_amount', 0);
+        if ($discountRaw > 0 && $discountRaw < $grossAmount && $this->can->check($ctx['session'], 'apply_discount')) {
+            $reasonRaw = trim((string) $request->request->get('discount_reason', ''));
+            if ($reasonRaw !== '') {
+                $discountAmount = $discountRaw;
+                $discountReason = $reasonRaw;
+            }
+        }
 
         if ($amount <= 0) {
             return $this->redirectToRoute('terminal_checkout_step1', $ctx['route_params']);
@@ -125,9 +159,15 @@ class CheckoutController extends AbstractController
             companyId:          $ctx['session']->company->id,
             nextStep:           2,
             newPayload:         [
-                'amount'      => $amount,
-                'area_id'     => $areaId,
-                'description' => $description !== '' ? $description : null,
+                'amount'           => $amount,
+                'gross_amount'     => $grossAmount,
+                'discount_amount'  => $discountAmount,
+                'discount_reason'  => $discountReason,
+                'area_id'          => $areaId,
+                'description'      => $description !== '' ? $description : null,
+                'catalog_item_id'  => $catalogItemId,
+                'event_id'         => $eventId,
+                'covers'           => $covers,
             ],
         );
 
@@ -155,6 +195,10 @@ class CheckoutController extends AbstractController
             $ctx['session']->company->id,
             $ctx['session']->branch->id,
         );
+
+        if (!$ctx['loyalty_enabled']) {
+            $methods = array_values(array_filter($methods, fn($m) => $m->methodKey !== 'loyalty'));
+        }
 
         return $this->render('terminal/checkout/step2_payment.html.twig', [
             'draft'        => $draft,
@@ -294,18 +338,34 @@ class CheckoutController extends AbstractController
                 }
             }
 
+            // Resolve revenue_source_type from draft catalog_item_id
+            $draftCatalogId       = $draft->get('catalog_item_id') ? (int) $draft->get('catalog_item_id') : null;
+            $revenueSourceType    = $draftCatalogId ? 'catalog_item' : null;
+
+            // Discount fields from draft
+            $draftDiscountAmount  = (int) ($draft->get('discount_amount', 0) ?? 0);
+            $draftGrossAmount     = (float) ($draft->get('gross_amount') ?: $draft->get('amount', 0));
+
             $txnId = $this->transactions->create(
-                companyId:          $ctx['session']->company->id,
-                branchId:           $ctx['session']->branch->id,
-                areaId:             $draft->get('area_id'),
-                terminalIdentifier: $ctx['terminal'],
-                cashierUserId:      $ctx['session']->user->id,
-                paymentMethodId:    $this->resolvePaymentMethodId($primarySplit['method_key']),
-                amount:             (float) $draft->get('amount', 0),
-                description:        $draft->get('description'),
-                mode:               'manual',
-                mpesaConfigId:      $primarySplit['method_key'] === 'mpesa'    ? (int) $primarySplit['config_id'] : null,
-                pesapalConfigId:    $primarySplit['method_key'] === 'pesapal'  ? (int) $primarySplit['config_id'] : null,
+                companyId:           $ctx['session']->company->id,
+                branchId:            $ctx['session']->branch->id,
+                areaId:              $draft->get('area_id'),
+                terminalIdentifier:  $ctx['terminal'],
+                cashierUserId:       $ctx['session']->user->id,
+                paymentMethodId:     $this->resolvePaymentMethodId($primarySplit['method_key']),
+                amount:              (float) $draft->get('amount', 0),
+                description:         $draft->get('description'),
+                mode:                'manual',
+                mpesaConfigId:       $primarySplit['method_key'] === 'mpesa'   ? (int) $primarySplit['config_id'] : null,
+                pesapalConfigId:     $primarySplit['method_key'] === 'pesapal' ? (int) $primarySplit['config_id'] : null,
+                revenueSourceType:   $revenueSourceType,
+                revenueSourceId:     $draftCatalogId,
+                eventId:             $draft->get('event_id') ? (int) $draft->get('event_id') : null,
+                covers:              $draft->get('covers') !== null ? (int) $draft->get('covers') : null,
+                grossAmount:         $draftGrossAmount,
+                discountAmount:      (float) $draftDiscountAmount,
+                discountReason:      $draft->get('discount_reason'),
+                discountByUserId:    $draftDiscountAmount > 0 ? $ctx['session']->user->id : null,
             );
 
             $this->checkout->advanceDraft(
@@ -355,11 +415,22 @@ class CheckoutController extends AbstractController
         $nextIndex  = $splitIndex + 1;
         $txnId      = $draft->posTransactionId;
 
-        $mpesaCode = trim((string) $request->request->get('mpesa_code', '')) ?: null;
+        $mpesaCode        = trim((string) $request->request->get('mpesa_code',        '')) ?: null;
+        $cardCode         = trim((string) $request->request->get('card_code',         '')) ?: null;
+        $otherDescription = trim((string) $request->request->get('other_description', '')) ?: null;
+        $otherCode        = trim((string) $request->request->get('other_code',        '')) ?: null;
 
         // Record this split leg
         if ($txnId && isset($splits[$splitIndex])) {
             $leg = $splits[$splitIndex];
+
+            $apiReceipt = match ($leg['method_key']) {
+                'mpesa' => $mpesaCode,
+                'card'  => $cardCode,
+                'other' => $otherCode,
+                default => null,
+            };
+
             $this->transactions->recordSplitLeg(
                 posTransactionId: $txnId,
                 splitIndex:       $splitIndex,
@@ -367,14 +438,15 @@ class CheckoutController extends AbstractController
                 methodKey:        $leg['method_key'],
                 amount:           (float) $leg['amount'],
                 mpesaConfigId:    isset($leg['config_id']) && $leg['method_key'] === 'mpesa' ? (int) $leg['config_id'] : null,
-                apiReceipt:       $leg['method_key'] === 'mpesa' ? $mpesaCode : null,
+                apiReceipt:       $apiReceipt,
+                paymentNotes:     $leg['method_key'] === 'other' ? $otherDescription : null,
             );
 
-            // Propagate M-Pesa code to the parent transaction row so it appears on receipts/reports
-            if ($mpesaCode !== null && $leg['method_key'] === 'mpesa' && $txnId) {
+            // Propagate receipt code to the parent transaction row for receipts/reports
+            if ($apiReceipt !== null && $txnId) {
                 $this->db->executeStatement(
                     'UPDATE pos_transactions SET api_receipt = :code, updated_at = NOW() WHERE id = :id',
-                    ['code' => $mpesaCode, 'id' => $txnId],
+                    ['code' => $apiReceipt, 'id' => $txnId],
                 );
             }
         }
@@ -412,6 +484,11 @@ class CheckoutController extends AbstractController
         $ctx = $this->requirePosJson($request, $branch);
         if ($ctx instanceof JsonResponse) {
             return $ctx;
+        }
+
+        // Gate: must hold SEND_STK_PUSH
+        if (!$this->can->check($ctx['session'], 'SEND_STK_PUSH')) {
+            return $this->json(['success' => false, 'message' => 'You do not have permission to send STK pushes.'], 403);
         }
 
         $draft = $this->checkout->getActiveDraft($ctx['terminal'], $ctx['session']->company->id);
@@ -463,6 +540,29 @@ class CheckoutController extends AbstractController
                 nextStep:           3, // stay on step 3 — JS polls
                 newPayload:         ['stk_phone' => $normalised],
             );
+
+            $posId = $this->posId($txnId, $ctx['session']->company->id);
+            $this->activityLog->send(
+                session:     $ctx['session'],
+                module:      UserActivityLogService::MODULE_PAYMENTS,
+                description: sprintf(
+                    'Sent STK push of KES %s to ···%s (checkout #%s)',
+                    number_format($amount, 2),
+                    substr($normalised, -3),
+                    $posId ?? $txnId,
+                ),
+                permission:  'SEND_STK_PUSH',
+                subjectType: 'pos_transaction',
+                subjectId:   $txnId,
+                metadata:    [
+                    'amount'               => $amount,
+                    'masked_phone'         => '···' . substr($normalised, -3),
+                    'checkout_request_id'  => $result['checkout_request_id'],
+                    'pos_id'               => $posId,
+                    'pos_transaction_id'   => $txnId,
+                ],
+                request:     $request,
+            );
         }
 
         return $this->json($result);
@@ -483,7 +583,11 @@ class CheckoutController extends AbstractController
         }
 
         $row = $this->db->fetchAssociative(
-            'SELECT status, api_receipt FROM pos_transactions
+            'SELECT status,
+                    api_receipt,
+                    loyalty_auto_awarded,
+                    loyalty_points_awarded
+               FROM pos_transactions
               WHERE api_checkout_request_id = :id
                 AND company_id = :company_id
               ORDER BY id DESC LIMIT 1',
@@ -536,9 +640,11 @@ class CheckoutController extends AbstractController
         }
 
         return $this->json([
-            'status'  => $row['status'],
-            'receipt' => $row['api_receipt'],
-            'message' => $row['status'] === 'failed' ? 'Payment was declined or not completed.' : null,
+            'status'         => $row['status'],
+            'receipt'        => $row['api_receipt'],
+            'auto_awarded'   => (bool) ($row['loyalty_auto_awarded'] ?? false),
+            'points_awarded' => (int) ($row['loyalty_points_awarded'] ?? 0),
+            'message'        => $row['status'] === 'failed' ? 'Payment was declined or not completed.' : null,
         ]);
     }
 
@@ -645,7 +751,8 @@ class CheckoutController extends AbstractController
         $branchId = $ctx['session']->branch->id ?? null;
 
         $row = $this->db->fetchAssociative(
-            'SELECT id, msisdn, transaction_id, amount, first_name
+            'SELECT id, msisdn, transaction_id, amount, first_name,
+                    loyalty_auto_awarded, loyalty_points_awarded
                FROM mpesa_payments
               WHERE id = :id
                 AND company_id = :cid
@@ -678,14 +785,33 @@ class CheckoutController extends AbstractController
         // Mark pos_transaction complete and advance draft
         $txnId = $draft->posTransactionId;
 
-        // Store the M-Pesa receipt + link back to the mpesa_payments row
-        if ($txnId && !empty($row['transaction_id'])) {
-            $this->db->executeStatement(
-                'UPDATE pos_transactions
-                    SET api_receipt = :receipt, mpesa_payment_id = :mp_id
-                  WHERE id = :id',
-                ['receipt' => $row['transaction_id'], 'mp_id' => $row['id'], 'id' => $txnId],
+        if ($txnId) {
+            $this->transactions->syncAutoAwardedMpesaPaymentToTransaction(
+                $txnId,
+                (int) $row['id'],
+                isset($splits[$splitIndex]) ? (float) $splits[$splitIndex]['amount'] : null,
             );
+
+            if ((bool) ($row['loyalty_auto_awarded'] ?? false)) {
+                $this->activityLog->log(
+                    session:     $ctx['session'],
+                    module:      UserActivityLogService::MODULE_LOYALTY,
+                    action:      UserActivityLogService::ACTION_UPDATE,
+                    description: sprintf(
+                        'Synced callback-side loyalty award from M-Pesa payment #%d to transaction #%d (no re-award)',
+                        (int) $row['id'],
+                        $txnId,
+                    ),
+                    subjectType: 'pos_transaction',
+                    subjectId:   $txnId,
+                    metadata:    [
+                        'mpesa_payment_id'   => (int) $row['id'],
+                        'pos_transaction_id' => $txnId,
+                        'award_source'       => 'mpesa_claim_sync',
+                        'points'             => (int) ($row['loyalty_points_awarded'] ?? 0),
+                    ],
+                );
+            }
         }
 
         // Record this callback split leg
@@ -744,6 +870,10 @@ class CheckoutController extends AbstractController
             return $ctx;
         }
 
+        if (!$ctx['loyalty_enabled']) {
+            return $this->json(['success' => false, 'message' => 'Loyalty module not enabled.'], 400);
+        }
+
         $phone = trim((string) $request->query->get('phone', ''));
         $normalised = $this->customers->normalizePhone($phone);
 
@@ -751,8 +881,8 @@ class CheckoutController extends AbstractController
             return $this->json(['enrolled' => false, 'phone' => null]);
         }
 
-        $program = $this->loyalty->getProgram($ctx['session']->company->id);
-        $account = $this->loyalty->getAccount($ctx['session']->company->id, $normalised);
+        $program = $this->loyalty->getProgram($ctx['session']->company->id, $ctx['session']->branch->id);
+        $account = $this->loyalty->getAccount($ctx['session']->company->id, $normalised, $ctx['session']->branch->id);
 
         if ($account === null) {
             return $this->json([
@@ -781,6 +911,10 @@ class CheckoutController extends AbstractController
             return $ctx;
         }
 
+        if (!$ctx['loyalty_enabled']) {
+            return $this->json(['success' => false, 'message' => 'Loyalty module not enabled.'], 400);
+        }
+
         $draft = $this->checkout->getActiveDraft($ctx['terminal'], $ctx['session']->company->id);
         if ($draft === null) {
             return $this->json(['success' => false, 'message' => 'No active checkout.'], 400);
@@ -796,12 +930,12 @@ class CheckoutController extends AbstractController
         $splitIndex = (int) $draft->get('split_index', 0);
         $splitAmount = isset($splits[$splitIndex]) ? (float) $splits[$splitIndex]['amount'] : 0.0;
 
-        $redemptionConfig = $this->loyalty->getRedemptionConfig($ctx['session']->company->id);
+        $redemptionConfig = $this->loyalty->getRedemptionConfig($ctx['session']->company->id, $ctx['session']->branch->id);
         if ($redemptionConfig === null) {
             return $this->json(['success' => false, 'message' => 'Loyalty redemption not enabled.'], 400);
         }
 
-        $account = $this->loyalty->getAccount($ctx['session']->company->id, $normalised);
+        $account = $this->loyalty->getAccount($ctx['session']->company->id, $normalised, $ctx['session']->branch->id);
         if ($account === null) {
             return $this->json(['success' => false, 'message' => 'Customer not enrolled in loyalty.'], 400);
         }
@@ -856,18 +990,22 @@ class CheckoutController extends AbstractController
             return $ctx;
         }
 
+        if (!$ctx['loyalty_enabled']) {
+            return $this->json(['success' => false, 'message' => 'Loyalty module not enabled.'], 400);
+        }
+
         $phone = trim((string) $request->query->get('phone', ''));
         $normalised = $this->customers->normalizePhone($phone);
         if ($normalised === null) {
             return $this->json(['enrolled' => false]);
         }
 
-        $account = $this->loyalty->getAccount($ctx['session']->company->id, $normalised);
+        $account = $this->loyalty->getAccount($ctx['session']->company->id, $normalised, $ctx['session']->branch->id);
         if ($account === null) {
             return $this->json(['enrolled' => false, 'phone' => $normalised]);
         }
 
-        $redemptionCfg = $this->loyalty->getRedemptionConfig($ctx['session']->company->id);
+        $redemptionCfg = $this->loyalty->getRedemptionConfig($ctx['session']->company->id, $ctx['session']->branch->id);
         $kesPerPoint   = (float) ($redemptionCfg['kes_per_point'] ?? 1.0);
         $maxPct        = (int)   ($redemptionCfg['max_redemption_pct'] ?? 100);
 
@@ -932,7 +1070,43 @@ class CheckoutController extends AbstractController
             return $draft;
         }
 
-        $program = $this->loyalty->getProgram($ctx['session']->company->id);
+        $remainingEarnableAmount = $this->remainingEarnableAmount($draft, $ctx['session']->company->id);
+
+        if ($draft->posTransactionId
+            && $this->isTransactionAutoAwarded($draft->posTransactionId, $ctx['session']->company->id)
+            && $remainingEarnableAmount <= 0.0
+        ) {
+            $this->activityLog->log(
+                session:     $ctx['session'],
+                module:      UserActivityLogService::MODULE_LOYALTY,
+                action:      UserActivityLogService::ACTION_UPDATE,
+                description: sprintf(
+                    'Step 4 skipped — loyalty points already auto-awarded for transaction #%d',
+                    $draft->posTransactionId,
+                ),
+                subjectType: 'pos_transaction',
+                subjectId:   $draft->posTransactionId,
+                metadata:    ['reason' => 'auto_award_complete', 'transaction_id' => $draft->posTransactionId],
+            );
+            $this->advanceToSuccessFromTransaction($ctx, $draft, $draft->posTransactionId);
+            return $this->redirectToRoute('terminal_checkout_step5', $ctx['route_params']);
+        }
+
+        // Skip loyalty step entirely if module is disabled for this company
+        if (!$ctx['loyalty_enabled']) {
+            if ($draft->posTransactionId) {
+                $this->transactions->markComplete($draft->posTransactionId);
+            }
+            $this->checkout->advanceDraft(
+                terminalIdentifier: $ctx['terminal'],
+                companyId:          $ctx['session']->company->id,
+                nextStep:           5,
+                newPayload:         [],
+            );
+            return $this->redirectToRoute('terminal_checkout_step5', $ctx['route_params']);
+        }
+
+        $program = $this->loyalty->getProgram($ctx['session']->company->id, $ctx['session']->branch->id);
 
         // Points are earned only on the non-loyalty portion of the bill
         $loyaltyRedeemedKes = 0.0;
@@ -941,10 +1115,10 @@ class CheckoutController extends AbstractController
                 $loyaltyRedeemedKes += (float) ($s['amount'] ?? 0);
             }
         }
-        $earnableAmount = max(0.0, (float) $draft->get('amount', 0) - $loyaltyRedeemedKes);
+        $earnableAmount = max(0.0, $this->remainingEarnableAmount($draft, $ctx['session']->company->id));
 
         $pointsPreview = $program
-            ? $this->loyalty->calculatePoints($ctx['session']->company->id, $earnableAmount)
+            ? $this->loyalty->calculatePoints($ctx['session']->company->id, $earnableAmount, $ctx['session']->branch->id)
             : 0;
 
         // Pre-fill phone from STK push step or loyalty split
@@ -978,7 +1152,7 @@ class CheckoutController extends AbstractController
         }
 
         $phone      = trim((string) $request->request->get('phone', ''));
-        $skip       = $request->request->get('skip') === '1';
+        $skip       = $request->request->get('skip') === '1' || !$ctx['loyalty_enabled'];
         $txnId      = $draft->posTransactionId;
         $firstName  = trim((string) $request->request->get('first_name', ''));
         $gender     = trim((string) $request->request->get('gender', ''));
@@ -987,6 +1161,14 @@ class CheckoutController extends AbstractController
         $birthDay   = $request->request->get('birth_day') !== '' && $request->request->get('birth_day') !== null
             ? (int) $request->request->get('birth_day') : null;
 
+        if ($txnId
+            && $this->isTransactionAutoAwarded($txnId, $ctx['session']->company->id)
+            && $this->remainingEarnableAmount($draft, $ctx['session']->company->id) <= 0.0
+        ) {
+            $this->advanceToSuccessFromTransaction($ctx, $draft, $txnId, $phone);
+            return $this->redirectToRoute('terminal_checkout_step5', $ctx['route_params']);
+        }
+
         // Points awarded only on the amount NOT paid by loyalty redemption
         $loyaltyRedeemedKes = 0.0;
         foreach (($draft->get('splits', []) ?: []) as $s) {
@@ -994,7 +1176,7 @@ class CheckoutController extends AbstractController
                 $loyaltyRedeemedKes += (float) ($s['amount'] ?? 0);
             }
         }
-        $earnableAmount = max(0.0, (float) $draft->get('amount', 0) - $loyaltyRedeemedKes);
+        $earnableAmount = max(0.0, $this->remainingEarnableAmount($draft, $ctx['session']->company->id));
 
         $pointsAwarded  = 0;
         $loyaltyAccount = null;
@@ -1022,11 +1204,50 @@ class CheckoutController extends AbstractController
 
             $normalised = $this->customers->normalizePhone($phone);
             if ($normalised) {
-                $loyaltyAccount = $this->loyalty->getAccount($ctx['session']->company->id, $normalised);
+                $loyaltyAccount = $this->loyalty->getAccount($ctx['session']->company->id, $normalised, $ctx['session']->branch->id);
             }
+
+            $posId = $this->posId($txnId, $ctx['session']->company->id);
+            $this->activityLog->create(
+                session:     $ctx['session'],
+                module:      UserActivityLogService::MODULE_TRANSACTIONS,
+                description: sprintf(
+                    'Checkout completed — KES %s, #%s%s',
+                    number_format((float) $draft->get('amount', 0), 2),
+                    $posId ?? $txnId,
+                    $pointsAwarded > 0 ? sprintf(', +%d pts awarded', $pointsAwarded) : '',
+                ),
+                subjectType: 'pos_transaction',
+                subjectId:   $txnId,
+                metadata:    [
+                    'amount'         => (float) $draft->get('amount', 0),
+                    'points_awarded' => $pointsAwarded,
+                    'loyalty_phone'  => '···' . substr((string) $phone, -3),
+                    'pos_id'         => $posId,
+                ],
+                request:     $request,
+            );
         } elseif ($skip && $txnId) {
             // Mark complete without loyalty
             $this->transactions->markComplete($txnId);
+
+            $posId = $this->posId($txnId, $ctx['session']->company->id);
+            $this->activityLog->create(
+                session:     $ctx['session'],
+                module:      UserActivityLogService::MODULE_TRANSACTIONS,
+                description: sprintf(
+                    'Checkout completed — KES %s, #%s (no loyalty)',
+                    number_format((float) $draft->get('amount', 0), 2),
+                    $posId ?? $txnId,
+                ),
+                subjectType: 'pos_transaction',
+                subjectId:   $txnId,
+                metadata:    [
+                    'amount' => (float) $draft->get('amount', 0),
+                    'pos_id' => $posId,
+                ],
+                request:     $request,
+            );
         }
 
         $this->checkout->advanceDraft(
@@ -1063,7 +1284,7 @@ class CheckoutController extends AbstractController
             return $this->redirectToRoute('terminal_dashboard', $ctx['route_params']);
         }
 
-        $program = $this->loyalty->getProgram($ctx['session']->company->id);
+        $program = $this->loyalty->getProgram($ctx['session']->company->id, $ctx['session']->branch->id);
 
         return $this->render('terminal/checkout/step5_success.html.twig', [
             'draft'        => $draft,
@@ -1089,6 +1310,25 @@ class CheckoutController extends AbstractController
         // Mark the transaction cancelled if one was created
         if ($draft?->posTransactionId) {
             $this->transactions->markCancelled($draft->posTransactionId);
+
+            $posId = $this->posId($draft->posTransactionId, $ctx['session']->company->id);
+            $this->activityLog->update(
+                session:     $ctx['session'],
+                module:      UserActivityLogService::MODULE_TRANSACTIONS,
+                description: sprintf(
+                    'Checkout cancelled — #%s voided',
+                    $posId ?? $draft->posTransactionId,
+                ),
+                subjectType: 'pos_transaction',
+                subjectId:   $draft->posTransactionId,
+                metadata:    [
+                    'pos_id'             => $posId,
+                    'pos_transaction_id' => $draft->posTransactionId,
+                    'amount'             => (float) ($draft->get('amount', 0)),
+                    'status'             => 'cancelled',
+                ],
+                request:     $request,
+            );
         }
 
         $this->checkout->cancelDraft($ctx['terminal'], $ctx['session']->company->id);
@@ -1136,11 +1376,14 @@ class CheckoutController extends AbstractController
 
             $session->branch = $branchNode;
 
+            $loyaltyEnabled = $this->isLoyaltyEnabled($session->company->id, $branchNode->id);
+
             return [
-                'session'       => $session,
-                'terminal'      => $terminal,
-                'subdomain'     => $subdomain,
-                'route_params'  => ['subdomain' => $subdomain, 'domain' => $baseDomain, 'branch' => $branch],
+                'session'          => $session,
+                'terminal'         => $terminal,
+                'subdomain'        => $subdomain,
+                'route_params'     => ['subdomain' => $subdomain, 'domain' => $baseDomain, 'branch' => $branch],
+                'loyalty_enabled'  => $loyaltyEnabled,
             ];
 
         } catch (AuthException) {
@@ -1177,10 +1420,13 @@ class CheckoutController extends AbstractController
 
             $session->branch = $branchNode;
 
+            $loyaltyEnabled = $this->isLoyaltyEnabled($session->company->id, $branchNode->id);
+
             return [
-                'session'       => $session,
-                'terminal'      => $terminal,
-                'route_params'  => ['subdomain' => $subdomain, 'domain' => $baseDomain, 'branch' => $branch],
+                'session'         => $session,
+                'terminal'        => $terminal,
+                'route_params'    => ['subdomain' => $subdomain, 'domain' => $baseDomain, 'branch' => $branch],
+                'loyalty_enabled' => $loyaltyEnabled,
             ];
         } catch (AuthException $e) {
             return $this->json(['success' => false, 'message' => $e->getMessage()], $e->getHttpStatus());
@@ -1227,5 +1473,106 @@ class CheckoutController extends AbstractController
     private function generateToken(string $id): string
     {
         return $this->container->get('security.csrf.token_manager')?->getToken($id)->getValue() ?? '';
+    }
+
+    private function isLoyaltyEnabled(int $companyId, int $branchId): bool
+    {
+        return $this->features->canAny(
+            $companyId,
+            TenantFeatureAccessService::FEATURE_EARN_POINTS,
+            TenantFeatureAccessService::FEATURE_REDEEM_POINTS,
+            TenantFeatureAccessService::FEATURE_REWARD_SETUP,
+            TenantFeatureAccessService::FEATURE_LOYALTY_BALANCE,
+        ) && $this->loyalty->getProgram($companyId, $branchId) !== null;
+    }
+
+    private function isTransactionAutoAwarded(int $transactionId, int $companyId): bool
+    {
+        return (bool) $this->db->fetchOne(
+            'SELECT loyalty_auto_awarded
+               FROM pos_transactions
+              WHERE id = :id
+                AND company_id = :company_id
+              LIMIT 1',
+            [
+                'id' => $transactionId,
+                'company_id' => $companyId,
+            ],
+        );
+    }
+
+    private function advanceToSuccessFromTransaction(array $ctx, CheckoutDraft $draft, int $transactionId, string $phoneOverride = ''): void
+    {
+        $snapshot = $this->db->fetchAssociative(
+            'SELECT pt.msisdn,
+                    pt.loyalty_points_awarded,
+                    la.points_balance,
+                    lt.name AS tier_name,
+                    lp.points_name
+               FROM pos_transactions pt
+          LEFT JOIN loyalty_accounts la ON la.id = pt.loyalty_account_id
+          LEFT JOIN loyalty_tiers lt ON lt.id = la.loyalty_tier_id
+          LEFT JOIN loyalty_programs lp ON lp.id = la.loyalty_program_id
+              WHERE pt.id = :id
+                AND pt.company_id = :company_id
+              LIMIT 1',
+            [
+                'id' => $transactionId,
+                'company_id' => $ctx['session']->company->id,
+            ],
+        ) ?: [];
+
+        $this->checkout->advanceDraft(
+            terminalIdentifier: $ctx['terminal'],
+            companyId:          $ctx['session']->company->id,
+            nextStep:           5,
+            newPayload:         [
+                'loyalty_phone'   => $phoneOverride !== '' ? $phoneOverride : (string) ($snapshot['msisdn'] ?? ''),
+                'points_awarded'  => (float) ($snapshot['loyalty_points_awarded'] ?? 0),
+                'loyalty_balance' => $snapshot['points_balance'] !== null ? (float) $snapshot['points_balance'] : null,
+                'loyalty_tier'    => $snapshot['tier_name'] ?? null,
+                'loyalty_name'    => $snapshot['points_name'] ?? null,
+            ],
+        );
+    }
+
+    /** Fetch the human-readable pos_id for a transaction, returns null if not found. */
+    private function posId(int $transactionId, int $companyId): ?int
+    {
+        $val = $this->db->fetchOne(
+            'SELECT pos_id FROM pos_transactions WHERE id = :id AND company_id = :company_id LIMIT 1',
+            ['id' => $transactionId, 'company_id' => $companyId],
+        );
+
+        return $val ? (int) $val : null;
+    }
+
+    private function remainingEarnableAmount(CheckoutDraft $draft, int $companyId): float
+    {
+        $loyaltyRedeemedKes = 0.0;
+        foreach (($draft->get('splits', []) ?: []) as $s) {
+            if (($s['method_key'] ?? '') === 'loyalty') {
+                $loyaltyRedeemedKes += (float) ($s['amount'] ?? 0);
+            }
+        }
+
+        $baseEarnable = max(0.0, (float) $draft->get('amount', 0) - $loyaltyRedeemedKes);
+        if (!$draft->posTransactionId) {
+            return $baseEarnable;
+        }
+
+        $autoAwardedAmount = (float) ($this->db->fetchOne(
+            'SELECT loyalty_auto_awarded_amount
+               FROM pos_transactions
+              WHERE id = :id
+                AND company_id = :company_id
+              LIMIT 1',
+            [
+                'id' => $draft->posTransactionId,
+                'company_id' => $companyId,
+            ],
+        ) ?? 0);
+
+        return max(0.0, $baseEarnable - $autoAwardedAmount);
     }
 }

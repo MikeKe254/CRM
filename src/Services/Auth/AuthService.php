@@ -437,6 +437,7 @@ final class AuthService
                 canDashboardLogin:        $isPlatformAdmin ? true : $this->safeBool($user['can_dashboard_login']),
                 canPosLogin:              $isPlatformAdmin ? false : $this->safeBool($user['can_pos_login']),
                 roles:                    $roles,
+                isPlatformOwner:          $isPlatformAdmin && (bool) ($user['is_platform_owner'] ?? false),
             ),
             company: new AuthCompany(
                 id:        (int) $company['id'],

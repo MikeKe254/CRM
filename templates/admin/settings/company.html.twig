@@ -1,0 +1,54 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+<form method="POST" action="{{ path('admin_settings_save_company', _rp) }}">
+
+<div class="settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+
+    {# ── SECTION: Company name ───────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Company name</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Appears on receipts, reports, and all customer-facing surfaces.</p>
+        </div>
+        <div class="settings-section-fields">
+            <label class="s-label" for="co-name">Display name <span class="text-red-400 font-normal">*</span></label>
+            <input id="co-name" type="text" name="name" value="{{ company.name ?? '' }}" required
+                   placeholder="e.g. Koma Gardens Ltd" autocomplete="organization" class="s-input">
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    {# ── SECTION: Contact details ────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Contact details</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Used in automated messages and customer notifications.</p>
+        </div>
+        <div class="settings-section-fields space-y-4">
+            <div>
+                <label class="s-label" for="co-email">Email address</label>
+                <input id="co-email" type="email" name="email" value="{{ company.email ?? '' }}"
+                       placeholder="info@yourcompany.com" autocomplete="email" class="s-input">
+            </div>
+            <div>
+                <label class="s-label" for="co-phone">Phone number</label>
+                <input id="co-phone" type="tel" name="phone" value="{{ company.phone ?? '' }}"
+                       placeholder="+254 700 000 000" autocomplete="tel" class="s-input">
+            </div>
+        </div>
+    </div>
+
+    {# ── FOOTER ──────────────────────────────────────────────────────── #}
+    <div class="settings-card-footer flex items-center justify-between px-8 py-4 border-t border-gray-100 bg-gray-50">
+        <p class="text-xs text-gray-400">Changes take effect immediately.</p>
+        <button type="submit"
+                class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-lg transition-colors">
+            Save changes
+        </button>
+    </div>
+
+</div>
+</form>
+{% endblock %}

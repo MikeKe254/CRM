@@ -30,8 +30,8 @@ final class PaymentConfig
         /** Mpesa-specific sub-type: paybill | till | buygoods — null for non-mpesa */
         public readonly ?string $mpesaType,
 
-        /** M-Pesa integration mode: stk_push | callback | manual — null for non-mpesa */
-        public readonly ?string $integrationMode,
+        /** M-Pesa enabled integration modes: ['stk_push','callback','manual'] subsets — empty for non-mpesa */
+        public readonly array $integrationModes,
 
         /** Decrypted API credentials — keyed by field name. Empty for cash/manual. */
         public readonly array  $credentials,

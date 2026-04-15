@@ -15,9 +15,9 @@ final class LoyaltyAccount
         public readonly int                 $companyId,
         public readonly int                 $customerId,
         public readonly string              $msisdn,
-        public readonly int                 $pointsBalance,
-        public readonly int                 $totalPointsEarned,
-        public readonly int                 $totalPointsRedeemed,
+        public readonly float               $pointsBalance,
+        public readonly float               $totalPointsEarned,
+        public readonly float               $totalPointsRedeemed,
 
         // Program branding
         public readonly string              $programName,
@@ -37,32 +37,36 @@ final class LoyaltyAccount
     ) {}
 
     /** Points needed to reach next tier. Null if already at highest. */
-    public function pointsToNextTier(): ?int
+    public function pointsToNextTier(): ?float
     {
         if ($this->nextTierMinPoints === null) {
             return null;
         }
 
-        return max(0, $this->nextTierMinPoints - $this->pointsBalance);
+        return max(0.0, (float) $this->nextTierMinPoints - $this->pointsBalance);
     }
 
-    /** Formatted balance with symbol, e.g. "250 pts" or "250 Stars" */
+    /** Formatted balance with symbol, e.g. "250 pts", "47.88 pts", "250 Stars" */
     public function formattedBalance(): string
     {
-        $symbol = $this->pointsSymbol ?? $this->pointsName;
-        return number_format($this->pointsBalance) . ' ' . $symbol;
+        $symbol    = $this->pointsSymbol ?? $this->pointsName;
+        $formatted = fmod($this->pointsBalance, 1.0) === 0.0
+            ? number_format((int) $this->pointsBalance)
+            : number_format($this->pointsBalance, 2);
+
+        return $formatted . ' ' . $symbol;
     }
 
     public static function fromRow(array $row): self
     {
         return new self(
-            id:                  (int) $row['id'],
-            companyId:           (int) $row['company_id'],
-            customerId:          (int) $row['customer_id'],
+            id:                  (int)   $row['id'],
+            companyId:           (int)   $row['company_id'],
+            customerId:          (int)   $row['customer_id'],
             msisdn:              (string) $row['msisdn'],
-            pointsBalance:       (int) $row['points_balance'],
-            totalPointsEarned:   (int) $row['total_points_earned'],
-            totalPointsRedeemed: (int) $row['total_points_redeemed'],
+            pointsBalance:       (float) $row['points_balance'],
+            totalPointsEarned:   (float) $row['total_points_earned'],
+            totalPointsRedeemed: (float) $row['total_points_redeemed'],
             programName:         (string) ($row['program_name'] ?? 'Loyalty Program'),
             pointsName:          (string) ($row['points_name'] ?? 'Points'),
             pointsSymbol:        $row['points_symbol'] ?? null,

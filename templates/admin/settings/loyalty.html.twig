@@ -1,0 +1,239 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+
+{% set lp = loyalty_program %}
+{% set _mod_on = company.loyalty_module_enabled ?? 1 %}
+{% set _redemp_on = lp.redemption_enabled ?? 1 %}
+{% set _active = lp.is_active ?? 1 %}
+{% set _auto_award = lp.auto_award_enabled ?? 0 %}
+{% set _auto_enroll = lp.auto_enroll_on_payment ?? 0 %}
+
+{% if not _mod_on %}
+<div class="flex items-start gap-3 px-4 py-3.5 mb-4 rounded-xl border border-amber-200 bg-amber-50">
+    <svg width="15" height="15" fill="none" stroke="#d97706" stroke-width="1.75" viewBox="0 0 24 24" class="flex-shrink-0 mt-0.5">
+        <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z"/>
+        <line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+    </svg>
+    <p class="text-sm text-amber-700 leading-relaxed">
+        The Loyalty module is <strong>disabled</strong>. No points will be earned or redeemed.
+        {% if isSuperAdmin() and platformCan('manage_tenant_overrides') %}
+        Adjust it under <a href="{{ path('admin_settings_modules', _rp) }}" class="font-semibold underline underline-offset-2 hover:text-amber-900">Modules</a> to restore plan access.
+        {% else %}
+        Contact platform support if this needs to be restored before the current override ends.
+        {% endif %}
+    </p>
+</div>
+{% endif %}
+
+<form method="POST" action="{{ path('admin_settings_save_loyalty', _rp) }}">
+<div class="settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+
+    <div class="settings-card-header flex items-center justify-between px-8 py-5 border-b border-gray-100">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Loyalty Programme</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Configure how customers earn and redeem points.</p>
+        </div>
+        {% if lp %}
+        <span class="inline-flex items-center gap-1.5 text-xs font-semibold px-2.5 py-1 rounded-full
+                     {{ _active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">
+            <span class="w-1.5 h-1.5 rounded-full inline-block {{ _active ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+            {{ _active ? 'Active' : 'Paused' }}
+        </span>
+        {% endif %}
+    </div>
+
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Branding</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">How the programme is named to customers on receipts and the POS screen.</p>
+        </div>
+        <div class="settings-section-fields space-y-4">
+            <div>
+                <label class="s-label" for="lp-name">Programme name</label>
+                <input id="lp-name" type="text" name="program_name" value="{{ lp.program_name ?? 'Loyalty Program' }}"
+                       placeholder="e.g. Koma Rewards" class="s-input">
+            </div>
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="s-label" for="lp-pts-name">Points name</label>
+                    <input id="lp-pts-name" type="text" name="points_name" value="{{ lp.points_name ?? 'Points' }}"
+                           placeholder="Stars, Coins..." class="s-input">
+                </div>
+                <div>
+                    <label class="s-label" for="lp-pts-sym">Symbol <span class="text-gray-400 font-normal">(optional)</span></label>
+                    <input id="lp-pts-sym" type="text" name="points_symbol" value="{{ lp.points_symbol ?? '' }}"
+                           placeholder="pts" class="s-input">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Earning rules</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">How many points customers earn per purchase, and the welcome bonus.</p>
+        </div>
+        <div class="settings-section-fields space-y-4">
+            <div>
+                <label class="s-label">Earn rate</label>
+                <div style="display:grid;grid-template-columns:1fr auto 1fr;gap:.5rem;align-items:center;">
+                    <div style="position:relative;">
+                        <input type="number" id="lp-ppu" name="points_per_unit"
+                               value="{{ lp.points_per_unit ?? 1 }}" min="1" class="s-input"
+                               style="padding-right:2.5rem;">
+                        <span style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#9ca3af;pointer-events:none;">pts</span>
+                    </div>
+                    <span class="text-xs text-gray-400 font-medium text-center">per</span>
+                    <div style="position:relative;">
+                        <input type="number" id="lp-unit" name="unit_amount"
+                               value="{{ lp.unit_amount ?? 100 }}" min="1" step="1" class="s-input"
+                               style="padding-right:2.75rem;">
+                        <span style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#9ca3af;pointer-events:none;">KES</span>
+                    </div>
+                </div>
+                <p id="lp-earn-preview" class="s-hint">
+                    Customers earn <strong class="text-gray-700">{{ lp.points_per_unit ?? 1 }} {{ lp.points_name ?? 'points' }}</strong> for every <strong class="text-gray-700">{{ lp.unit_amount ?? 100 }} KES</strong> spent.
+                </p>
+            </div>
+
+            <div>
+                <label class="s-label" for="lp-bonus">Enrolment bonus</label>
+                <div style="position:relative;">
+                    <input id="lp-bonus" type="number" name="enroll_bonus_points"
+                           value="{{ lp.enroll_bonus_points ?? 0 }}" min="0" class="s-input"
+                           style="padding-right:3.25rem;">
+                    <span style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#9ca3af;pointer-events:none;">points</span>
+                </div>
+                <p class="s-hint">Awarded once when a customer first enrols. Set to 0 to disable.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Redemption</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Whether customers can spend their points as a discount at checkout.</p>
+        </div>
+        <div class="settings-section-fields space-y-4">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Allow redemption</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Customers can redeem points as a checkout discount.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="redemption_enabled" value="1" {{ _redemp_on ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+
+            <div class="grid grid-cols-2 gap-3">
+                <div>
+                    <label class="s-label" for="lp-kpp">Value per point</label>
+                    <div style="position:relative;">
+                        <span style="position:absolute;left:.75rem;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#9ca3af;pointer-events:none;">KES</span>
+                        <input id="lp-kpp" type="number" name="kes_per_point"
+                               value="{{ lp.kes_per_point ?? 1.0 }}" min="0.01" step="0.01"
+                               class="s-input" style="padding-left:2.75rem;">
+                    </div>
+                    <p class="s-hint">KES value of 1 point at redemption.</p>
+                </div>
+                <div>
+                    <label class="s-label" for="lp-maxpct">Max of bill</label>
+                    <div style="position:relative;">
+                        <input id="lp-maxpct" type="number" name="max_redemption_pct"
+                               value="{{ lp.max_redemption_pct ?? 100 }}" min="1" max="100"
+                               class="s-input" style="padding-right:2rem;">
+                        <span style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);font-size:.8125rem;font-weight:700;color:#9ca3af;pointer-events:none;">%</span>
+                    </div>
+                    <p class="s-hint">Max % of total payable via points.</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Payment automation</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Let qualifying M-Pesa callbacks award points automatically before the cashier reaches manual loyalty capture.</p>
+        </div>
+        <div class="settings-section-fields space-y-4">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Auto-award on payment completion</p>
+                    <p class="text-xs text-gray-500 mt-0.5">For eligible M-Pesa methods, award points automatically as soon as the payment callback succeeds.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="auto_award_enabled" value="1" {{ _auto_award ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #ede9fe;background:#faf5ff;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Auto-enroll on payment</p>
+                    <p class="text-xs text-gray-500 mt-0.5">If a customer is not yet enrolled, create their loyalty account during payment processing. Use only if this matches your consent and data-capture policy.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="auto_enroll_on_payment" value="1" {{ _auto_enroll ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Programme status</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Pause the programme at any time. Balances and configuration are preserved.</p>
+        </div>
+        <div class="settings-section-fields">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Programme active</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Points are earned and redeemed in real time.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="is_active" value="1" {{ _active ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-card-footer flex items-center justify-between px-8 py-4 border-t border-gray-100 bg-gray-50">
+        <p class="text-xs text-gray-400">Changes apply immediately across all terminals.</p>
+        <button type="submit"
+                class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-lg transition-colors">
+            Save changes
+        </button>
+    </div>
+
+</div>
+</form>
+
+<script>
+(function () {
+    const ppu  = document.getElementById('lp-ppu');
+    const unit = document.getElementById('lp-unit');
+    const prev = document.getElementById('lp-earn-preview');
+    const ptsName = {{ (lp.points_name ?? 'points')|json_encode }};
+    if (!ppu || !unit || !prev) return;
+    function refresh() {
+        const p = parseInt(ppu.value) || 0;
+        const u = parseInt(unit.value) || 0;
+        prev.innerHTML = `Customers earn <strong style="color:#374151">${p} ${ptsName}</strong> for every <strong style="color:#374151">${u} KES</strong> spent.`;
+    }
+    ppu.addEventListener('input', refresh);
+    unit.addEventListener('input', refresh);
+})();
+</script>
+{% endblock %}

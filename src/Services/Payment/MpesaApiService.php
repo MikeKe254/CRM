@@ -66,7 +66,7 @@ final class MpesaApiService
         $timestamp = (new \DateTimeImmutable('now', new \DateTimeZone('Africa/Nairobi')))->format('YmdHis');
         $password  = base64_encode($shortcode . $passkey . $timestamp);
 
-        $partyB = $type === 'till'
+        $partyB = $type === 'buygoods'
             ? (string) $config->cfg('till_number', $shortcode)
             : $shortcode;
 

@@ -51,6 +51,7 @@ class UserController extends AdminBaseController
         $deletedFilter = $showDeleted ? '' : 'AND u.deleted_at IS NULL';
         $multiBranchEnabled = $this->isMultiBranchEnabled($session->company->id);
         $canViewLeadershipUsers = $this->canViewLeadershipUsers($session);
+        $activeBranchId = $session->branch?->id;
 
         // scope=branch  → exact active branch only
         // scope=subtree → active branch + all descendants (default)
@@ -237,15 +238,31 @@ class UserController extends AdminBaseController
         $hasSubBranches = $session->branch !== null
             && count($this->hierarchy->getDescendantIds($session->branch->id)) > 0;
 
-        $departments = $this->db->fetchAllAssociative(
-            "SELECT id, name FROM departments WHERE company_id = :cid AND status = 'active' AND deleted_at IS NULL ORDER BY is_system DESC, name ASC",
-            ['cid' => $session->company->id],
-        );
+        $departments = $activeBranchId !== null
+            ? $this->db->fetchAllAssociative(
+                "SELECT id, name
+                   FROM departments
+                  WHERE company_id = :cid
+                    AND branch_id = :bid
+                    AND status = 'active'
+                    AND deleted_at IS NULL
+                  ORDER BY is_system DESC, name ASC",
+                ['cid' => $session->company->id, 'bid' => $activeBranchId],
+            )
+            : [];
 
-        $areas = $this->db->fetchAllAssociative(
-            "SELECT id, name FROM areas WHERE company_id = :cid AND status = 'active' AND deleted_at IS NULL ORDER BY is_system DESC, name ASC",
-            ['cid' => $session->company->id],
-        );
+        $areas = $activeBranchId !== null
+            ? $this->db->fetchAllAssociative(
+                "SELECT id, name
+                   FROM areas
+                  WHERE company_id = :cid
+                    AND branch_id = :bid
+                    AND status = 'active'
+                    AND deleted_at IS NULL
+                  ORDER BY is_system DESC, name ASC",
+                ['cid' => $session->company->id, 'bid' => $activeBranchId],
+            )
+            : [];
 
         return $this->render('admin/users/index.html.twig', [
             'session'       => $session,
@@ -323,8 +340,13 @@ class UserController extends AdminBaseController
         // Validate department belongs to this company
         if ($deptId !== null) {
             $validDept = $this->db->fetchOne(
-                'SELECT id FROM departments WHERE id = :id AND company_id = :cid AND deleted_at IS NULL',
-                ['id' => $deptId, 'cid' => $session->company->id],
+                'SELECT id
+                   FROM departments
+                  WHERE id = :id
+                    AND company_id = :cid
+                    AND branch_id = :bid
+                    AND deleted_at IS NULL',
+                ['id' => $deptId, 'cid' => $session->company->id, 'bid' => $session->branch?->id ?? 0],
             );
             if (!$validDept) $deptId = null;
         }
@@ -357,8 +379,13 @@ class UserController extends AdminBaseController
         // Assign areas (validate each belongs to this company)
         foreach ($areaIds as $areaId) {
             $valid = $this->db->fetchOne(
-                'SELECT id FROM areas WHERE id = :id AND company_id = :cid AND deleted_at IS NULL',
-                ['id' => $areaId, 'cid' => $session->company->id],
+                'SELECT id
+                   FROM areas
+                  WHERE id = :id
+                    AND company_id = :cid
+                    AND branch_id = :bid
+                    AND deleted_at IS NULL',
+                ['id' => $areaId, 'cid' => $session->company->id, 'bid' => $session->branch?->id ?? 0],
             );
             if ($valid) {
                 $this->db->insert('user_areas', ['user_id' => $userId, 'area_id' => $areaId]);
@@ -431,8 +458,13 @@ class UserController extends AdminBaseController
             $deptId = (int) $request->request->get('department_id', 0) ?: null;
             if ($deptId !== null) {
                 $validDept = $this->db->fetchOne(
-                    'SELECT id FROM departments WHERE id = :id AND company_id = :cid AND deleted_at IS NULL',
-                    ['id' => $deptId, 'cid' => $session->company->id],
+                    'SELECT id
+                       FROM departments
+                      WHERE id = :id
+                        AND company_id = :cid
+                        AND branch_id = :bid
+                        AND deleted_at IS NULL',
+                    ['id' => $deptId, 'cid' => $session->company->id, 'bid' => $session->branch?->id ?? 0],
                 );
                 if (!$validDept) $deptId = null;
             }
@@ -445,8 +477,13 @@ class UserController extends AdminBaseController
             $this->db->executeStatement('DELETE FROM user_areas WHERE user_id = :uid', ['uid' => $id]);
             foreach ($areaIds as $areaId) {
                 $valid = $this->db->fetchOne(
-                    'SELECT id FROM areas WHERE id = :id AND company_id = :cid AND deleted_at IS NULL',
-                    ['id' => $areaId, 'cid' => $session->company->id],
+                    'SELECT id
+                       FROM areas
+                      WHERE id = :id
+                        AND company_id = :cid
+                        AND branch_id = :bid
+                        AND deleted_at IS NULL',
+                    ['id' => $areaId, 'cid' => $session->company->id, 'bid' => $session->branch?->id ?? 0],
                 );
                 if ($valid) {
                     $this->db->insert('user_areas', ['user_id' => $id, 'area_id' => $areaId]);

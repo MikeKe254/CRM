@@ -104,6 +104,7 @@ final class TenantFeatureAccessService
     public const FEATURE_BRANCH_SELECTION      = 'branch_selection';
 
     // ── Payments ─────────────────────────────────────────────────────────────
+    public const FEATURE_PAYMENTS              = 'payments';
     public const FEATURE_MPESA                 = 'mpesa';
     public const FEATURE_BANK_PAYMENTS         = 'bank_payments';
     public const FEATURE_CUSTOM_PAYMENT_METHODS = 'custom_payment_methods';
@@ -243,6 +244,11 @@ final class TenantFeatureAccessService
         );
 
         return $this->cache[$cacheKey] = (bool) $inPlan;
+    }
+
+    public function isEnabled(string $featureSlug, AuthResult $session): bool
+    {
+        return $this->can($session->company->id, $featureSlug);
     }
 
     /**

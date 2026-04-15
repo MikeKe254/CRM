@@ -1,0 +1,576 @@
+
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Buyout Cloud</title>
+    <meta name="description" content="Buyout Cloud is a technology company building software, websites, and business systems.">
+    <style>
+        :root {
+            --bg: #dfeaf7;
+            --panel-strong: rgba(255, 255, 255, 0.86);
+            --ink: #0f172a;
+            --muted: #64748b;
+            --brand-a: #0b8f83;
+            --brand-b: #2563eb;
+            --brand-c: #7c3aed;
+            --glow-a: rgba(37, 99, 235, 0.16);
+            --glow-b: rgba(124, 58, 237, 0.12);
+            --shadow: 0 28px 70px rgba(15, 23, 42, 0.12);
+            --radius: 30px;
+        }
+
+        * { box-sizing: border-box; }
+        html, body { margin: 0; width: 100%; height: 100%; overflow: hidden; }
+
+        body {
+            font-family: "Segoe UI", Inter, system-ui, sans-serif;
+            color: var(--ink);
+            background:
+                radial-gradient(circle at 10% 10%, rgba(11, 143, 131, 0.18), transparent 22%),
+                radial-gradient(circle at 85% 10%, var(--glow-a), transparent 24%),
+                radial-gradient(circle at 85% 75%, var(--glow-b), transparent 20%),
+                linear-gradient(180deg, #eef5fd 0%, var(--bg) 100%);
+        }
+
+        a { color: inherit; text-decoration: none; }
+        button { font: inherit; }
+
+        .frame { width: 100%; height: 100%; padding: 18px; }
+
+        .shell {
+            width: 100%; height: 100%; display: grid; grid-template-rows: 86px 1fr;
+            background: rgba(255, 255, 255, 0.3); border: 1px solid rgba(255, 255, 255, 0.45);
+            border-radius: 34px; overflow: hidden; backdrop-filter: blur(20px); box-shadow: var(--shadow);
+        }
+
+        .header {
+            display: flex; align-items: center; justify-content: space-between; gap: 18px;
+            padding: 18px 26px; border-bottom: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.16);
+        }
+
+        .brand { display: flex; align-items: center; gap: 14px; min-width: 0; }
+
+        .brand__mark {
+            width: 50px; height: 50px; border-radius: 18px; display: grid; place-items: center;
+            background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 55%, var(--brand-c) 100%);
+            color: #fff; font-size: 20px; font-weight: 800; letter-spacing: -0.04em;
+            box-shadow: 0 18px 38px rgba(37, 99, 235, 0.18); flex-shrink: 0;
+        }
+
+        .brand__name {
+            display: block; font-size: 32px; font-weight: 800; line-height: 1; letter-spacing: -0.05em;
+        }
+
+        .brand__tag {
+            display: block; margin-top: 5px; color: var(--muted); font-size: 13px; white-space: nowrap;
+        }
+
+        .header__right { display: flex; align-items: center; gap: 10px; min-width: 0; }
+
+        .meta-pill {
+            display: inline-flex; align-items: center; justify-content: center; min-height: 40px; padding: 0 14px;
+            border-radius: 999px; background: rgba(255, 255, 255, 0.76); border: 1px solid rgba(148, 163, 184, 0.16);
+            color: #334155; font-size: 13px; font-weight: 700;
+        }
+
+        .menu-toggle {
+            display: none; width: 46px; height: 46px; border: 0; border-radius: 15px;
+            background: rgba(255, 255, 255, 0.78); box-shadow: 0 10px 26px rgba(15, 23, 42, 0.08);
+            cursor: pointer; position: relative;
+        }
+
+        .menu-toggle span, .menu-toggle span::before, .menu-toggle span::after {
+            content: ""; position: absolute; left: 12px; width: 22px; height: 2px; background: var(--ink);
+            border-radius: 999px; transition: 0.18s ease;
+        }
+
+        .menu-toggle span { top: 22px; }
+        .menu-toggle span::before { top: -7px; left: 0; }
+        .menu-toggle span::after { top: 7px; left: 0; }
+
+        .body { min-height: 0; display: grid; grid-template-columns: 260px 1fr; }
+
+        .sidebar {
+            min-height: 0; padding: 18px; border-right: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.16); display: flex; flex-direction: column; gap: 14px;
+        }
+
+        .sidebar__label {
+            color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase;
+            letter-spacing: 0.12em; padding: 0 10px;
+        }
+
+        .nav { display: flex; flex-direction: column; gap: 10px; }
+
+        .nav-btn {
+            width: 100%; border: 1px solid transparent; border-radius: 20px; background: transparent; color: #475569;
+            padding: 14px; text-align: left; cursor: pointer; transition: 0.18s ease;
+        }
+
+        .nav-btn:hover { background: rgba(255, 255, 255, 0.42); color: var(--ink); }
+
+        .nav-btn.is-active {
+            background: linear-gradient(135deg, rgba(11, 143, 131, 0.11), rgba(37, 99, 235, 0.12));
+            border-color: rgba(37, 99, 235, 0.12); color: var(--ink); box-shadow: 0 14px 30px rgba(15, 23, 42, 0.07);
+        }
+
+        .nav-btn__eyebrow {
+            font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; opacity: 0.8; margin-bottom: 6px;
+        }
+
+        .nav-btn__title { font-size: 18px; font-weight: 800; line-height: 1.1; letter-spacing: -0.03em; }
+        .nav-btn__text { margin-top: 6px; font-size: 13px; line-height: 1.4; }
+
+        .sidebar__footer {
+            margin-top: auto; padding: 18px; border-radius: 22px;
+            background: linear-gradient(135deg, rgba(11, 143, 131, 0.09), rgba(37, 99, 235, 0.1));
+            border: 1px solid rgba(148, 163, 184, 0.14);
+        }
+
+        .sidebar__footer strong { display: block; margin-bottom: 5px; font-size: 16px; letter-spacing: -0.03em; }
+        .sidebar__footer p { margin: 0; color: var(--muted); font-size: 13px; line-height: 1.45; }
+
+        .stage { position: relative; min-height: 0; overflow: hidden; padding: 20px; }
+
+        .panel {
+            position: absolute; inset: 20px; opacity: 0; pointer-events: none; transform: translateY(10px);
+            transition: opacity 0.2s ease, transform 0.2s ease; display: grid; grid-template-rows: auto 1fr;
+            gap: 18px; min-height: 0;
+        }
+
+        .panel.is-active { opacity: 1; pointer-events: auto; transform: translateY(0); }
+
+        .panel__head { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
+
+        .panel__eyebrow {
+            display: inline-flex; align-items: center; min-height: 28px; padding: 0 10px; border-radius: 999px;
+            background: rgba(255, 255, 255, 0.72); color: var(--muted); border: 1px solid rgba(148, 163, 184, 0.16);
+            font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+        }
+
+        .panel__title {
+            margin: 12px 0 0; font-size: clamp(34px, 4.5vw, 58px); line-height: 0.98; letter-spacing: -0.07em; max-width: 12ch;
+        }
+
+        .panel__lead { margin: 0; max-width: 34ch; color: var(--muted); font-size: 15px; line-height: 1.55; text-align: right; }
+        .panel__body { min-height: 0; display: grid; grid-template-columns: 1.3fr 0.9fr; gap: 16px; }
+
+        .surface {
+            min-height: 0; border-radius: var(--radius); border: 1px solid rgba(148, 163, 184, 0.14);
+            background: var(--panel-strong); box-shadow: 0 18px 40px rgba(15, 23, 42, 0.08); overflow: hidden;
+        }
+
+        .surface--hero {
+            padding: 28px; display: grid; grid-template-rows: 1fr auto;
+            background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.12), transparent 28%),
+                linear-gradient(160deg, rgba(255, 255, 255, 0.96) 0%, rgba(244, 248, 254, 0.94) 100%);
+        }
+
+        .hero-copy { max-width: 13ch; font-size: clamp(40px, 5.5vw, 78px); line-height: 0.92; letter-spacing: -0.08em; font-weight: 800; }
+        .hero-row { display: flex; align-items: flex-end; justify-content: space-between; gap: 18px; }
+        .hero-note { max-width: 28ch; color: var(--muted); font-size: 15px; line-height: 1.55; }
+        .cta { display: flex; gap: 10px; flex-wrap: wrap; justify-content: flex-end; }
+        .btn {
+            display: inline-flex; align-items: center; justify-content: center; min-height: 46px; padding: 0 18px;
+            border-radius: 16px; border: 1px solid transparent; font-size: 14px; font-weight: 800;
+            letter-spacing: -0.02em; cursor: pointer; transition: 0.18s ease;
+        }
+
+        .btn--primary {
+            background: linear-gradient(135deg, var(--brand-a) 0%, var(--brand-b) 100%);
+            color: #fff; box-shadow: 0 14px 28px rgba(37, 99, 235, 0.18);
+        }
+
+        .btn--secondary { background: rgba(255, 255, 255, 0.78); border-color: rgba(148, 163, 184, 0.18); color: var(--ink); }
+
+        .stack { min-height: 0; display: grid; gap: 16px; grid-template-rows: repeat(3, minmax(0, 1fr)); }
+
+        .mini-card, .metric, .contact-card {
+            min-height: 0; border-radius: 24px; border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.84); box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+        }
+
+        .mini-card { padding: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+        .mini-card__label, .metric__label, .contact-card small {
+            color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+        }
+        .mini-card__value { font-size: 26px; line-height: 1; letter-spacing: -0.06em; font-weight: 800; max-width: 9ch; }
+
+        .grid-tiles { min-height: 0; display: grid; gap: 16px; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+
+        .tile {
+            min-height: 0; padding: 22px; border-radius: 26px; border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.86); box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06);
+            display: flex; flex-direction: column; justify-content: space-between; gap: 12px;
+        }
+
+        .tile__kicker {
+            color: var(--muted); font-size: 11px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.1em;
+        }
+
+        .tile h3 { margin: 0; font-size: 24px; letter-spacing: -0.05em; }
+        .tile p { margin: 0; color: var(--muted); font-size: 14px; line-height: 1.55; max-width: 26ch; }
+
+        .tile__number {
+            width: 42px; height: 42px; border-radius: 14px; display: grid; place-items: center;
+            background: linear-gradient(135deg, rgba(11, 143, 131, 0.12), rgba(37, 99, 235, 0.13));
+            color: var(--ink); font-weight: 800; font-size: 13px;
+        }
+
+        .systems-grid { min-height: 0; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+
+        .system-card {
+            min-height: 0; padding: 26px; border-radius: 28px; border: 1px solid rgba(148, 163, 184, 0.14);
+            background: radial-gradient(circle at top right, rgba(37, 99, 235, 0.1), transparent 34%), rgba(255, 255, 255, 0.88);
+            box-shadow: 0 18px 40px rgba(15, 23, 42, 0.07); display: grid; align-content: space-between; gap: 18px;
+        }
+
+        .system-card strong { display: block; font-size: 36px; letter-spacing: -0.07em; line-height: 1; }
+        .system-card p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; max-width: 24ch; }
+
+        .metric-grid { min-height: 0; display: grid; gap: 16px; grid-template-columns: 1fr 1fr; }
+        .metric { padding: 20px; display: flex; flex-direction: column; justify-content: space-between; }
+        .metric__value { font-size: 32px; letter-spacing: -0.07em; line-height: 1; font-weight: 800; max-width: 9ch; }
+        .metric__text { color: var(--muted); font-size: 14px; line-height: 1.5; max-width: 24ch; }
+
+        .contact-layout { min-height: 0; display: grid; gap: 16px; grid-template-columns: 1.1fr 0.9fr; }
+
+        .contact-card {
+            padding: 28px; display: grid; align-content: space-between; gap: 20px;
+        }
+
+        .contact-card strong { display: block; font-size: 44px; line-height: 0.96; letter-spacing: -0.08em; max-width: 9ch; }
+        .contact-card p { margin: 0; color: var(--muted); font-size: 15px; line-height: 1.55; max-width: 30ch; }
+
+        .contact-links { display: grid; gap: 16px; }
+
+        .contact-link {
+            min-height: 0; padding: 22px; border-radius: 24px; border: 1px solid rgba(148, 163, 184, 0.14);
+            background: rgba(255, 255, 255, 0.88); box-shadow: 0 14px 30px rgba(15, 23, 42, 0.06); transition: 0.18s ease;
+        }
+
+        .contact-link:hover { transform: translateY(-2px); box-shadow: 0 18px 38px rgba(15, 23, 42, 0.08); }
+        .contact-link strong { display: block; margin-top: 8px; font-size: 24px; line-height: 1.1; letter-spacing: -0.05em; }
+        .contact-link p { margin: 10px 0 0; color: var(--muted); font-size: 14px; line-height: 1.5; }
+
+        @media (max-width: 1080px) {
+            .body { grid-template-columns: 220px 1fr; }
+            .panel__body, .contact-layout { grid-template-columns: 1fr; }
+            .stack { grid-template-columns: repeat(3, minmax(0, 1fr)); grid-template-rows: 1fr; }
+        }
+
+        @media (max-width: 860px) {
+            .frame { padding: 10px; }
+            .shell { border-radius: 24px; grid-template-rows: 78px 1fr; }
+            .header { padding: 14px 16px; }
+            .brand__name { font-size: 24px; }
+            .brand__tag, .meta-pill { display: none; }
+            .menu-toggle { display: inline-flex; align-items: center; justify-content: center; }
+            .body { grid-template-columns: 1fr; position: relative; }
+            .sidebar {
+                position: absolute; top: 0; left: 0; bottom: 0; width: min(290px, calc(100vw - 24px));
+                transform: translateX(-105%); transition: transform 0.22s ease; z-index: 10;
+                border-right: 1px solid rgba(148, 163, 184, 0.14); border-radius: 0 24px 24px 0;
+                box-shadow: 0 20px 48px rgba(15, 23, 42, 0.12);
+            }
+            .sidebar.is-open { transform: translateX(0); }
+            .stage { padding: 14px; }
+            .panel { inset: 14px; gap: 14px; }
+            .panel__head { align-items: flex-start; flex-direction: column; }
+            .panel__lead { text-align: left; max-width: 30ch; }
+            .panel__title { font-size: clamp(28px, 9vw, 44px); }
+            .surface--hero, .tile, .system-card, .contact-card, .contact-link, .mini-card, .metric { padding: 18px; }
+            .hero-copy { font-size: clamp(34px, 11vw, 52px); max-width: 11ch; }
+            .hero-row { flex-direction: column; align-items: flex-start; }
+            .cta { justify-content: flex-start; }
+            .grid-tiles, .systems-grid, .metric-grid { grid-template-columns: 1fr; }
+            .stack { grid-template-columns: 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="frame">
+        <div class="shell">
+            <header class="header">
+                <a class="brand" href="#" data-panel-link="home">
+                    <span class="brand__mark">BC</span>
+                    <span>
+                        <span class="brand__name">Buyout Cloud</span>
+                        <span class="brand__tag">Software. Systems. Web.</span>
+                    </span>
+                </a>
+
+                <div class="header__right">
+                    <span class="meta-pill">info@buyout.co.ke</span>
+                    <span class="meta-pill">+254 796 763 792</span>
+                    <button class="menu-toggle" type="button" aria-expanded="false" aria-controls="side-nav" aria-label="Open navigation">
+                        <span></span>
+                    </button>
+                </div>
+            </header>
+
+            <div class="body">
+                <aside class="sidebar" id="side-nav">
+                    <div class="sidebar__label">Navigate</div>
+                    <nav class="nav">
+                        <button class="nav-btn is-active" type="button" data-panel="home">
+                            <div class="nav-btn__eyebrow">Start</div>
+                            <div class="nav-btn__title">Home</div>
+                            <div class="nav-btn__text">The shape of Buyout Cloud.</div>
+                        </button>
+                        <button class="nav-btn" type="button" data-panel="services">
+                            <div class="nav-btn__eyebrow">Capability</div>
+                            <div class="nav-btn__title">Services</div>
+                            <div class="nav-btn__text">Software, websites, and systems.</div>
+                        </button>
+                        <button class="nav-btn" type="button" data-panel="systems">
+                            <div class="nav-btn__eyebrow">Build</div>
+                            <div class="nav-btn__title">Systems</div>
+                            <div class="nav-btn__text">Products we are creating.</div>
+                        </button>
+                        <button class="nav-btn" type="button" data-panel="contact">
+                            <div class="nav-btn__eyebrow">Connect</div>
+                            <div class="nav-btn__title">Contact</div>
+                            <div class="nav-btn__text">Start a conversation.</div>
+                        </button>
+                    </nav>
+
+                    <div class="sidebar__footer">
+                        <strong>Quietly high quality.</strong>
+                        <p>Minimal surface. Strong execution. Modern systems with intent.</p>
+                    </div>
+                </aside>
+
+                <main class="stage">
+                    <section class="panel is-active" data-panel-view="home">
+                        <div class="panel__head">
+                            <div>
+                                <div class="panel__eyebrow">Technology Company</div>
+                                <h1 class="panel__title">We build clean systems that move business.</h1>
+                            </div>
+                            <p class="panel__lead">Buyout Cloud creates software, websites, and business systems with a sharp product feel.</p>
+                        </div>
+
+                        <div class="panel__body">
+                            <div class="surface surface--hero">
+                                <div class="hero-copy">Design first. Build solid.</div>
+
+                                <div class="hero-row">
+                                    <p class="hero-note">A minimal, modern technology company focused on useful software and strong execution.</p>
+                                    <div class="cta">
+                                        <a class="btn btn--primary" href="#" data-panel-link="contact">Start a Project</a>
+                                        <a class="btn btn--secondary" href="#" data-panel-link="systems">See Systems</a>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="stack">
+                                <div class="mini-card">
+                                    <div class="mini-card__label">Core</div>
+                                    <div class="mini-card__value">Software Development</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-card__label">Delivery</div>
+                                    <div class="mini-card__value">Web Experiences</div>
+                                </div>
+                                <div class="mini-card">
+                                    <div class="mini-card__label">Systems</div>
+                                    <div class="mini-card__value">Patronr. SimbaPOS.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+                    <section class="panel" data-panel-view="services">
+                        <div class="panel__head">
+                            <div>
+                                <div class="panel__eyebrow">Services</div>
+                                <h2 class="panel__title">Focused capabilities.</h2>
+                            </div>
+                            <p class="panel__lead">A small, sharp stack built for companies that want more than generic delivery.</p>
+                        </div>
+
+                        <div class="grid-tiles">
+                            <article class="tile">
+                                <div class="tile__number">01</div>
+                                <div>
+                                    <div class="tile__kicker">Software</div>
+                                    <h3>Custom Software</h3>
+                                </div>
+                                <p>Internal tools, SaaS products, and operational platforms shaped around real workflows.</p>
+                            </article>
+
+                            <article class="tile">
+                                <div class="tile__number">02</div>
+                                <div>
+                                    <div class="tile__kicker">Web</div>
+                                    <h3>Web Development</h3>
+                                </div>
+                                <p>Responsive websites and digital fronts that feel calm, modern, and production-ready.</p>
+                            </article>
+
+                            <article class="tile">
+                                <div class="tile__number">03</div>
+                                <div>
+                                    <div class="tile__kicker">Systems</div>
+                                    <h3>Business Systems</h3>
+                                </div>
+                                <p>Software that supports revenue flow, operations, customer work, and scale.</p>
+                            </article>
+
+                            <article class="tile">
+                                <div class="tile__number">04</div>
+                                <div>
+                                    <div class="tile__kicker">Approach</div>
+                                    <h3>Design + Build</h3>
+                                </div>
+                                <p>Intentional UX, strong structure, and technical decisions made for the long run.</p>
+                            </article>
+                        </div>
+                    </section>
+
+                    <section class="panel" data-panel-view="systems">
+                        <div class="panel__head">
+                            <div>
+                                <div class="panel__eyebrow">Systems</div>
+                                <h2 class="panel__title">Products in motion.</h2>
+                            </div>
+                            <p class="panel__lead">We build business systems with product discipline, not just project delivery.</p>
+                        </div>
+
+                        <div class="panel__body">
+                            <div class="systems-grid">
+                                <article class="system-card">
+                                    <div class="tile__kicker">Revenue Operating System</div>
+                                    <strong>Patronr</strong>
+                                    <p>CRM and revenue infrastructure for hospitality and service businesses.</p>
+                                </article>
+
+                                <article class="system-card">
+                                    <div class="tile__kicker">Point of Sale</div>
+                                    <strong>SimbaPOS</strong>
+                                    <p>Operational POS software built for clarity, speed, and practical daily use.</p>
+                                </article>
+                            </div>
+
+                            <div class="metric-grid">
+                                <div class="metric">
+                                    <div class="metric__label">Style</div>
+                                    <div class="metric__value">Minimal. Modern.</div>
+                                    <div class="metric__text">We keep the surface clean and the system strong underneath.</div>
+                                </div>
+                                <div class="metric">
+                                    <div class="metric__label">Intent</div>
+                                    <div class="metric__value">Useful technology.</div>
+                                    <div class="metric__text">The goal is real business movement, not software noise.</div>
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="panel" data-panel-view="contact">
+                        <div class="panel__head">
+                            <div>
+                                <div class="panel__eyebrow">Contact</div>
+                                <h2 class="panel__title">Let’s build something sharp.</h2>
+                            </div>
+                            <p class="panel__lead">For software, websites, or system work, this is the fastest way in.</p>
+                        </div>
+
+                        <div class="contact-layout">
+                            <div class="contact-card">
+                                <div>
+                                    <small>Buyout Cloud</small>
+                                    <strong>Technology with a product mind.</strong>
+                                </div>
+                                <p>Software development, web development, and business systems designed with clarity and intent.</p>
+                            </div>
+
+                            <div class="contact-links">
+                                <a class="contact-link" href="mailto:info@buyout.co.ke">
+                                    <small>Email</small>
+                                    <strong>info@buyout.co.ke</strong>
+                                    <p>Projects, partnerships, and business enquiries.</p>
+                                </a>
+
+                                <a class="contact-link" href="tel:+254796763792">
+                                    <small>Phone</small>
+                                    <strong>+254 796 763 792</strong>
+                                    <p>Call or WhatsApp for a direct conversation.</p>
+                                </a>
+                            </div>
+                        </div>
+                    </section>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function () {
+            const sidebar = document.getElementById("side-nav");
+            const toggle = document.querySelector(".menu-toggle");
+            const buttons = Array.from(document.querySelectorAll("[data-panel]"));
+            const links = Array.from(document.querySelectorAll("[data-panel-link]"));
+            const views = Array.from(document.querySelectorAll("[data-panel-view]"));
+
+            function closeMenu() {
+                if (!toggle || !sidebar) {
+                    return;
+                }
+
+                toggle.setAttribute("aria-expanded", "false");
+                sidebar.classList.remove("is-open");
+            }
+
+            function activate(name) {
+                buttons.forEach(function (button) {
+                    button.classList.toggle("is-active", button.dataset.panel === name);
+                });
+
+                views.forEach(function (view) {
+                    view.classList.toggle("is-active", view.dataset.panelView === name);
+                });
+
+                closeMenu();
+            }
+
+            buttons.forEach(function (button) {
+                button.addEventListener("click", function () {
+                    activate(button.dataset.panel);
+                });
+            });
+            links.forEach(function (link) {
+                link.addEventListener("click", function (event) {
+                    event.preventDefault();
+                    activate(link.dataset.panelLink);
+                });
+            });
+
+            if (toggle && sidebar) {
+                toggle.addEventListener("click", function () {
+                    const expanded = toggle.getAttribute("aria-expanded") === "true";
+                    toggle.setAttribute("aria-expanded", expanded ? "false" : "true");
+                    sidebar.classList.toggle("is-open", !expanded);
+                });
+            }
+
+            document.addEventListener("click", function (event) {
+                if (!sidebar || !toggle) {
+                    return;
+                }
+
+                if (window.innerWidth > 860) {
+                    return;
+                }
+
+                if (!sidebar.contains(event.target) && !toggle.contains(event.target)) {
+                    closeMenu();
+                }
+            });
+        })();
+    </script>
+</body>
+</html>

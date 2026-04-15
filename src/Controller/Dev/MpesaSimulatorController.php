@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Controller\Dev;
 
+use DateTimeImmutable;
 use Doctrine\DBAL\Connection;
 use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
 use Symfony\Component\HttpFoundation\Request;
@@ -12,11 +13,12 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Dev-only M-Pesa payment simulator.
- * Inserts fake rows into mpesa_payments to test the callback claim flow.
  *
- * Access: /dev/mpesa-sim  (disabled in prod via env check)
+ * Access:
+ * - /dev/mpesa-sim            legacy fake-row generator
+ * - /dev/mpesa-webhook-sim    webhook-style JSON dispatcher
  */
-#[Route('/dev/mpesa-sim', name: 'dev_mpesa_sim')]
+#[Route('/dev')]
 class MpesaSimulatorController extends AbstractController
 {
     private const KENYAN_FIRST_NAMES = [
@@ -37,9 +39,19 @@ class MpesaSimulatorController extends AbstractController
         'Mukhwana','Nangila','Hassan','Omar','Abdi','Ali','Salim',
     ];
 
-    public function __construct(private readonly Connection $db) {}
+    private const SAMPLE_PHONES = [
+        '254796763792',
+        '254700123456',
+        '254711222333',
+        '254722444555',
+        '254733666777',
+    ];
 
-    #[Route('', name: '', methods: ['GET', 'POST'])]
+    public function __construct(private readonly Connection $db)
+    {
+    }
+
+    #[Route('/mpesa-sim', name: 'dev_mpesa_sim', methods: ['GET', 'POST'])]
     public function index(Request $request): Response
     {
         if ($this->getParameter('kernel.environment') === 'prod') {
@@ -47,15 +59,15 @@ class MpesaSimulatorController extends AbstractController
         }
 
         $generated = [];
-        $error     = null;
+        $error = null;
 
         if ($request->isMethod('POST')) {
             try {
                 $generated = $this->generate(
-                    amount:    (float)  $request->request->get('amount', 100),
-                    count:     (int)    $request->request->get('count', 1),
-                    companyId: (int)    $request->request->get('company_id', 1),
-                    branchId:  (int)    $request->request->get('branch_id', 30),
+                    amount: (float) $request->request->get('amount', 100),
+                    count: (int) $request->request->get('count', 1),
+                    companyId: (int) $request->request->get('company_id', 1),
+                    branchId: (int) $request->request->get('branch_id', 30),
                     shortcode: (string) $request->request->get('shortcode', '5548218'),
                 );
             } catch (\Throwable $e) {
@@ -63,7 +75,47 @@ class MpesaSimulatorController extends AbstractController
             }
         }
 
-        // Load recent simulated payments (last 30)
+        return $this->renderSimulator($request, $generated, null, $error, false);
+    }
+
+    #[Route('/mpesa-webhook-sim', name: 'dev_mpesa_webhook_sim', methods: ['GET', 'POST'])]
+    public function webhookSimulator(Request $request): Response
+    {
+        if ($this->getParameter('kernel.environment') === 'prod') {
+            throw $this->createNotFoundException();
+        }
+
+        $generated = [];
+        $error = null;
+        $dispatchResult = null;
+
+        if ($request->isMethod('POST')) {
+            try {
+                $action = (string) $request->request->get('action', 'dispatch');
+
+                if ($action === 'generate') {
+                    $generated = $this->generate(
+                        amount: (float) $request->request->get('amount', 100),
+                        count: (int) $request->request->get('count', 1),
+                        companyId: (int) $request->request->get('company_id', 1),
+                        branchId: (int) $request->request->get('branch_id', 30),
+                        shortcode: (string) $request->request->get('shortcode', '5548218'),
+                    );
+                } else {
+                    $dispatchResult = $this->dispatchSimulation($request);
+                }
+            } catch (\Throwable $e) {
+                $error = $e->getMessage();
+            }
+        }
+
+        return $this->renderSimulator($request, $generated, $dispatchResult, $error, true);
+    }
+
+    private function renderSimulator(Request $request, array $generated, ?array $dispatchResult, ?string $error, bool $showDispatchTools): Response
+    {
+        $companyId = max(1, (int) ($request->request->get('company_id', 1) ?: 1));
+
         $recent = $this->db->fetchAllAssociative(
             "SELECT id, first_name, last_name, msisdn, amount, transaction_id,
                     created_at, claimed, claimed_by_user_id
@@ -72,35 +124,318 @@ class MpesaSimulatorController extends AbstractController
                 AND deleted_at IS NULL
               ORDER BY id DESC
               LIMIT 30",
-            ['cid' => $request->request->get('company_id', 1) ?: 1],
+            ['cid' => $companyId],
         );
 
-        $html = $this->renderPage($request, $recent, $generated, $error);
+        $configs = $this->loadMpesaConfigs();
 
-        return new Response($html);
+        return $this->render('dev/mpesa_simulator/index.html.twig', [
+            'generated' => $generated,
+            'recent' => $recent,
+            'error' => $error,
+            'dispatch_result' => $dispatchResult,
+            'show_dispatch_tools' => $showDispatchTools,
+            'configs' => $configs,
+            'sample_phones' => self::SAMPLE_PHONES,
+            'form' => [
+                'amount' => (string) ($request->request->get('amount', '') ?: ''),
+                'count' => (string) ($request->request->get('count', 1) ?: 1),
+                'company_id' => (string) ($request->request->get('company_id', 1) ?: 1),
+                'branch_id' => (string) ($request->request->get('branch_id', 30) ?: 30),
+                'shortcode' => (string) ($request->request->get('shortcode', '5548218') ?: '5548218'),
+                'config_id' => (int) ($request->request->get('config_id', 0) ?: 0),
+                'payload_type' => (string) ($request->request->get('payload_type', 'c2b') ?: 'c2b'),
+                'msisdn' => (string) ($request->request->get('msisdn', self::SAMPLE_PHONES[0]) ?: self::SAMPLE_PHONES[0]),
+                'dispatch_amount' => (string) ($request->request->get('dispatch_amount', 100) ?: 100),
+                'bill_ref' => (string) ($request->request->get('bill_ref', 'SIM-ORDER-001') ?: 'SIM-ORDER-001'),
+                'receipt' => (string) ($request->request->get('receipt', '') ?: ''),
+                'checkout_request_id' => (string) ($request->request->get('checkout_request_id', '') ?: ''),
+            ],
+        ]);
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
+    private function loadMpesaConfigs(): array
+    {
+        $rows = $this->db->fetchAllAssociative(
+            'SELECT id,
+                    company_id,
+                    branch_id,
+                    shortcode,
+                    till_number,
+                    integration_mode,
+                    callback_url,
+                    confirmation_url,
+                    forward_urls,
+                    is_active,
+                    integration_enabled
+               FROM mpesa_configs
+              WHERE deleted_at IS NULL
+              ORDER BY company_id ASC, branch_id ASC, shortcode ASC, id ASC'
+        );
+
+        return array_map(function (array $row): array {
+            $forwardUrls = json_decode((string) ($row['forward_urls'] ?? '[]'), true);
+            if (!is_array($forwardUrls)) {
+                $forwardUrls = [];
+            }
+
+            $targets = array_values(array_filter(array_unique(array_map(
+                static fn ($url) => is_string($url) ? trim($url) : '',
+                $forwardUrls
+            ))));
+
+            return [
+                'id' => (int) $row['id'],
+                'company_id' => (int) $row['company_id'],
+                'branch_id' => $row['branch_id'] !== null ? (int) $row['branch_id'] : null,
+                'shortcode' => (string) ($row['shortcode'] ?? ''),
+                'till_number' => (string) ($row['till_number'] ?? ''),
+                'integration_mode' => (string) ($row['integration_mode'] ?? 'manual'),
+                'callback_url' => trim((string) ($row['callback_url'] ?? '')),
+                'confirmation_url' => trim((string) ($row['confirmation_url'] ?? '')),
+                'forward_urls' => $targets,
+                'is_active' => (int) ($row['is_active'] ?? 0) === 1,
+                'integration_enabled' => (int) ($row['integration_enabled'] ?? 0) === 1,
+            ];
+        }, $rows);
+    }
+
+    private function dispatchSimulation(Request $request): array
+    {
+        $configId = (int) $request->request->get('config_id', 0);
+        if ($configId <= 0) {
+            throw new \RuntimeException('Select an M-Pesa config first.');
+        }
+
+        $config = $this->db->fetchAssociative(
+            'SELECT id,
+                    company_id,
+                    branch_id,
+                    shortcode,
+                    till_number,
+                    integration_mode,
+                    callback_url,
+                    confirmation_url,
+                    forward_urls
+               FROM mpesa_configs
+              WHERE id = :id
+                AND deleted_at IS NULL
+              LIMIT 1',
+            ['id' => $configId],
+        );
+
+        if ($config === false) {
+            throw new \RuntimeException('Selected M-Pesa config was not found.');
+        }
+
+        $payloadType = strtolower(trim((string) $request->request->get('payload_type', 'c2b')));
+        if (!in_array($payloadType, ['c2b', 'stk'], true)) {
+            throw new \RuntimeException('Unsupported payload type.');
+        }
+
+        $msisdn = $this->normalizePhone((string) $request->request->get('msisdn', self::SAMPLE_PHONES[0]));
+        if ($msisdn === null) {
+            throw new \RuntimeException('Enter a valid Kenyan phone in 2547XXXXXXXX format.');
+        }
+
+        $amount = (float) $request->request->get('dispatch_amount', 100);
+        if ($amount <= 0) {
+            throw new \RuntimeException('Dispatch amount must be greater than zero.');
+        }
+
+        $billRef = trim((string) $request->request->get('bill_ref', 'SIM-ORDER-001'));
+        $receipt = trim((string) $request->request->get('receipt', ''));
+        if ($receipt === '') {
+            $receipt = $this->randomMpesaRef();
+        }
+
+        $firstName = self::KENYAN_FIRST_NAMES[array_rand(self::KENYAN_FIRST_NAMES)];
+        $lastName = self::KENYAN_LAST_NAMES[array_rand(self::KENYAN_LAST_NAMES)];
+        $transTime = (new DateTimeImmutable())->format('YmdHis');
+        $hashedMsisdn = hash('sha256', $msisdn);
+
+        $payload = $payloadType === 'stk'
+            ? $this->buildStkPayload(
+                checkoutRequestId: trim((string) $request->request->get('checkout_request_id', '')) ?: 'ws_CO_' . date('YmdHis') . '_' . substr(bin2hex(random_bytes(4)), 0, 8),
+                amount: $amount,
+                receipt: $receipt,
+                msisdn: $msisdn,
+                transTime: $transTime,
+            )
+            : $this->buildC2bPayload(
+                shortcode: (string) $config['shortcode'],
+                amount: $amount,
+                receipt: $receipt,
+                billRef: $billRef !== '' ? $billRef : 'SIM-ORDER-001',
+                hashedMsisdn: $hashedMsisdn,
+                firstName: $firstName,
+                lastName: $lastName,
+                transTime: $transTime,
+            );
+
+        $targets = $this->resolveTargets($config, $payloadType);
+        if ($targets === []) {
+            throw new \RuntimeException('The selected shortcode has no target URLs for this payload type.');
+        }
+
+        return [
+            'config' => [
+                'id' => (int) $config['id'],
+                'company_id' => (int) $config['company_id'],
+                'branch_id' => $config['branch_id'] !== null ? (int) $config['branch_id'] : null,
+                'shortcode' => (string) $config['shortcode'],
+                'integration_mode' => (string) ($config['integration_mode'] ?? 'manual'),
+            ],
+            'payload_type' => $payloadType,
+            'msisdn' => $msisdn,
+            'hashed_msisdn' => $hashedMsisdn,
+            'receipt' => $receipt,
+            'bill_ref' => $billRef,
+            'targets' => $targets,
+            'payload_json' => json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES),
+            'results' => $this->dispatchJson($payload, $targets),
+        ];
+    }
+
+    private function resolveTargets(array $config, string $payloadType): array
+    {
+        $targets = [];
+
+        if ($payloadType === 'stk') {
+            $callbackUrl = trim((string) ($config['callback_url'] ?? ''));
+            if ($callbackUrl !== '') {
+                $targets[] = $callbackUrl;
+            }
+        } else {
+            $confirmationUrl = trim((string) ($config['confirmation_url'] ?? ''));
+            if ($confirmationUrl !== '') {
+                $targets[] = $confirmationUrl;
+            }
+
+            $forwardUrls = json_decode((string) ($config['forward_urls'] ?? '[]'), true);
+            if (is_array($forwardUrls)) {
+                foreach ($forwardUrls as $url) {
+                    if (is_string($url) && trim($url) !== '') {
+                        $targets[] = trim($url);
+                    }
+                }
+            }
+        }
+
+        return array_values(array_unique($targets));
+    }
+
+    private function buildC2bPayload(
+        string $shortcode,
+        float $amount,
+        string $receipt,
+        string $billRef,
+        string $hashedMsisdn,
+        string $firstName,
+        string $lastName,
+        string $transTime,
+    ): array {
+        return [
+            'TransactionType' => 'Pay Bill',
+            'TransID' => $receipt,
+            'TransTime' => $transTime,
+            'TransAmount' => number_format($amount, 2, '.', ''),
+            'BusinessShortCode' => $shortcode,
+            'BillRefNumber' => $billRef,
+            'InvoiceNumber' => '',
+            'OrgAccountBalance' => '',
+            'ThirdPartyTransID' => '',
+            'MSISDN' => $hashedMsisdn,
+            'FirstName' => $firstName,
+            'MiddleName' => '',
+            'LastName' => $lastName,
+        ];
+    }
+
+    private function buildStkPayload(
+        string $checkoutRequestId,
+        float $amount,
+        string $receipt,
+        string $msisdn,
+        string $transTime,
+    ): array {
+        return [
+            'Body' => [
+                'stkCallback' => [
+                    'MerchantRequestID' => 'SIM-' . strtoupper(substr(bin2hex(random_bytes(5)), 0, 10)),
+                    'CheckoutRequestID' => $checkoutRequestId,
+                    'ResultCode' => 0,
+                    'ResultDesc' => 'The service request is processed successfully.',
+                    'CallbackMetadata' => [
+                        'Item' => [
+                            ['Name' => 'Amount', 'Value' => (float) number_format($amount, 2, '.', '')],
+                            ['Name' => 'MpesaReceiptNumber', 'Value' => $receipt],
+                            ['Name' => 'Balance'],
+                            ['Name' => 'TransactionDate', 'Value' => $transTime],
+                            ['Name' => 'PhoneNumber', 'Value' => $msisdn],
+                        ],
+                    ],
+                ],
+            ],
+        ];
+    }
+
+    private function dispatchJson(array $payload, array $targets): array
+    {
+        $json = json_encode($payload, JSON_UNESCAPED_SLASHES);
+        if ($json === false) {
+            throw new \RuntimeException('Failed to encode payload to JSON.');
+        }
+
+        $results = [];
+        foreach ($targets as $url) {
+            $ch = curl_init($url);
+            curl_setopt_array($ch, [
+                CURLOPT_POST => true,
+                CURLOPT_POSTFIELDS => $json,
+                CURLOPT_HTTPHEADER => ['Content-Type: application/json'],
+                CURLOPT_RETURNTRANSFER => true,
+                CURLOPT_TIMEOUT => 10,
+                CURLOPT_CONNECTTIMEOUT => 5,
+                CURLOPT_SSL_VERIFYPEER => false,
+                CURLOPT_SSL_VERIFYHOST => false,
+            ]);
+
+            $body = curl_exec($ch);
+            $errno = curl_errno($ch);
+            $error = curl_error($ch);
+            $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
+            curl_close($ch);
+
+            $results[] = [
+                'url' => $url,
+                'ok' => $errno === 0 && $status >= 200 && $status < 300,
+                'status' => $status,
+                'error' => $errno !== 0 ? $error : null,
+                'body' => is_string($body) ? $body : null,
+            ];
+        }
+
+        return $results;
+    }
 
     private function generate(float $amount, int $count, int $companyId, int $branchId, string $shortcode): array
     {
-        $count   = max(1, min(10, $count));
+        $count = max(1, min(10, $count));
         $created = [];
 
-        // Spread created_at across random offsets: 1–8 minutes ago each
         $offsets = [];
         for ($i = 0; $i < $count; $i++) {
-            $offsets[] = random_int(60, 480); // 1–8 min ago in seconds
+            $offsets[] = random_int(60, 480);
         }
-        sort($offsets); // oldest first
+        sort($offsets);
 
         foreach ($offsets as $secAgo) {
             $firstName = self::KENYAN_FIRST_NAMES[array_rand(self::KENYAN_FIRST_NAMES)];
-            $lastName  = self::KENYAN_LAST_NAMES[array_rand(self::KENYAN_LAST_NAMES)];
-            $msisdn    = '2547' . str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
-            $txnId     = $this->randomMpesaRef();
+            $lastName = self::KENYAN_LAST_NAMES[array_rand(self::KENYAN_LAST_NAMES)];
+            $msisdn = '2547' . str_pad((string) random_int(0, 99999999), 8, '0', STR_PAD_LEFT);
+            $txnId = $this->randomMpesaRef();
 
-            // Use MySQL NOW() - INTERVAL to avoid PHP/MySQL timezone drift
             $this->db->executeStatement(
                 "INSERT INTO mpesa_payments
                     (bestguess, short_code, client_id, msisdn, amount, reference,
@@ -115,39 +450,38 @@ class MpesaSimulatorController extends AbstractController
                      :retries, :status_description, :result_description, :payment_id,
                      NOW() - INTERVAL :secs_ago SECOND, :company_id, :branch_id, 0)",
                 [
-                    'bestguess'          => 'SIM',
-                    'short_code'         => $shortcode,
-                    'client_id'          => 0,
-                    'msisdn'             => $msisdn,
-                    'amount'             => $amount,
-                    'reference'          => 'SIM-' . strtoupper(substr(uniqid(), -6)),
-                    'invoice_number'     => null,
-                    'method'             => 'SIM',
-                    'reference_id'       => 0,
-                    'transaction_id'     => $txnId,
-                    'first_name'         => $firstName,
-                    'last_name'          => $lastName,
-                    'middle_name'        => null,
-                    'account'            => null,
-                    'status_code'        => 0,
-                    'retries'            => 0,
+                    'bestguess' => 'SIM',
+                    'short_code' => $shortcode,
+                    'client_id' => 0,
+                    'msisdn' => $msisdn,
+                    'amount' => $amount,
+                    'reference' => 'SIM-' . strtoupper(substr(uniqid('', true), -6)),
+                    'invoice_number' => null,
+                    'method' => 'SIM',
+                    'reference_id' => 0,
+                    'transaction_id' => $txnId,
+                    'first_name' => $firstName,
+                    'last_name' => $lastName,
+                    'middle_name' => null,
+                    'account' => null,
+                    'status_code' => 0,
+                    'retries' => 0,
                     'status_description' => 'The service request is processed successfully.',
                     'result_description' => 'The service request is processed successfully.',
-                    'payment_id'         => 0,
-                    'secs_ago'           => $secAgo,
-                    'company_id'         => $companyId,
-                    'branch_id'          => $branchId,
+                    'payment_id' => 0,
+                    'secs_ago' => $secAgo,
+                    'company_id' => $companyId,
+                    'branch_id' => $branchId,
                 ],
             );
 
-            // Read back the actual created_at MySQL used
             $createdAt = $this->db->fetchOne('SELECT NOW() - INTERVAL :s SECOND', ['s' => $secAgo]);
 
             $created[] = [
-                'name'       => "$firstName $lastName",
-                'msisdn'     => $msisdn,
-                'amount'     => $amount,
-                'txn_id'     => $txnId,
+                'name' => "$firstName $lastName",
+                'msisdn' => $msisdn,
+                'amount' => $amount,
+                'txn_id' => $txnId,
                 'created_at' => $createdAt,
             ];
         }
@@ -158,159 +492,30 @@ class MpesaSimulatorController extends AbstractController
     private function randomMpesaRef(): string
     {
         $chars = 'ABCDEFGHJKLMNPQRSTUVWXYZ0123456789';
-        $ref   = '';
+        $ref = '';
         for ($i = 0; $i < 10; $i++) {
             $ref .= $chars[random_int(0, strlen($chars) - 1)];
         }
+
         return $ref;
     }
 
-    // ─────────────────────────────────────────────────────────────────────────
-
-    private function renderPage(Request $req, array $recent, array $generated, ?string $error): string
+    private function normalizePhone(string $phone): ?string
     {
-        $amt       = htmlspecialchars((string) ($req->request->get('amount', '') ?: ''));
-        $count     = htmlspecialchars((string) ($req->request->get('count', 1)));
-        $company   = htmlspecialchars((string) ($req->request->get('company_id', 1)));
-        $branch    = htmlspecialchars((string) ($req->request->get('branch_id', 30)));
-        $shortcode = htmlspecialchars((string) ($req->request->get('shortcode', '5548218')));
-
-        $generatedHtml = '';
-        foreach ($generated as $g) {
-            $generatedHtml .= sprintf(
-                '<div style="display:flex;align-items:center;justify-content:space-between;padding:10px 14px;background:#052e16;border:1px solid #166534;border-radius:10px;">
-                    <div>
-                        <div style="color:#4ade80;font-weight:700;font-size:14px;">%s</div>
-                        <div style="color:#6b7280;font-size:12px;font-family:monospace;">%s · %s</div>
-                    </div>
-                    <div style="text-align:right;">
-                        <div style="color:#fff;font-weight:700;">KES %s</div>
-                        <div style="color:#374151;font-size:11px;font-family:monospace;">%s</div>
-                    </div>
-                </div>',
-                htmlspecialchars($g['name']),
-                htmlspecialchars($g['msisdn']),
-                htmlspecialchars($g['created_at']),
-                number_format($g['amount']),
-                htmlspecialchars($g['txn_id']),
-            );
+        $digits = preg_replace('/\D/', '', $phone);
+        if ($digits === null || $digits === '') {
+            return null;
+        }
+        if (strlen($digits) === 10 && $digits[0] === '0') {
+            $digits = '254' . substr($digits, 1);
+        }
+        if (strlen($digits) === 9 && ($digits[0] === '7' || $digits[0] === '1')) {
+            $digits = '254' . $digits;
+        }
+        if (strlen($digits) !== 12 || !str_starts_with($digits, '254')) {
+            return null;
         }
 
-        $recentHtml = '';
-        foreach ($recent as $r) {
-            $claimedBadge = $r['claimed']
-                ? '<span style="background:#1e3a5f;color:#60a5fa;font-size:10px;padding:2px 7px;border-radius:99px;font-weight:600;">CLAIMED</span>'
-                : '<span style="background:#1a2e1a;color:#4ade80;font-size:10px;padding:2px 7px;border-radius:99px;font-weight:600;">UNCLAIMED</span>';
-
-            $recentHtml .= sprintf(
-                '<tr style="border-bottom:1px solid #1f2937;">
-                    <td style="padding:9px 10px;color:#9ca3af;font-size:12px;font-family:monospace;">%s</td>
-                    <td style="padding:9px 10px;color:#fff;font-weight:600;font-size:13px;">%s %s</td>
-                    <td style="padding:9px 10px;color:#9ca3af;font-size:12px;font-family:monospace;">···%s</td>
-                    <td style="padding:9px 10px;color:#4ade80;font-weight:700;font-size:13px;">%s</td>
-                    <td style="padding:9px 10px;color:#6b7280;font-size:11px;font-family:monospace;">%s</td>
-                    <td style="padding:9px 10px;">%s</td>
-                </tr>',
-                htmlspecialchars((string) $r['id']),
-                htmlspecialchars((string) ($r['first_name'] ?? '')),
-                htmlspecialchars((string) ($r['last_name'] ?? '')),
-                htmlspecialchars(substr((string) ($r['msisdn'] ?? ''), -3)),
-                'KES ' . number_format((float) $r['amount']),
-                htmlspecialchars((string) ($r['created_at'] ?? '')),
-                $claimedBadge,
-            );
-        }
-
-        $errorHtml = $error
-            ? '<div style="background:#450a0a;border:1px solid #7f1d1d;border-radius:10px;padding:12px 16px;color:#f87171;font-size:13px;margin-bottom:12px;">' . htmlspecialchars($error) . '</div>'
-            : '';
-
-        $successHtml = $generated
-            ? '<div style="margin-bottom:12px;display:flex;flex-direction:column;gap:6px;">' . $generatedHtml . '</div>'
-            : '';
-
-        return <<<HTML
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>M-Pesa Simulator — Dev</title>
-<style>
-  * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #030712; color: #e5e7eb; font-family: -apple-system, system-ui, sans-serif; min-height: 100vh; padding: 24px 16px; }
-  input, select { background: #111827; border: 1px solid #374151; border-radius: 10px; color: #fff; padding: 10px 14px; font-size: 15px; width: 100%; outline: none; }
-  input:focus, select:focus { border-color: #10b981; }
-  label { display: block; color: #9ca3af; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; margin-bottom: 5px; }
-  .btn { width: 100%; padding: 14px; border: none; border-radius: 12px; font-size: 16px; font-weight: 700; cursor: pointer; }
-  .btn-green { background: #16a34a; color: #fff; }
-  .btn-green:hover { background: #15803d; }
-  table { width: 100%; border-collapse: collapse; }
-  th { color: #6b7280; font-size: 11px; text-transform: uppercase; letter-spacing: .06em; text-align: left; padding: 8px 10px; border-bottom: 1px solid #1f2937; }
-</style>
-</head>
-<body>
-<div style="max-width:680px;margin:0 auto;">
-
-  <div style="margin-bottom:24px;">
-    <div style="color:#10b981;font-size:11px;font-weight:600;letter-spacing:.1em;text-transform:uppercase;margin-bottom:4px;">DEV TOOL</div>
-    <h1 style="color:#fff;font-size:24px;font-weight:800;">M-Pesa Payment Simulator</h1>
-    <p style="color:#6b7280;font-size:13px;margin-top:4px;">Inserts fake mpesa_payments rows to test the callback claim flow.</p>
-  </div>
-
-  {$errorHtml}
-  {$successHtml}
-
-  <form method="post" style="background:#0f172a;border:1px solid #1f2937;border-radius:16px;padding:20px;margin-bottom:24px;">
-    <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:12px;">
-      <div>
-        <label>Amount (KES)</label>
-        <input type="number" name="amount" value="{$amt}" placeholder="e.g. 700" step="1" min="1" required>
-      </div>
-      <div>
-        <label>Number of transactions</label>
-        <input type="number" name="count" value="{$count}" min="1" max="10">
-      </div>
-    </div>
-    <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:16px;">
-      <div>
-        <label>Company ID</label>
-        <input type="number" name="company_id" value="{$company}" min="1">
-      </div>
-      <div>
-        <label>Branch ID</label>
-        <input type="number" name="branch_id" value="{$branch}" min="1">
-      </div>
-      <div>
-        <label>Shortcode</label>
-        <input type="text" name="shortcode" value="{$shortcode}">
-      </div>
-    </div>
-    <button type="submit" class="btn btn-green">⚡ Generate Payments</button>
-  </form>
-
-  <div style="background:#0f172a;border:1px solid #1f2937;border-radius:16px;overflow:hidden;">
-    <div style="padding:14px 16px;border-bottom:1px solid #1f2937;display:flex;align-items:center;justify-content:space-between;">
-      <div style="color:#fff;font-weight:700;font-size:14px;">Recent Payments</div>
-      <div style="color:#6b7280;font-size:12px;">Last 30 rows</div>
-    </div>
-    <div style="overflow-x:auto;">
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th><th>Name</th><th>Phone</th><th>Amount</th><th>Created</th><th>Status</th>
-          </tr>
-        </thead>
-        <tbody>
-          {$recentHtml}
-        </tbody>
-      </table>
-    </div>
-  </div>
-
-</div>
-</body>
-</html>
-HTML;
+        return $digits;
     }
 }

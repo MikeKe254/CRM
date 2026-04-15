@@ -1,0 +1,877 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Patronr System Design</title>
+    <style>
+        :root {
+            --bg: #f6f8fb;
+            --panel: #ffffff;
+            --ink: #0f172a;
+            --muted: #475569;
+            --line: #dbe3ee;
+            --brand: #0f766e;
+            --brand-soft: #ccfbf1;
+            --accent: #1d4ed8;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(180deg, #eef4fb 0%, var(--bg) 100%);
+            color: var(--ink);
+            line-height: 1.65;
+        }
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 40px 20px 72px;
+        }
+        .hero {
+            background:
+                radial-gradient(circle at top right, rgba(29, 78, 216, .10), transparent 28%),
+                radial-gradient(circle at top left, rgba(15, 118, 110, .10), transparent 24%),
+                var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            padding: 32px;
+            box-shadow: 0 24px 48px rgba(15, 23, 42, .06);
+            margin-bottom: 24px;
+        }
+        .eyebrow {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--brand-soft);
+            color: var(--brand);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 36px;
+            line-height: 1.1;
+            letter-spacing: -.03em;
+        }
+        .intro {
+            font-size: 17px;
+            color: var(--muted);
+            max-width: 760px;
+            margin-top: 14px;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 28px 30px;
+            box-shadow: 0 18px 38px rgba(15, 23, 42, .05);
+        }
+        .toc {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px 18px;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--line);
+        }
+        .toc a {
+            color: var(--accent);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .toc a:hover { text-decoration: underline; }
+        .toc-group {
+            grid-column: 1 / -1;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin: 10px 0 2px;
+        }
+        section {
+            padding: 18px 0 8px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        section:last-child { border-bottom: none; }
+        h2 {
+            margin: 0 0 14px;
+            font-size: 24px;
+            line-height: 1.2;
+            letter-spacing: -.02em;
+        }
+        h3 {
+            margin: 20px 0 8px;
+            font-size: 17px;
+            line-height: 1.3;
+        }
+        p { margin: 0 0 12px; }
+        ul, ol {
+            margin: 0 0 14px 22px;
+            padding: 0;
+        }
+        li { margin-bottom: 6px; }
+        strong.callout {
+            display: block;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: #f0fdfa;
+            border: 1px solid #99f6e4;
+            color: #115e59;
+            margin: 14px 0 18px;
+        }
+        .note {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin: 14px 0 18px;
+            font-size: 15px;
+        }
+        .warn {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin: 14px 0 18px;
+            font-size: 15px;
+        }
+        .small {
+            font-size: 14px;
+            color: var(--muted);
+        }
+        code {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 90%;
+        }
+        pre {
+            background: #0f172a;
+            color: #e2e8f0;
+            border-radius: 16px;
+            padding: 18px 20px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 13px;
+            line-height: 1.7;
+            overflow-x: auto;
+            margin: 14px 0 18px;
+        }
+        pre code {
+            background: none;
+            color: inherit;
+            padding: 0;
+            font-size: inherit;
+        }
+        .pillars {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 14px;
+            margin: 18px 0;
+        }
+        .pillar {
+            border-radius: 18px;
+            padding: 18px 16px;
+            border: 1px solid var(--line);
+        }
+        .pillar.capture  { background: #f0fdf4; border-color: #bbf7d0; }
+        .pillar.understand { background: #eff6ff; border-color: #bfdbfe; }
+        .pillar.act      { background: #fdf4ff; border-color: #e9d5ff; }
+        .pillar.measure  { background: #fff7ed; border-color: #fed7aa; }
+        .pillar-label {
+            font-size: 11px;
+            font-weight: 800;
+            letter-spacing: .1em;
+            text-transform: uppercase;
+            margin-bottom: 6px;
+        }
+        .pillar.capture  .pillar-label { color: #15803d; }
+        .pillar.understand .pillar-label { color: #1d4ed8; }
+        .pillar.act      .pillar-label { color: #7e22ce; }
+        .pillar.measure  .pillar-label { color: #c2410c; }
+        .pillar p { margin: 0; font-size: 14px; color: var(--muted); }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin: 14px 0 18px;
+        }
+        th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-bottom: 2px solid var(--line);
+            font-weight: 700;
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: top;
+        }
+        tr:last-child td { border-bottom: none; }
+        @media (max-width: 720px) {
+            .wrap { padding: 20px 14px 48px; }
+            .hero, .panel { padding: 22px 18px; border-radius: 20px; }
+            h1 { font-size: 29px; }
+            h2 { font-size: 22px; }
+            .pillars { grid-template-columns: 1fr 1fr; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="hero">
+            <div class="eyebrow">Direction Doc</div>
+            <h1>Patronr System Design</h1>
+            <p class="intro">
+                This is the high-level design anchor for Patronr. It captures the product truth, system shape,
+                and architectural direction that must remain consistent as the platform grows. It is not a
+                low-level technical spec — it is the reference point for what Patronr is and what it must stay.
+            </p>
+        </div>
+
+        <div class="panel">
+            <div class="toc">
+                <div class="toc-group">Foundation</div>
+                <a href="#product-definition">1. Product Definition</a>
+                <a href="#core-problem">2. Core Problem</a>
+                <a href="#product-thesis">3. Product Thesis</a>
+                <a href="#domain-positioning">4. Domain Positioning</a>
+                <a href="#what-patronr-is-not">5. What Patronr Is Not</a>
+                <a href="#system-design-principle">6. System Design Principle</a>
+
+                <div class="toc-group">System Layers</div>
+                <a href="#platform-layer">7. Platform Layer</a>
+                <a href="#tenant-operating-layer">8. Tenant Operating Layer</a>
+                <a href="#customer-intelligence-layer">9. Customer Intelligence Layer</a>
+                <a href="#core-operating-flows">10. Core Operating Flows</a>
+                <a href="#architectural-direction">11. Architectural Direction</a>
+                <a href="#operational-context-model">12. Operational Context Model</a>
+                <a href="#identity-model">13. Identity Model</a>
+
+                <div class="toc-group">Domain Design</div>
+                <a href="#payments-design-direction">14. Payments Design Direction</a>
+                <a href="#loyalty-design-direction">15. Loyalty Design Direction</a>
+                <a href="#messaging-design-direction">16. Messaging Design Direction</a>
+                <a href="#intelligence-design-direction">17. Intelligence Design Direction</a>
+                <a href="#ux-design-direction">18. UX Design Direction</a>
+
+                <div class="toc-group">Positioning</div>
+                <a href="#repositioning-guardrails">19. Repositioning Guardrails</a>
+                <a href="#long-term-product-shape">20. Long-Term Product Shape</a>
+                <a href="#practical-decision-test">21. Practical Decision Test</a>
+                <a href="#current-strategic-summary">22. Current Strategic Summary</a>
+
+                <div class="toc-group">Revenue Operating System Expansion</div>
+                <a href="#revenue-classification">23. Revenue Classification</a>
+                <a href="#promotions-discounts">24. Promotions and Discounts</a>
+                <a href="#vouchers-gift-cards">25. Vouchers and Gift Cards</a>
+                <a href="#segmentation-churn">26. Customer Segmentation and Churn Signals</a>
+                <a href="#staff-performance">27. Staff Performance Layer</a>
+                <a href="#communications-foundation">28. Communications Foundation</a>
+                <a href="#manager-action-surface">29. Manager Action Surface</a>
+                <a href="#campaign-outcomes">30. Campaign Outcome Tracking</a>
+                <a href="#not-building-yet">31. What Is Deliberately Not Being Built Yet</a>
+                <a href="#four-pillars">32. The Four ROS Pillars</a>
+                <a href="#updated-product-shape">33. Updated Long-Term Product Shape</a>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- FOUNDATION -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="product-definition">
+                <h2>1. Product Definition</h2>
+                <p><strong>Patronr is a CRM and Revenue Operating System for hospitality businesses, designed to capture customer data at the point of payment, improve retention, and drive revenue growth.</strong></p>
+                <p>This means Patronr is not just a CRM, POS, loyalty tool, reporting dashboard, or messaging tool. It is a system that combines these into one operational loop.</p>
+                <strong class="callout">Patronr embeds customer capture, retention, and revenue action into the natural payment flow.</strong>
+            </section>
+
+            <section id="core-problem">
+                <h2>2. Core Problem</h2>
+                <p>Most hospitality businesses already process payments every day, but they do not consistently convert those transactions into customer identity, repeat-visit insight, retention action, or revenue decisions.</p>
+                <p>Traditional CRM tools fail because they are detached from the operational moment that matters most: payment. If customer capture depends on extra staff effort outside the payment flow, adoption drops and data quality collapses.</p>
+                <p>Patronr exists to solve that gap.</p>
+            </section>
+
+            <section id="product-thesis">
+                <h2>3. Product Thesis</h2>
+                <p>Every payment should become an opportunity to identify the customer, connect the transaction to behavior, reward the customer, trigger the right communication, and improve future revenue decisions.</p>
+                <p>The system should be designed around this loop:</p>
+                <ol>
+                    <li>Payment happens</li>
+                    <li>Customer is identified or created</li>
+                    <li>Transaction is linked to profile</li>
+                    <li>Loyalty and reward logic is applied</li>
+                    <li>Customer behavior becomes structured data</li>
+                    <li>Messaging, segmentation, and intelligence are updated</li>
+                    <li>The business gets guidance on what to do next</li>
+                </ol>
+                <p>That is the Patronr operating loop. This loop must be strong in execution, not only correct in concept.</p>
+                <ul>
+                    <li>Customer capture at payment must feel faster than skipping it</li>
+                    <li>Staff should not need to think in CRM language to use it correctly</li>
+                    <li>Intelligence must lead to action, not stop at insight</li>
+                    <li>Recommended actions must be directly executable inside the system where possible</li>
+                </ul>
+            </section>
+
+            <section id="domain-positioning">
+                <h2>4. Domain Positioning</h2>
+                <p><strong>Primary category:</strong> CRM and Revenue Operating System</p>
+                <p><strong>Core business domain:</strong> hospitality and service businesses</p>
+                <p>Core operating environments include restaurants, resorts, hotels, lounges, bars, cafes, spas, salons, car wash businesses, and other repeat-visit service businesses.</p>
+                <p>The rule is: design the system for hospitality and service businesses from the start. Avoid category language that unnecessarily narrows the product to restaurants only. Keep the product flexible enough to support different service environments that share the same payment-linked customer capture and retention model.</p>
+                <p>The positioning is now intentionally broader, not future-tense expansion language.</p>
+            </section>
+
+            <section id="what-patronr-is-not">
+                <h2>5. What Patronr Is Not</h2>
+                <p>Patronr should not drift into being treated as:</p>
+                <ul>
+                    <li>a generic contact manager</li>
+                    <li>a pure marketing automation tool</li>
+                    <li>a standalone POS replacement by default</li>
+                    <li>a dashboard-heavy analytics product with weak operational capture</li>
+                    <li>a loyalty add-on with no operational intelligence</li>
+                </ul>
+                <p>The system can include parts of those categories, but the design center must remain: payment-linked customer capture, retention, branch operations, and revenue guidance.</p>
+            </section>
+
+            <section id="system-design-principle">
+                <h2>6. System Design Principle</h2>
+                <strong class="callout">Branch-first operational execution, with company-level intelligence and platform-level control.</strong>
+                <p>This creates three interacting layers: Platform, Tenant Operating, and Customer Intelligence. Each layer has a different responsibility.</p>
+                <p>The system should also be judged against five strength tests:</p>
+                <ol>
+                    <li>Is point-of-payment customer capture extremely strong?</li>
+                    <li>Does the system convert intelligence into immediate action?</li>
+                    <li>Is branch-first operation preserved without leakage?</li>
+                    <li>Are platform, tenant, and customer concerns clearly separated?</li>
+                    <li>Does the experience feel like an operating system rather than a collection of tools?</li>
+                </ol>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- SYSTEM LAYERS -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="platform-layer">
+                <h2>7. Platform Layer</h2>
+                <p>The platform layer exists to operate Patronr as a SaaS business. Responsibilities include tenant provisioning, plan and subscription management, feature release and entitlement, platform admin management, and provider integrations.</p>
+                <ul>
+                    <li>Platform owner is not tenant owner</li>
+                    <li>Platform roles must never be inferred from tenant roles, and vice versa</li>
+                    <li>Platform admin access into tenant context must still respect explicit platform permissions</li>
+                    <li>Platform logic should coordinate tenant capability, not redefine tenant business behavior per company through ad hoc hacks</li>
+                </ul>
+            </section>
+
+            <section id="tenant-operating-layer">
+                <h2>8. Tenant Operating Layer</h2>
+                <p>The tenant operating layer is where a hospitality business runs daily operations. Responsibilities include branch and org structure, user management, role hierarchy, permission assignment, payment processing, terminal operations, loyalty settings, and reporting.</p>
+                <ul>
+                    <li>Operational flows should begin from what staff are trying to do now</li>
+                    <li>Daily work should be executable with minimal screen switching</li>
+                    <li>Branch managers should be able to answer "what should I do today?" from inside this layer</li>
+                </ul>
+            </section>
+
+            <section id="customer-intelligence-layer">
+                <h2>9. Customer Intelligence Layer</h2>
+                <p>This layer converts operational activity into customer understanding and action. Responsibilities include customer profiles, transaction history, visit patterns, loyalty state, segmentation, churn and return signals, and messaging triggers.</p>
+                <p>This layer must not stop at analysis. It must increasingly produce recommended actions, suggested campaigns, suggested follow-ups, and segment-specific next moves.</p>
+                <strong class="callout">The intelligence layer is only strong when action is close to one tap away.</strong>
+            </section>
+
+            <section id="core-operating-flows">
+                <h2>10. Core Operating Flows</h2>
+                <h3>A. Payment-to-customer capture flow</h3>
+                <p>This is the most important flow in the entire system.</p>
+                <ol>
+                    <li>Staff initiates payment</li>
+                    <li>Payment is completed through terminal-supported method</li>
+                    <li>Customer phone is captured or confirmed</li>
+                    <li>Customer is matched or created</li>
+                    <li>Transaction is linked to the customer</li>
+                    <li>Loyalty logic is applied</li>
+                    <li>Transaction becomes usable CRM data</li>
+                </ol>
+                <p>If staff frequently skip capture in busy periods, the system design should be treated as failing.</p>
+                <h3>B. Loyalty flow</h3>
+                <ol>
+                    <li>Customer is enrolled or matched</li>
+                    <li>Earn/redeem rules are applied</li>
+                    <li>Balance and ledger are updated</li>
+                    <li>Customer is notified where appropriate</li>
+                    <li>Loyalty state becomes part of retention logic</li>
+                </ol>
+                <h3>C. Intelligence-to-action flow</h3>
+                <p>This flow should evolve from insight only, to insight → recommended action → one-tap execution → measurable outcome → learning loop.</p>
+                <h3>D. SaaS control flow</h3>
+                <ol>
+                    <li>Platform releases a feature</li>
+                    <li>Plan decides default entitlement</li>
+                    <li>Override can change effective availability</li>
+                    <li>Tenant config decides operational behavior</li>
+                </ol>
+            </section>
+
+            <section id="architectural-direction">
+                <h2>11. Architectural Direction</h2>
+                <p>Patronr should be designed as a modular operational platform with strong separation of concerns. Each system area should have a clear source of truth, service-level enforcement, UI that reflects real backend rules, and explicit operational outcomes.</p>
+                <p>Main system areas: Auth and identity · Branch and org structure · Roles and permissions · Feature entitlement · Payments and terminal · Loyalty · CRM · Messaging · Reporting and intelligence · Audit and traceability</p>
+            </section>
+
+            <section id="operational-context-model">
+                <h2>12. Operational Context Model</h2>
+                <p>The system is branch-first.</p>
+                <ul>
+                    <li><code>branch_id</code> is the primary operational context</li>
+                    <li><code>company_id</code> is secondary for operational records</li>
+                    <li>Business actions should generally happen within a branch context</li>
+                    <li>Company-level intelligence is built from branch-linked data</li>
+                </ul>
+                <p>Branch-first does not mean branch-isolated by mistake. Cross-branch visibility should be explicit, permissioned, and explainable.</p>
+            </section>
+
+            <section id="identity-model">
+                <h2>13. Identity Model</h2>
+                <h3>Staff identity</h3>
+                <p>Tenant-owned and permission-controlled through hierarchy and branch context.</p>
+                <h3>Customer identity</h3>
+                <p>Customer identity should remain canonical at the company level. One customer identity per real customer per company — not duplicated per branch by default.</p>
+                <p>Future direction: canonical <code>customers</code> table with an optional <code>customer_branch_profiles</code> intelligence layer on top. This allows one identity, branch-local insight, and company-wide lifetime understanding.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- DOMAIN DESIGN -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="payments-design-direction">
+                <h2>14. Payments Design Direction</h2>
+                <p>Payments are not just settlement mechanisms in Patronr. They are operating events.</p>
+                <p>Each payment method should contribute to checkout completion, customer identification, loyalty execution, activity logging, and revenue attribution.</p>
+                <p>M-Pesa is strategically important and should be treated as a first-class native flow, not a bolt-on.</p>
+            </section>
+
+            <section id="loyalty-design-direction">
+                <h2>15. Loyalty Design Direction</h2>
+                <p>Loyalty should be tightly linked to payments and retention, not isolated as a separate product. The point of loyalty is not only reward — it is also identity capture, retention improvement, repeat-visit reinforcement, and behavior segmentation.</p>
+                <p>If loyalty becomes a side feature rather than a retention mechanism, the design has drifted.</p>
+            </section>
+
+            <section id="messaging-design-direction">
+                <h2>16. Messaging Design Direction</h2>
+                <p>Messaging is a core operating capability, especially in markets like Kenya. Channels: SMS, WhatsApp, email. Use cases: payment confirmations, loyalty notifications, targeted campaigns, automated reports, win-back messages.</p>
+                <p>Messaging must remain provider-agnostic where possible. Recipients should be chosen based on customer behavior, not only static lists. Messaging should move from manual broadcast to guided action over time.</p>
+            </section>
+
+            <section id="intelligence-design-direction">
+                <h2>17. Intelligence Design Direction</h2>
+                <p>The intelligence layer should be practical, not theatrical. It should not pretend to offer perfect prediction. It should give useful operational guidance based on real historical patterns.</p>
+                <p>The strongest expression of this layer is not "here is a chart." It is: here is what is happening → here is why it matters → here is what you can do now → here is the expected business effect.</p>
+                <p>This is where Patronr becomes a Revenue Operating System rather than only a CRM.</p>
+            </section>
+
+            <section id="ux-design-direction">
+                <h2>18. UX Design Direction</h2>
+                <p>The UX should feel like a calm, production-grade business product. Principles: operational first · low friction · no unnecessary staff burden · clear hierarchy · clean branch context · polished but restrained visuals · fast comprehension over feature clutter · actionability over dashboard decoration.</p>
+                <p>In terminal flows especially: speed matters, clarity matters, success/failure states must be obvious, customer capture should feel natural, and the system should reassure staff immediately when automation has already handled downstream work.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- POSITIONING -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="repositioning-guardrails">
+                <h2>19. Repositioning Guardrails</h2>
+                <p>Patronr can evolve in category language over time, but these must remain true:</p>
+                <ul>
+                    <li>payment is still a primary customer capture moment</li>
+                    <li>the system still improves retention, not just reporting</li>
+                    <li>branch operations remain first-class</li>
+                    <li>actions matter as much as insights</li>
+                    <li>CRM remains embedded in operations, not detached from them</li>
+                </ul>
+                <p><strong>Good examples:</strong> CRM and Revenue Operating System for hospitality · Revenue operating platform for hospitality · Payment-linked CRM and retention platform</p>
+                <p><strong>Bad examples:</strong> Generic analytics platform · Messaging tool for restaurants · Pure loyalty app · Generic POS</p>
+            </section>
+
+            <section id="long-term-product-shape">
+                <h2>20. Long-Term Product Shape</h2>
+                <p>If Patronr matures fully, it should feel like:</p>
+                <ul>
+                    <li>an operational system for branches</li>
+                    <li>a CRM system for customer memory</li>
+                    <li>a retention engine for repeat business</li>
+                    <li>a communication engine for engagement</li>
+                    <li>an intelligence layer for daily revenue decisions</li>
+                    <li>a SaaS platform with clean controls, plans, and overrides</li>
+                    <li>a daily action system that tells the business what matters now and makes execution easy</li>
+                </ul>
+            </section>
+
+            <section id="practical-decision-test">
+                <h2>21. Practical Decision Test</h2>
+                <p>When making future product or architecture decisions, ask:</p>
+                <ol>
+                    <li>Does this strengthen or weaken payment-linked customer capture?</li>
+                    <li>Does this help retention and revenue action, or only add admin complexity?</li>
+                    <li>Does this fit the branch-first operational model?</li>
+                    <li>Does this preserve the separation between platform, tenant, and customer concerns?</li>
+                    <li>Does this make Patronr more like an operating system, or more like a disconnected tool?</li>
+                    <li>Does this help the business decide what to do today?</li>
+                </ol>
+                <p>If the answer consistently weakens these principles, the direction is probably wrong.</p>
+            </section>
+
+            <section id="current-strategic-summary">
+                <h2>22. Current Strategic Summary</h2>
+                <p>Patronr is being built as a CRM, a loyalty and retention engine, a branch operating system, a communications and reporting platform, an emerging intelligence layer, and a SaaS product with platform-grade controls.</p>
+                <strong class="callout">Capture customer identity and behavior at the point of payment, then turn that into retention and revenue action.</strong>
+                <p>The near-term challenge is to make all of the following very strong at once: point-of-payment customer capture · branch-first execution · clean separation of concerns · decision-to-action workflows · daily operational usefulness.</p>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- REVENUE OPERATING SYSTEM EXPANSION -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="revenue-classification">
+                <h2>23. Revenue Classification</h2>
+                <p>Patronr needs a lightweight classification layer so every transaction carries context about what revenue came from and under what conditions it was generated.</p>
+                <p>This is not a full inventory or product management system. It is a revenue intelligence layer built into the checkout moment.</p>
+
+                <h3>Classification model</h3>
+                <p>Every transaction can optionally carry:</p>
+                <ul>
+                    <li>a <strong>revenue source</strong> — what was sold</li>
+                    <li>an <strong>area</strong> — where in the branch it happened</li>
+                    <li>an <strong>event context</strong> — what was happening when it was sold</li>
+                </ul>
+                <p>These are independent dimensions and must not be collapsed into one field. A cashier can sell a service (massage) in a specific area (spa suite) during an event (Valentine's special). All three pieces of context matter independently and together.</p>
+
+                <h3>Revenue source</h3>
+                <p>Classifies what type of thing was sold. Three valid types:</p>
+                <ul>
+                    <li><strong>service</strong> — something performed for the customer (spa treatment, salon service, car wash, room service)</li>
+                    <li><strong>product</strong> — something sold to the customer (drinks, food package, retail item, add-on)</li>
+                    <li><strong>ticket</strong> — entry access or participation in an event or experience</li>
+                </ul>
+                <p>The catalog (<code>catalog_items</code>) is branch-scoped and lightweight. A name, a category, an optional price, and an active/inactive flag is enough to start.</p>
+                <pre><code>pos_transactions
+  revenue_source_type  ENUM('service', 'product', 'ticket')  nullable
+  revenue_source_id    INT  nullable  — FK to catalog_items</code></pre>
+
+                <h3>Events</h3>
+                <p>Events are a revenue attribution context, not a type of thing being sold. An event is a named window of business activity that a transaction can be tagged to.</p>
+                <p>Examples: live band night · Valentine's dinner · pool party · conference day · brunch event · holiday special · promotional weekend</p>
+                <p>Why events matter:</p>
+                <ul>
+                    <li>lets revenue be understood in context rather than as an undifferentiated stream</li>
+                    <li>answers which events drive the highest revenue</li>
+                    <li>answers which customer types attend which events</li>
+                    <li>answers whether event attendees become repeat visitors</li>
+                    <li>enables event ROI comparison over time</li>
+                    <li>feeds campaign targeting ("contact everyone who attended last year's event")</li>
+                </ul>
+                <p>Events are branch-scoped and have a start and end time. When an event is active during a transaction, the system can suggest it for tagging. Cashiers can also tag a transaction to an event manually.</p>
+                <pre><code>events
+  company_id, branch_id
+  name
+  description
+  starts_at, ends_at
+  status (active, ended, cancelled)
+
+pos_transactions
+  event_id  INT  nullable  — FK to events</code></pre>
+                <p>Event is a separate column from revenue source. They coexist, not compete.</p>
+
+                <h3>Tickets</h3>
+                <p>Tickets are deferred until the events foundation is stable. They are best understood as a sub-product of events — paid entry or reserved participation — and require their own checkout sub-flow. Do not build tickets before events are solid.</p>
+
+                <h3>Covers / headcount</h3>
+                <p>Every checkout can optionally record the number of covers (people served). This is one of the most valuable intelligence fields in hospitality — it immediately enables revenue per cover, spend-per-head comparisons across areas, times, and events, capacity utilization signals, and event size vs event revenue comparisons.</p>
+                <pre><code>pos_transactions
+  covers  SMALLINT UNSIGNED  nullable</code></pre>
+                <p>One field. Optional. Never required. High intelligence value.</p>
+
+                <h3>Areas</h3>
+                <p>Areas are already a native classification dimension in Patronr. <code>area_id</code> is already captured on transactions at checkout. Areas are branch-scoped spaces that reflect how a physical business is laid out.</p>
+                <p>Examples: restaurant floor, terrace, private dining · pool bar, lounge, rooftop · spa suite, treatment room · VIP section, main hall</p>
+                <p>Why areas matter for revenue intelligence:</p>
+                <ul>
+                    <li>revenue by area answers which parts of the business are generating the most</li>
+                    <li>spend patterns differ by area — rooftop vs ground floor, VIP vs standard</li>
+                    <li>area performance feeds staffing and operational decisions</li>
+                    <li>combined with events and covers, area becomes a powerful intelligence slice</li>
+                </ul>
+                <p>No new schema is needed. Area is already captured. It needs to be surfaced properly in the intelligence and reporting layer.</p>
+
+                <h3>Design rules for checkout classification</h3>
+                <ul>
+                    <li>All classification fields are optional — cashiers must never be blocked by them</li>
+                    <li>Recent and frequent selections should appear first</li>
+                    <li>Only active items for the current branch should be shown</li>
+                    <li>One primary catalog selection is enough for v1 — do not allow multiple catalog item selections at checkout to start</li>
+                    <li>The system should suggest the active event if one exists — cashier confirms or skips</li>
+                    <li>Area is already selected at checkout — no extra step needed</li>
+                    <li>Classification enriches intelligence but must never slow the payment moment</li>
+                </ul>
+            </section>
+
+            <section id="promotions-discounts">
+                <h2>24. Promotions and Discounts</h2>
+                <p>Discounts applied outside Patronr make revenue data unreliable. If a cashier gives a 10% discount verbally and records the post-discount amount, the system sees a smaller transaction with no record of the discount, its reason, or whether it was authorized.</p>
+                <strong class="callout">Patronr must own the discount moment.</strong>
+                <h3>Discount model</h3>
+                <p>Discounts are applied at checkout before payment is taken. Types:</p>
+                <ul>
+                    <li><strong>Percentage discount</strong> — e.g. 15% off total</li>
+                    <li><strong>Fixed amount discount</strong> — e.g. KES 200 off</li>
+                    <li><strong>Category discount</strong> — percentage or fixed applied to a specific revenue source type (e.g. 10% off all services)</li>
+                </ul>
+                <p>Every discount must carry: who applied it · what type it was · original amount · discounted amount · optional reason or authorization note.</p>
+                <h3>Why this matters</h3>
+                <ul>
+                    <li>Revenue reporting reflects real original values, not post-discount amounts</li>
+                    <li>Discount usage becomes a visible metric</li>
+                    <li>Unauthorized discounting becomes detectable</li>
+                    <li>Promotional campaigns can be tracked properly</li>
+                    <li>Margin intelligence becomes possible</li>
+                </ul>
+                <h3>Design rules</h3>
+                <ul>
+                    <li>Discounts are optional at checkout</li>
+                    <li>Permission-gated — not every cashier should be able to apply discounts</li>
+                    <li>Discount history is attached to the transaction record</li>
+                    <li>Gross amount and net amount must both be stored</li>
+                </ul>
+            </section>
+
+            <section id="vouchers-gift-cards">
+                <h2>25. Vouchers and Gift Cards</h2>
+                <p>Vouchers and gift cards are both a revenue capture tool and a retention mechanism. When a customer buys a gift card, that is revenue recognized today. When it is redeemed, the loop closes.</p>
+                <p>This means gift cards generate upfront revenue, bring customers back (or bring new customers in), and are trackable through the full cycle.</p>
+                <h3>Voucher model</h3>
+                <p>Two sub-types:</p>
+                <ul>
+                    <li><strong>Gift card</strong> — monetary value, purchasable, redeemable at checkout like a payment method</li>
+                    <li><strong>Promotional voucher</strong> — issued by the business as a discount or reward, redeemable for a fixed value or percentage</li>
+                </ul>
+                <p>Both should be redeemable at the terminal alongside other payment methods.</p>
+                <h3>Design rules</h3>
+                <ul>
+                    <li>Gift cards are linked to a code (physical or digital)</li>
+                    <li>Balance is tracked as it is redeemed</li>
+                    <li>Vouchers have an expiry date</li>
+                    <li>Redemption is recorded against a transaction</li>
+                    <li>Partial redemption must be supported (redeem KES 300 of a KES 500 card)</li>
+                </ul>
+            </section>
+
+            <section id="segmentation-churn">
+                <h2>26. Customer Segmentation and Churn Signals</h2>
+                <p>Patronr must derive customer segments automatically from transaction and visit behavior. Segments should not require manual tagging by staff — they should emerge from what the system already knows.</p>
+                <h3>Core automatic segments</h3>
+                <ul>
+                    <li><strong>New</strong> — first transaction in the last N days</li>
+                    <li><strong>Returning</strong> — two or more visits, last visit within the retention window</li>
+                    <li><strong>High value</strong> — top X% of customers by total spend</li>
+                    <li><strong>Frequent</strong> — visits more often than the branch average</li>
+                    <li><strong>At risk</strong> — visited regularly but have gone quiet (no visit in X days despite historical pattern suggesting they should have returned)</li>
+                    <li><strong>Lost</strong> — no visit in a significant configurable window</li>
+                </ul>
+                <h3>Why this matters</h3>
+                <ul>
+                    <li>Campaigns and messaging become targeted rather than broadcast</li>
+                    <li>The business can act on churn signals before customers are fully lost</li>
+                    <li>High-value customers can be treated differently</li>
+                    <li>Retention rate becomes measurable as a real metric</li>
+                </ul>
+                <h3>Retention rate</h3>
+                <p>Retention rate is one of the most important metrics in a revenue operating system. It should answer: of all customers who visited in the previous period, what percentage returned in the current period? Surfaced at branch level and company level.</p>
+                <h3>Design rules</h3>
+                <ul>
+                    <li>Segments are computed, not stored as static flags</li>
+                    <li>Segment membership updates as transaction data updates</li>
+                    <li>Thresholds (days, spend percentiles) should be configurable per business</li>
+                    <li>Segments feed messaging and action surfaces, not just reports</li>
+                </ul>
+            </section>
+
+            <section id="staff-performance">
+                <h2>27. Staff Performance Layer</h2>
+                <p>Revenue per cashier, transactions per period, average transaction size, and cancellation rates should all be natively visible in Patronr. This is not a surveillance tool — it is visibility that makes accountability possible.</p>
+                <h3>What should be measurable per cashier</h3>
+                <ul>
+                    <li>Total revenue processed</li>
+                    <li>Transaction count and average transaction value</li>
+                    <li>Discount frequency and total discount value applied</li>
+                    <li>Cancellation count</li>
+                    <li>Loyalty capture rate — what percentage of their transactions captured a customer phone</li>
+                    <li>Period-level breakdown (daily, weekly)</li>
+                </ul>
+                <div class="note"><strong>Loyalty capture rate per cashier</strong> is one of the most operationally useful metrics in the system. If cashier A captures customer phones on 70% of transactions and cashier B captures on 20%, the branch manager should know. This directly maps to CRM data quality and long-term retention capability.</div>
+                <h3>Design rules</h3>
+                <ul>
+                    <li>Staff performance data is derived from existing transaction records — no separate input required</li>
+                    <li>Visible to branch managers and owners; permission-gated for cashier self-view</li>
+                    <li>Should feed into the manager action surface</li>
+                </ul>
+            </section>
+
+            <section id="communications-foundation">
+                <h2>28. Communications Foundation</h2>
+                <p>Communications is not a bolt-on feature. It is the action layer of the intelligence loop. Without it, Patronr can understand what is happening but cannot act on it.</p>
+                <h3>Channels</h3>
+                <ul>
+                    <li><strong>SMS</strong> — primary channel for Kenya. High open rate, no app required.</li>
+                    <li><strong>WhatsApp</strong> — more important than email for Kenya. Customers read and respond. Belongs in the foundation alongside SMS.</li>
+                    <li><strong>Email</strong> — useful for reports and formal communications. Lower urgency than SMS/WhatsApp.</li>
+                </ul>
+                <p>Channel priority: SMS first, WhatsApp close behind, email where appropriate.</p>
+                <h3>Core use cases</h3>
+                <p>Payment confirmation · Loyalty enrollment welcome · Loyalty earn/redeem notification · Win-back message · Birthday message · Event invitation or reminder · Scheduled report to owner/manager · Campaign broadcast to a segment</p>
+                <h3>Provider abstraction</h3>
+                <p>Communications must be provider-agnostic. The system should support multiple SMS and WhatsApp providers behind a unified interface. Provider configuration, credentials, and routing should be tenant-managed and platform-controlled.</p>
+                <h3>Automated triggers</h3>
+                <p>Rule-based triggers should fire without manual intervention:</p>
+                <ul>
+                    <li>Customer reaches loyalty milestone → send congratulations</li>
+                    <li>Customer has not visited in X days → send win-back</li>
+                    <li>Customer's birthday month → send offer</li>
+                    <li>Event is approaching → notify past event attendees</li>
+                    <li>Transaction completed → send payment confirmation if enabled</li>
+                </ul>
+                <h3>Scheduled reports</h3>
+                <p>Owners and managers should receive automatic summaries without needing to log in. A daily or weekly briefing via SMS or WhatsApp should cover: yesterday's revenue · transaction count · top payment method · new customers captured · loyalty activity · notable variance from recent average.</p>
+                <div class="note">This should feel like a morning briefing, not a dashboard they must visit.</div>
+                <h3>Design rules</h3>
+                <ul>
+                    <li>Every outbound message is logged with delivery state</li>
+                    <li>All messages carry company and branch context</li>
+                    <li>Provider failures must not break the transaction flow that triggered them</li>
+                    <li>Templates should be configurable per tenant</li>
+                    <li>Message history should be linked to the customer record where applicable</li>
+                </ul>
+            </section>
+
+            <section id="manager-action-surface">
+                <h2>29. Manager Action Surface</h2>
+                <p>The manager action surface is the interface where intelligence becomes decision. It is not a report. It is not a chart.</p>
+                <strong class="callout">It is the answer to: what should I do today?</strong>
+                <h3>What it surfaces</h3>
+                <ul>
+                    <li>Segments that need attention (at-risk customers ready for a win-back campaign)</li>
+                    <li>Upcoming events and revenue projections based on history</li>
+                    <li>Staff performance flags (low loyalty capture rates, high discount usage)</li>
+                    <li>Loyalty activity summary (points awarded, redemptions, new enrollments)</li>
+                    <li>Recent customer milestones worth acting on</li>
+                </ul>
+                <h3>Design principle</h3>
+                <p>Every item surfaced should be directly actionable from the same screen where possible. See the at-risk segment → tap to create a campaign → send. See the low capture rate cashier → tap to review their transaction history. The distance between insight and action must be as short as possible.</p>
+                <h3>Design rules</h3>
+                <ul>
+                    <li>Branch-scoped by default, company-level roll-up for owners</li>
+                    <li>Updates daily at minimum</li>
+                    <li>Not a real-time feed — a daily prioritized task surface</li>
+                    <li>Actions taken from here should be logged</li>
+                </ul>
+            </section>
+
+            <section id="campaign-outcomes">
+                <h2>30. Campaign Outcome Tracking</h2>
+                <p>When a campaign is sent, the system must be able to answer whether it worked. Without outcome tracking, campaigns are a cost center, not an investment.</p>
+                <h3>What outcome tracking answers</h3>
+                <ul>
+                    <li>How many recipients returned after the campaign was sent</li>
+                    <li>Total revenue attributed to returning recipients within the attribution window</li>
+                    <li>Comparison to baseline return rate for the same segment</li>
+                    <li>Which message type or segment produced the best result</li>
+                </ul>
+                <h3>Attribution model</h3>
+                <p>When a customer who received a campaign makes a transaction within a defined attribution window (e.g. 14 days), that transaction is attributed to the campaign. Attribution is approximate by design — it measures correlation, not causation. But it is operationally useful: the business can see whether campaigns are moving customer behavior or not.</p>
+                <h3>Design rules</h3>
+                <ul>
+                    <li>Every campaign send is recorded against the customer</li>
+                    <li>Transaction attribution is automated based on the window</li>
+                    <li>Outcome report is attached to the campaign record</li>
+                    <li>Campaign ROI (revenue generated vs cost of sends) should be surfaced where applicable</li>
+                </ul>
+            </section>
+
+            <section id="not-building-yet">
+                <h2>31. What Is Deliberately Not Being Built Yet</h2>
+                <p>Some capabilities belong in Patronr eventually but are not the right next investment. These should not be built until the core ROS loop is strong.</p>
+                <ul>
+                    <li><strong>Shift management</strong> — Opening floats, cash counts, and variance reconciliation belong to POS cash drawer management — not to a Revenue Operating System. Patronr already knows who processed each transaction through the session and user context on every transaction. That is enough for staff performance attribution and period-level revenue reporting without building a full POS shift system. Adding shift management would pull Patronr away from being a ROS and toward being a POS replacement. That is not the right direction.</li>
+                    <li><strong>Full inventory and stock management</strong> — stock levels, purchase orders, supplier management. This is a different product category. The catalog layer should remain a lightweight revenue classifier.</li>
+                    <li><strong>Table management and floor plan</strong> — visual floor plans, table status boards. Heavy to build well. Only consider after events and the manager action surface are operational.</li>
+                    <li><strong>Reservations and bookings</strong> — full booking calendars and confirmation flows. Tickets (tied to events) are the lighter version and come first.</li>
+                    <li><strong>Accounting export and full financial reporting</strong> — P&amp;L, balance sheet, tax reporting. Patronr should make it easy to export clean revenue data to accounting tools, but must not try to become accounting software.</li>
+                    <li><strong>AI-driven predictions</strong> — demand forecasting, AI-generated campaigns, predictive churn models. Valid long-term direction. The data foundation must be solid first.</li>
+                </ul>
+            </section>
+
+            <section id="four-pillars">
+                <h2>32. The Four ROS Pillars</h2>
+                <p>Every feature in Patronr should serve at least one of these four pillars. A feature that does not serve any of them should be questioned seriously before being built.</p>
+                <div class="pillars">
+                    <div class="pillar capture">
+                        <div class="pillar-label">Capture</div>
+                        <p>Getting revenue context, customer identity, and operational detail into the system at the moment it happens. Covers, catalog items, areas, events, discount records — all capture.</p>
+                    </div>
+                    <div class="pillar understand">
+                        <div class="pillar-label">Understand</div>
+                        <p>Turning captured data into structured intelligence that reflects real business behavior. Segments, retention rate, staff performance, event ROI, churn signals — all understand.</p>
+                    </div>
+                    <div class="pillar act">
+                        <div class="pillar-label">Act</div>
+                        <p>Converting intelligence into direct, fast, measurable action. Campaigns, automated triggers, scheduled reports, win-back messages, manager action surface — all act.</p>
+                    </div>
+                    <div class="pillar measure">
+                        <div class="pillar-label">Measure</div>
+                        <p>Closing the loop by tracking whether actions produced results. Campaign outcomes, retention trend, event comparison, discount impact — all measure.</p>
+                    </div>
+                </div>
+            </section>
+
+            <section id="updated-product-shape">
+                <h2>33. Updated Long-Term Product Shape</h2>
+                <p>If Patronr matures fully across all four pillars, it should feel like:</p>
+                <ul>
+                    <li>an operational system for branches — where daily work happens</li>
+                    <li>a CRM system for customer memory — where identity and behavior accumulate</li>
+                    <li>a retention engine — where repeat business is actively managed</li>
+                    <li>a communication engine — where the right message reaches the right customer at the right time</li>
+                    <li>an intelligence layer — where patterns become visible and actionable</li>
+                    <li>a revenue classification layer — where every transaction carries context about what was sold, where, and under what conditions</li>
+                    <li>a SaaS platform — with clean controls, plans, and overrides</li>
+                </ul>
+                <p>The business should feel that Patronr:</p>
+                <ul>
+                    <li>knows its customers</li>
+                    <li>understands its revenue</li>
+                    <li>surfaces what matters today</li>
+                    <li>makes the right action one step away</li>
+                </ul>
+            </section>
+
+        </div>
+    </div>
+</body>
+</html>

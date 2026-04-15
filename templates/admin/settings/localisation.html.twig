@@ -1,0 +1,116 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+
+{% set _code = company.currency_code ?? 'KES' %}
+{% set _tz   = company.timezone     ?? 'Africa/Nairobi' %}
+{% set _fmt  = company.date_format  ?? 'DD/MM/YYYY' %}
+{% set _preferred = ['KES','USD','EUR','GBP','UGX','TZS','RWF','ETB','NGN','ZAR','GHS'] %}
+
+<form method="POST" action="{{ path('admin_settings_save_localisation', _rp) }}">
+<div class="settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+
+    {# ── SECTION: Currency ───────────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Currency</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Default for all transaction amounts, totals, and reports.</p>
+        </div>
+        <div class="settings-section-fields">
+            <label class="s-label" for="loc-currency">Default currency</label>
+            <div class="s-select-wrap">
+                <select id="loc-currency" name="currency_code" class="s-input" style="padding-right:2.25rem;">
+                    {% set _pop = [] %}
+                    {% set _rest = [] %}
+                    {% for c in currencies %}
+                        {% if c.code in _preferred %}{% set _pop = _pop|merge([c]) %}
+                        {% else %}{% set _rest = _rest|merge([c]) %}{% endif %}
+                    {% endfor %}
+                    <optgroup label="Popular">
+                        {% for c in _pop %}
+                        <option value="{{ c.code }}" {{ _code == c.code ? 'selected' : '' }}>
+                            {{ c.code }} — {{ c.name }} ({{ c.symbol }})
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                    <optgroup label="All currencies">
+                        {% for c in _rest %}
+                        <option value="{{ c.code }}" {{ _code == c.code ? 'selected' : '' }}>
+                            {{ c.code }} — {{ c.name }} ({{ c.symbol }})
+                        </option>
+                        {% endfor %}
+                    </optgroup>
+                </select>
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+            <p class="s-hint">Exchange rates can be set separately for multi-currency support.</p>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    {# ── SECTION: Timezone ───────────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Timezone</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Applied to report periods, schedules, and displayed timestamps.</p>
+        </div>
+        <div class="settings-section-fields">
+            <label class="s-label" for="loc-tz">Timezone</label>
+            <div class="s-select-wrap">
+                <select id="loc-tz" name="timezone" class="s-input" style="padding-right:2.25rem;">
+                    {% for region, zones in tz_grouped %}
+                    <optgroup label="{{ region }}">
+                        {% for tz in zones %}
+                        <option value="{{ tz }}" {{ _tz == tz ? 'selected' : '' }}>{{ tz|replace({'_': ' '}) }}</option>
+                        {% endfor %}
+                    </optgroup>
+                    {% endfor %}
+                </select>
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    {# ── SECTION: Date format ────────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Date format</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">How dates are displayed across the platform and in exports.</p>
+        </div>
+        <div class="settings-section-fields">
+            <label class="s-label">Format</label>
+            <div class="grid grid-cols-2 gap-2">
+                {% for fmt in [
+                    {v:'DD/MM/YYYY', eg:'05/04/2026'},
+                    {v:'MM/DD/YYYY', eg:'04/05/2026'},
+                    {v:'YYYY-MM-DD', eg:'2026-04-05'},
+                    {v:'D MMM YYYY', eg:'5 Apr 2026'},
+                ] %}
+                <label style="cursor:pointer;display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:8px;border:1.5px solid {{ _fmt == fmt.v ? '#6366f1' : '#e5e7eb' }};background:{{ _fmt == fmt.v ? '#eef2ff' : '#fff' }};transition:border-color .15s,background .15s;user-select:none;">
+                    <input type="radio" name="date_format" value="{{ fmt.v }}" {{ _fmt == fmt.v ? 'checked' : '' }}
+                           style="accent-color:#4f46e5;flex-shrink:0;">
+                    <span>
+                        <span style="display:block;font-size:.8125rem;font-weight:600;color:{{ _fmt == fmt.v ? '#3730a3' : '#111827' }};">{{ fmt.v }}</span>
+                        <span style="display:block;font-size:.6875rem;color:#9ca3af;margin-top:1px;font-family:monospace;">{{ fmt.eg }}</span>
+                    </span>
+                </label>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# ── FOOTER ──────────────────────────────────────────────────────── #}
+    <div class="settings-card-footer flex items-center justify-between px-8 py-4 border-t border-gray-100 bg-gray-50">
+        <p class="text-xs text-gray-400">Changes take effect immediately.</p>
+        <button type="submit"
+                class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-lg transition-colors">
+            Save changes
+        </button>
+    </div>
+
+</div>
+</form>
+{% endblock %}

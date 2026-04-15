@@ -6,6 +6,9 @@ namespace App\Controller;
 
 use App\Services\Auth\AuthService;
 use App\Services\Auth\Exception\AuthException;
+use App\Services\Feature\TenantFeatureAccessService;
+use App\Services\Loyalty\LoyaltyService;
+use App\Services\Permission\CheckPermissionService;
 use App\Services\Terminal\TerminalBranchAccessService;
 use App\Support\DomainHelper;
 use Doctrine\DBAL\Connection;
@@ -26,6 +29,9 @@ class LegacyMpesaController extends AbstractController
         private readonly DomainHelper $domains,
         private readonly TerminalBranchAccessService $terminalBranchAccess,
         private readonly AuthService $auth,
+        private readonly LoyaltyService $loyalty,
+        private readonly TenantFeatureAccessService $features,
+        private readonly CheckPermissionService $can,
     ) {}
 
     #[Route('/dashboard', name: 'terminal_dashboard', priority: 1)]
@@ -75,6 +81,7 @@ class LegacyMpesaController extends AbstractController
         $token    = $request->cookies->get('angavu_pos_token') ?: null;
         $isLocked = true;
         $userName = null;
+        $session  = null;
 
         if ($token !== null) {
             try {
@@ -86,9 +93,46 @@ class LegacyMpesaController extends AbstractController
             }
         }
 
+        $loyaltyEnabled = $this->features->canAny(
+            (int) $company['id'],
+            TenantFeatureAccessService::FEATURE_EARN_POINTS,
+            TenantFeatureAccessService::FEATURE_REDEEM_POINTS,
+            TenantFeatureAccessService::FEATURE_REWARD_SETUP,
+            TenantFeatureAccessService::FEATURE_LOYALTY_BALANCE,
+        ) && $this->loyalty->getProgram((int) $company['id'], $branchNode->id) !== null;
+
+        $terminalSettings = $this->db->fetchAssociative(
+            'SELECT show_mpesa_feed, show_quick_stk
+               FROM pos_terminal_settings
+              WHERE company_id = :company_id
+                AND branch_id  = :branch_id
+              LIMIT 1',
+            ['company_id' => $company['id'], 'branch_id' => $branchNode->id],
+        ) ?: ['show_mpesa_feed' => 0, 'show_quick_stk' => 0];
+
+        // Permission-gate the quick-access buttons.
+        // Both require a valid (unlocked) session AND the relevant permission.
+        // When locked there is no session to check — hide the buttons.
+        $mpesaFeedEnabled = false;
+        $quickStkEnabled  = false;
+
+        if ($session !== null) {
+            // Attach branch so branch-aware permission checks work for POS sessions
+            $session->branch = $branchNode;
+
+            $mpesaFeedEnabled = (bool) $terminalSettings['show_mpesa_feed']
+                && $this->can->check($session, 'VIEW_TRANSACTIONS');
+
+            $quickStkEnabled  = (bool) $terminalSettings['show_quick_stk']
+                && $this->can->check($session, 'SEND_STK_PUSH');
+        }
+
         return $this->render('terminal/dashboard.html.twig', [
-            'is_locked' => $isLocked,
-            'user_name' => $userName,
+            'is_locked'          => $isLocked,
+            'user_name'          => $userName,
+            'loyalty_enabled'    => $loyaltyEnabled,
+            'mpesa_feed_enabled' => $mpesaFeedEnabled,
+            'quick_stk_enabled'  => $quickStkEnabled,
         ]);
     }
 

@@ -1,0 +1,1571 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+
+<style>
+.pay-section { margin-bottom:1.5rem; }
+.pay-section-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.875rem 1.5rem; border-bottom:1px solid #f3f4f6;
+}
+.pay-section-title { font-size:.8125rem; font-weight:700; color:#374151; text-transform:uppercase; letter-spacing:.06em; }
+.pay-empty { padding:3rem 2rem; text-align:center; }
+.pay-row { display:flex; align-items:center; gap:1rem; padding:.875rem 1.5rem; transition:background .12s; }
+.pay-row:hover { background:#f9fafb; }
+.pay-icon { width:38px; height:38px; border-radius:10px; display:flex; align-items:center; justify-content:center; flex-shrink:0; }
+.pay-meta { flex:1; min-width:0; }
+.pay-meta-name { font-size:.875rem; font-weight:600; color:#111827; display:flex; align-items:center; gap:.5rem; flex-wrap:wrap; }
+.pay-meta-sub  { font-size:.75rem; color:#9ca3af; margin-top:2px; display:flex; align-items:center; gap:.4rem; flex-wrap:wrap; }
+.pay-badge { display:inline-flex; align-items:center; font-size:.6875rem; font-weight:700; padding:.2rem .5rem; border-radius:.375rem; }
+.pay-btn {
+    flex-shrink:0; display:inline-flex; align-items:center; gap:.375rem;
+    height:32px; padding:0 .875rem; font-size:.75rem; font-weight:600; color:#4b5563;
+    background:#fff; border:1px solid #e5e7eb; border-radius:.5rem;
+    cursor:pointer; transition:background .12s, border-color .12s;
+}
+.pay-btn:hover { background:#f9fafb; border-color:#d1d5db; }
+.pay-divider { height:1px; background:#f3f4f6; margin:0 1.5rem; }
+
+/* Drawer form groups */
+.d-group { margin-bottom:1.25rem; }
+.d-group-title {
+    font-size:.6875rem; font-weight:700; color:#9ca3af;
+    text-transform:uppercase; letter-spacing:.08em;
+    padding-bottom:.5rem; border-bottom:1px solid #f3f4f6; margin-bottom:.875rem;
+}
+.d-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+.d-row-3 { display:grid; grid-template-columns:1fr 1fr 1fr; gap:.75rem; }
+
+/* Password reveal */
+.secret-wrap { position:relative; }
+.secret-wrap input { padding-right:2.5rem; }
+.secret-eye {
+    position:absolute; right:.625rem; top:50%; transform:translateY(-50%);
+    background:none; border:none; cursor:pointer; padding:.25rem;
+    color:#9ca3af; display:flex; align-items:center; justify-content:center;
+    border-radius:.25rem;
+}
+.secret-eye:hover { color:#6b7280; }
+</style>
+
+
+{# ── M-PESA ─────────────────────────────────────────────────────────────── #}
+{% if released_methods['mpesa'] ?? false %}
+<div class="pay-section settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div class="settings-card-header pay-section-header">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">M-Pesa</h2>
+            <p class="text-xs text-gray-500 mt-0.5">STK Push, Paybill &amp; Till integrations.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            {% if mpesa_configs|length > 0 %}
+            <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                {{ mpesa_configs|length }} {{ mpesa_configs|length == 1 ? 'config' : 'configs' }}
+            </span>
+            {% endif %}
+            <button type="button" class="pay-btn" onclick="openCreateMpesaDrawer()">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add
+            </button>
+        </div>
+    </div>
+
+    {% if mpesa_configs is empty %}
+    <div class="pay-empty">
+        <div style="width:40px;height:40px;border-radius:10px;background:#f0fdf4;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;">
+            <svg width="18" height="18" fill="none" stroke="#16a34a" stroke-width="1.75" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">No M-Pesa integrations</p>
+        <p class="text-xs text-gray-400">Click <strong>Add</strong> to create a Paybill or Till configuration.</p>
+    </div>
+    {% else %}
+    <div class="settings-card-list">
+    {% for cfg in mpesa_configs %}
+    {% set _till = cfg.type == 'buygoods' %}
+    <div class="pay-row {{ not loop.last ? 'border-b border-gray-50' }}">
+        <div class="pay-icon" style="background:{{ _till ? '#ecfdf5' : '#eff6ff' }}">
+            {% if _till %}
+            <svg width="16" height="16" fill="none" stroke="#059669" stroke-width="1.75" viewBox="0 0 24 24">
+                <rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+            </svg>
+            {% else %}
+            <svg width="16" height="16" fill="none" stroke="#2563eb" stroke-width="1.75" viewBox="0 0 24 24">
+                <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+            </svg>
+            {% endif %}
+        </div>
+        <div class="pay-meta">
+            <div class="pay-meta-name">
+                {{ cfg.account_name ?: (_till ? 'Till Account' : 'Paybill Account') }}
+                <span class="pay-badge {{ _till ? 'bg-emerald-50 text-emerald-700' : 'bg-blue-50 text-blue-700' }}">
+                    {{ _till ? 'BuyGoods' : 'Paybill' }}
+                </span>
+                {% if not cfg.is_active %}
+                <span class="pay-badge bg-red-50 text-red-600">Inactive</span>
+                {% endif %}
+
+                <span class="pay-badge {{ cfg.environment == 'production' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-600' }}">
+                    {{ cfg.environment == 'production' ? 'Production' : 'Sandbox' }}
+                </span>
+            </div>
+            <div class="pay-meta-sub">
+                <span class="font-mono text-gray-500">{{ cfg.shortcode }}</span>
+                {% if cfg.till_number %}
+                <span class="text-gray-300">·</span>
+                <span class="font-mono text-gray-500">{{ cfg.till_number }}</span>
+                {% endif %}
+                {% if cfg.integration_modes is not empty %}
+                <span class="text-gray-300">·</span>
+                <span>{{ cfg.integration_modes|map(m => m|replace({'_': ' '})|capitalize)|join(', ') }}</span>
+                {% endif %}
+                {% if cfg.has_consumer_key %}
+                <span class="text-gray-300">·</span>
+                <span class="text-green-600 font-medium">Keys set</span>
+                {% else %}
+                <span class="text-gray-300">·</span>
+                <span class="text-amber-500 font-medium">No keys</span>
+                {% endif %}
+                {% if cfg.forward_urls_decoded is not empty %}
+                <span class="text-gray-300">·</span>
+                <span>{{ cfg.forward_urls_decoded|length }} forward URL{{ cfg.forward_urls_decoded|length != 1 ? 's' : '' }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div style="display:flex;gap:.375rem;">
+            <button type="button" class="pay-btn"
+                    onclick="openMpesaDrawer({{ cfg|json_encode|e('html_attr') }})">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Configure
+            </button>
+            <button type="button" class="pay-btn" style="color:#ef4444;border-color:#fecaca;"
+                    onclick="confirmDelete('mpesa', {{ cfg.id }}, '{{ cfg.account_name|default(cfg.shortcode)|e('html_attr') }}')">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                Delete
+            </button>
+        </div>
+    </div>
+    {% if not loop.last %}<div class="pay-divider"></div>{% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}{# /released mpesa #}
+
+{# ── CASH ──────────────────────────────────────────────────────────────── #}
+{% if released_methods['cash'] ?? false %}
+<div class="pay-section settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div class="settings-card-header pay-section-header">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Cash</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Cash acceptance rules and float management.</p>
+        </div>
+        {% if cash_configs|length > 0 %}
+        <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+            {{ cash_configs|length }} {{ cash_configs|length == 1 ? 'config' : 'configs' }}
+        </span>
+        {% endif %}
+    </div>
+
+    {% if cash_configs is empty %}
+    <div class="pay-empty">
+        <div style="width:40px;height:40px;border-radius:10px;background:#faf5ff;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;">
+            <svg width="18" height="18" fill="none" stroke="#7c3aed" stroke-width="1.75" viewBox="0 0 24 24">
+                <rect x="2" y="6" width="20" height="12" rx="2"/>
+                <circle cx="12" cy="12" r="3"/>
+                <path d="M6 12h.01M18 12h.01"/>
+            </svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">No cash configurations</p>
+        <p class="text-xs text-gray-400">Contact support to configure cash acceptance for your branches.</p>
+    </div>
+    {% else %}
+    <div class="settings-card-list">
+    {% for cfg in cash_configs %}
+    <div class="pay-row">
+        <div class="pay-icon" style="background:#faf5ff">
+            <svg width="16" height="16" fill="none" stroke="#7c3aed" stroke-width="1.75" viewBox="0 0 24 24">
+                <rect x="2" y="6" width="20" height="12" rx="2"/>
+                <circle cx="12" cy="12" r="3"/>
+            </svg>
+        </div>
+        <div class="pay-meta">
+            <div class="pay-meta-name">
+                {{ cfg.account_name ?: 'Cash Account' }}
+                {% if not cfg.is_active %}
+                <span class="pay-badge bg-red-50 text-red-600">Inactive</span>
+                {% endif %}
+                {% if cfg.requires_approval %}
+                <span class="pay-badge bg-amber-50 text-amber-600">Approval required</span>
+                {% endif %}
+            </div>
+            <div class="pay-meta-sub">
+                <span class="font-medium text-gray-500">{{ cfg.currency ?: 'KES' }}</span>
+                {% if cfg.min_amount or cfg.max_amount %}
+                <span class="text-gray-300">·</span>
+                <span>
+                    {% if cfg.min_amount %}min {{ cfg.min_amount|number_format(0) }}{% endif %}
+                    {% if cfg.min_amount and cfg.max_amount %} – {% endif %}
+                    {% if cfg.max_amount %}max {{ cfg.max_amount|number_format(0) }}{% endif %}
+                </span>
+                {% endif %}
+                {% if cfg.float_amount %}
+                <span class="text-gray-300">·</span>
+                <span>Float {{ cfg.float_amount|number_format(0) }}</span>
+                {% endif %}
+                {% if cfg.requires_receipt %}
+                <span class="text-gray-300">·</span>
+                <span>Receipt required</span>
+                {% endif %}
+            </div>
+        </div>
+        <button type="button" class="pay-btn"
+                onclick="openCashDrawer({{ cfg|json_encode|e('html_attr') }})">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+            </svg>
+            Configure
+        </button>
+    </div>
+    {% if not loop.last %}<div class="pay-divider"></div>{% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}{# /released cash #}
+
+{# ── BANK TRANSFER ─────────────────────────────────────────────────────── #}
+{% if released_methods['bank'] ?? false %}
+<div class="pay-section settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div class="settings-card-header pay-section-header">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Bank Transfer</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Bank account details and transfer settings.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            {% if bank_configs|length > 0 %}
+            <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                {{ bank_configs|length }} {{ bank_configs|length == 1 ? 'config' : 'configs' }}
+            </span>
+            {% endif %}
+            <button type="button" class="pay-btn" onclick="openCreateBankDrawer()">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add
+            </button>
+        </div>
+    </div>
+
+    {% if bank_configs is empty %}
+    <div class="pay-empty">
+        <div style="width:40px;height:40px;border-radius:10px;background:#eff6ff;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;">
+            <svg width="18" height="18" fill="none" stroke="#2563eb" stroke-width="1.75" viewBox="0 0 24 24">
+                <line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/>
+                <line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/>
+                <line x1="18" y1="18" x2="18" y2="11"/>
+                <polygon points="12 2 20 7 4 7"/>
+            </svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">No bank transfer configurations</p>
+        <p class="text-xs text-gray-400">Click <strong>Add</strong> to register a bank account.</p>
+    </div>
+    {% else %}
+    <div class="settings-card-list">
+    {% for cfg in bank_configs %}
+    <div class="pay-row">
+        <div class="pay-icon" style="background:#eff6ff">
+            <svg width="16" height="16" fill="none" stroke="#2563eb" stroke-width="1.75" viewBox="0 0 24 24">
+                <line x1="3" y1="22" x2="21" y2="22"/><line x1="6" y1="18" x2="6" y2="11"/>
+                <line x1="10" y1="18" x2="10" y2="11"/><line x1="14" y1="18" x2="14" y2="11"/>
+                <line x1="18" y1="18" x2="18" y2="11"/>
+                <polygon points="12 2 20 7 4 7"/>
+            </svg>
+        </div>
+        <div class="pay-meta">
+            <div class="pay-meta-name">
+                {{ cfg.account_name ?: (cfg.bank_name ?: 'Bank Account') }}
+                {% if not cfg.is_active %}
+                <span class="pay-badge bg-red-50 text-red-600">Inactive</span>
+                {% endif %}
+                {% if cfg.auto_confirm %}
+                <span class="pay-badge bg-blue-50 text-blue-600">Auto-confirm</span>
+                {% endif %}
+            </div>
+            <div class="pay-meta-sub">
+                {% if cfg.bank_name %}<span>{{ cfg.bank_name }}</span>{% endif %}
+                {% if cfg.bank_branch %}
+                <span class="text-gray-300">·</span>
+                <span>{{ cfg.bank_branch }}</span>
+                {% endif %}
+                {% if cfg.account_number %}
+                <span class="text-gray-300">·</span>
+                <span class="font-mono text-gray-500">{{ cfg.account_number }}</span>
+                {% endif %}
+                <span class="text-gray-300">·</span>
+                <span class="font-medium text-gray-500">{{ cfg.currency ?: 'KES' }}</span>
+            </div>
+        </div>
+        <div style="display:flex;gap:.375rem;">
+            <button type="button" class="pay-btn"
+                    onclick="openBankDrawer({{ cfg|json_encode|e('html_attr') }})">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Configure
+            </button>
+            <button type="button" class="pay-btn" style="color:#ef4444;border-color:#fecaca;"
+                    onclick="confirmDelete('bank', {{ cfg.id }}, '{{ cfg.account_name|default(cfg.bank_name)|e('html_attr') }}')">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                Delete
+            </button>
+        </div>
+    </div>
+    {% if not loop.last %}<div class="pay-divider"></div>{% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}{# /released bank #}
+
+{# ── PESAPAL ───────────────────────────────────────────────────────────── #}
+{% if released_methods['pesapal'] ?? false %}
+<div class="pay-section settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div class="settings-card-header pay-section-header">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Pesapal</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Card, M-Pesa &amp; Airtel Money via Pesapal gateway.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            {% if pesapal_configs is not empty %}
+            <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                {{ pesapal_configs|length }} {{ pesapal_configs|length == 1 ? 'config' : 'configs' }}
+            </span>
+            {% endif %}
+            {% if pesapal_configs is empty %}
+            <button type="button" class="pay-btn" onclick="openCreatePesapalDrawer()">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {% if pesapal_configs is empty %}
+    <div class="pay-empty">
+        <div style="width:40px;height:40px;border-radius:10px;background:#fef3c7;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;">
+            <svg width="18" height="18" fill="none" stroke="#d97706" stroke-width="1.75" viewBox="0 0 24 24"><rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/></svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">No Pesapal configuration</p>
+        <p class="text-xs text-gray-400">Click <strong>Add</strong> to set up Pesapal gateway.</p>
+    </div>
+    {% else %}
+    <div class="settings-card-list">
+    {% for cfg in pesapal_configs %}
+    <div class="pay-row">
+        <div class="pay-icon" style="background:#fef3c7">
+            <svg width="16" height="16" fill="none" stroke="#d97706" stroke-width="1.75" viewBox="0 0 24 24">
+                <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                <path d="M6 15h2M10 15h4"/>
+            </svg>
+        </div>
+        <div class="pay-meta">
+            <div class="pay-meta-name">
+                Pesapal
+                {% if not cfg.is_active %}
+                <span class="pay-badge bg-red-50 text-red-600">Inactive</span>
+                {% endif %}
+
+                <span class="pay-badge {{ cfg.environment == 'production' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-600' }}">
+                    {{ cfg.environment == 'production' ? 'Production' : 'Sandbox' }}
+                </span>
+            </div>
+            <div class="pay-meta-sub">
+                {% set methods = [] %}
+                {% if cfg.accepts_cards %}{% set methods = methods|merge(['Cards']) %}{% endif %}
+                {% if cfg.accepts_mpesa %}{% set methods = methods|merge(['M-Pesa']) %}{% endif %}
+                {% if cfg.accepts_airtel %}{% set methods = methods|merge(['Airtel']) %}{% endif %}
+                {% if cfg.accepts_bank %}{% set methods = methods|merge(['Bank']) %}{% endif %}
+                {% if methods is empty %}
+                <span class="text-amber-500">No payment methods enabled</span>
+                {% else %}
+                <span>{{ methods|join(', ') }}</span>
+                {% endif %}
+                {% if cfg.has_consumer_key %}
+                <span class="text-gray-300">·</span>
+                <span class="text-green-600 font-medium">Keys set</span>
+                {% else %}
+                <span class="text-gray-300">·</span>
+                <span class="text-amber-500 font-medium">No keys</span>
+                {% endif %}
+            </div>
+        </div>
+        <div style="display:flex;gap:.375rem;">
+            <button type="button" class="pay-btn"
+                    onclick="openPesapalDrawer({{ cfg|json_encode|e('html_attr') }})">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Configure
+            </button>
+            <button type="button" class="pay-btn" style="color:#ef4444;border-color:#fecaca;"
+                    onclick="confirmDelete('pesapal', {{ cfg.id }}, 'Pesapal')">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                Delete
+            </button>
+        </div>
+    </div>
+    {% if not loop.last %}<div class="pay-divider"></div>{% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}{# /released pesapal #}
+
+{# ── CARD ─────────────────────────────────────────────────────────────── #}
+{% if released_methods['card'] ?? false %}
+<div class="pay-section settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div class="settings-card-header pay-section-header">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Card</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Physical card terminal (Visa, Mastercard &amp; more).</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            {% if card_configs|length > 0 %}
+            <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-2.5 py-1 rounded-full">
+                {{ card_configs|length }} {{ card_configs|length == 1 ? 'config' : 'configs' }}
+            </span>
+            {% endif %}
+            <button type="button" class="pay-btn" onclick="openCreateCardDrawer()">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                Add
+            </button>
+        </div>
+    </div>
+
+    {% if card_configs is empty %}
+    <div class="pay-empty">
+        <div style="width:40px;height:40px;border-radius:10px;background:#f5f3ff;display:flex;align-items:center;justify-content:center;margin:0 auto .75rem;">
+            <svg width="18" height="18" fill="none" stroke="#7c3aed" stroke-width="1.75" viewBox="0 0 24 24">
+                <rect x="1" y="4" width="22" height="16" rx="2"/>
+                <line x1="1" y1="10" x2="23" y2="10"/>
+                <path d="M6 15h4M14 15h2"/>
+            </svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">No card configurations</p>
+        <p class="text-xs text-gray-400">Click <strong>Add</strong> to register a card terminal.</p>
+    </div>
+    {% else %}
+    <div class="settings-card-list">
+    {% for cfg in card_configs %}
+    <div class="pay-row {{ not loop.last ? 'border-b border-gray-50' }}">
+        <div class="pay-icon" style="background:#f5f3ff">
+            <svg width="16" height="16" fill="none" stroke="#7c3aed" stroke-width="1.75" viewBox="0 0 24 24">
+                <rect x="1" y="4" width="22" height="16" rx="2"/>
+                <line x1="1" y1="10" x2="23" y2="10"/>
+                <path d="M6 15h4M14 15h2"/>
+            </svg>
+        </div>
+        {% set _cardTypeLabels = {pdq: 'PDQ', mpos: 'mPOS', tap: 'Tap & Pay', virtual: 'Virtual'} %}
+        {% set _cardType = cfg.type ?? 'pdq' %}
+        <div class="pay-meta">
+            <div class="pay-meta-name">
+                {{ cfg.account_name ?: _cardTypeLabels[_cardType]|default('Card') }}
+                <span class="pay-badge bg-violet-50 text-violet-700">{{ _cardTypeLabels[_cardType]|default('Card') }}</span>
+                {% if not cfg.is_active %}
+                <span class="pay-badge bg-red-50 text-red-600">Inactive</span>
+                {% endif %}
+                {% if cfg.requires_receipt %}
+                <span class="pay-badge bg-amber-50 text-amber-600">Receipt required</span>
+                {% endif %}
+                {% if cfg.transaction_code_required %}
+                <span class="pay-badge bg-sky-50 text-sky-700">Code required</span>
+                {% endif %}
+            </div>
+            <div class="pay-meta-sub">
+                {% if cfg.acquiring_bank %}
+                <span>{{ cfg.acquiring_bank }}</span>
+                {% endif %}
+                {% if cfg.merchant_id %}
+                <span class="text-gray-300">·</span>
+                <span class="font-mono text-gray-500">MID: {{ cfg.merchant_id }}</span>
+                {% endif %}
+                {% if cfg.accepted_cards_decoded is not empty %}
+                <span class="text-gray-300">·</span>
+                <span>{{ cfg.accepted_cards_decoded|map(c => c|capitalize)|join(', ') }}</span>
+                {% endif %}
+            </div>
+        </div>
+        <div style="display:flex;gap:.375rem;">
+            <button type="button" class="pay-btn"
+                    onclick="openCardDrawer({{ cfg|json_encode|e('html_attr') }})">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Configure
+            </button>
+            <button type="button" class="pay-btn" style="color:#ef4444;border-color:#fecaca;"
+                    onclick="confirmDelete('card', {{ cfg.id }}, '{{ cfg.account_name|default('Card Terminal')|e('html_attr') }}')">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14H6L5 6"/><path d="M10 11v6M14 11v6"/><path d="M9 6V4h6v2"/>
+                </svg>
+                Delete
+            </button>
+        </div>
+    </div>
+    {% if not loop.last %}<div class="pay-divider"></div>{% endif %}
+    {% endfor %}
+    </div>
+    {% endif %}
+</div>
+{% endif %}{# /released card #}
+
+{# ── OTHER ────────────────────────────────────────────────────────────── #}
+<div class="pay-section settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div class="settings-card-header pay-section-header">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Other</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Ad-hoc payments that don't fit a configured method. Always available unless disabled for this branch.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.75rem;">
+            {% if other_enabled %}
+            <span class="text-xs font-semibold text-emerald-700 bg-emerald-50 px-2.5 py-1 rounded-full">Enabled</span>
+            {% else %}
+            <span class="text-xs font-semibold text-red-600 bg-red-50 px-2.5 py-1 rounded-full">Disabled</span>
+            {% endif %}
+            <button type="button" class="pay-btn {{ other_enabled ? 'text-red-600 border-red-200' : '' }}"
+                    onclick="toggleOtherPayment({{ other_enabled ? 'false' : 'true' }})">
+                {{ other_enabled ? 'Disable' : 'Enable' }}
+            </button>
+        </div>
+    </div>
+    <div style="padding:1rem 1.25rem;border-top:1px solid #f3f4f6;">
+        <div style="display:flex;flex-direction:column;gap:.375rem;">
+            <div style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:#6b7280;">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                Cashier will be prompted for a description and optional reference code.
+            </div>
+            <div style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:#6b7280;">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><path d="M12 8v4M12 16h.01"/></svg>
+                This setting applies to <strong style="color:#374151;">{{ session.branch.name }}</strong> only.
+            </div>
+        </div>
+    </div>
+</div>
+
+<script>
+/* ── URL base vars ── */
+const _mpesaBaseUrl      = '{{ path('admin_settings_save_payment',  _rp|merge({configId: 0})) }}';
+const _cashBaseUrl       = '{{ path('admin_settings_save_cash',     _rp|merge({configId: 0})) }}';
+const _bankBaseUrl       = '{{ path('admin_settings_save_bank',     _rp|merge({configId: 0})) }}';
+const _pesapalBaseUrl    = '{{ path('admin_settings_save_pesapal',  _rp|merge({configId: 0})) }}';
+const _createMpesaUrl    = '{{ path('admin_settings_create_mpesa',   _rp) }}';
+const _createBankUrl     = '{{ path('admin_settings_create_bank',    _rp) }}';
+const _createPesapalUrl  = '{{ path('admin_settings_create_pesapal', _rp) }}';
+const _cardBaseUrl       = '{{ path('admin_settings_save_card',     _rp|merge({configId: 0})) }}';
+const _createCardUrl     = '{{ path('admin_settings_create_card',    _rp) }}';
+const _deleteMpesaUrl    = '{{ path('admin_settings_delete_payment', _rp|merge({configId: 0})) }}';
+const _deleteBankUrl     = '{{ path('admin_settings_delete_bank',    _rp|merge({configId: 0})) }}';
+const _deletePesapalUrl  = '{{ path('admin_settings_delete_pesapal', _rp|merge({configId: 0})) }}';
+const _deleteCardUrl     = '{{ path('admin_settings_delete_card',    _rp|merge({configId: 0})) }}';
+const _toggleOtherUrl    = '{{ path('admin_settings_toggle_other',   _rp) }}';
+
+const _canViewCredentials = {{ can_view_credentials ? 'true' : 'false' }};
+const _canEditCredentials = {{ can_edit_credentials ? 'true' : 'false' }};
+
+function replaceId(base, id) {
+    return base.replace(/\/0$/, '/' + id);
+}
+
+/* ── Secret field helper ── */
+// currentValue: the decrypted value (non-empty = show it); canEdit: show input to change
+function secretField(id, label, currentValue, canEdit, placeholder) {
+    const hasValue = currentValue !== '' && currentValue != null;
+    const out = [];
+    out.push(`<div><label class="s-label">${label}</label>`);
+
+    if (hasValue) {
+        // Always show the current value as read-only monospace
+        out.push(`<div style="font-family:monospace;font-size:.8125rem;background:#f3f4f6;border:1px solid #e5e7eb;border-radius:.5rem;padding:.5rem .875rem;word-break:break-all;color:#111827;margin-bottom:.375rem;">${esc(currentValue)}</div>`);
+    }
+
+    if (canEdit) {
+        const hint = hasValue ? 'Enter a new value to replace it' : (placeholder || 'Not yet set');
+        out.push(`<input id="${id}" type="password" autocomplete="new-password"
+                   placeholder="${hasValue ? hint : hint}"
+                   class="s-input" style="width:100%;margin-top:${hasValue?'.25rem':'0'};">`);
+        out.push(hasValue
+            ? '<p class="s-hint">Leave blank to keep the current value.</p>'
+            : '<p class="s-hint">Required for API calls.</p>');
+    } else if (!hasValue) {
+        out.push(`<p style="font-size:.8125rem;color:#9ca3af;">Not yet set</p>`);
+    }
+
+    out.push('</div>');
+    return out.join('');
+}
+
+function toggleSecret(id, btn) {
+    const el = document.getElementById(id);
+    if (!el) return;
+    const show = el.type === 'password';
+    el.type = show ? 'text' : 'password';
+    btn.innerHTML = show
+        ? `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M17.94 17.94A10.07 10.07 0 0 1 12 20c-7 0-11-8-11-8a18.45 18.45 0 0 1 5.06-5.94"/><path d="M9.9 4.24A9.12 9.12 0 0 1 12 4c7 0 11 8 11 8a18.5 18.5 0 0 1-2.16 3.19"/><line x1="1" y1="1" x2="23" y2="23"/></svg>`
+        : `<svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7z"/><circle cx="12" cy="12" r="3"/></svg>`;
+}
+
+function urlInput(id, label, value, placeholder) {
+    return `
+    <div>
+        <label class="s-label" for="${id}">${label}</label>
+        <input id="${id}" type="url" value="${esc(value??'')}" placeholder="${placeholder||'https://'}"
+               class="s-input" style="width:100%;font-size:.8125rem;font-family:monospace;">
+    </div>`;
+}
+
+function esc(v) { return String(v??'').replace(/"/g,'&quot;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function val(id) { const el = document.getElementById(id); return el ? el.value : ''; }
+function chk(id) { const el = document.getElementById(id); return el ? (el.checked ? '1' : '0') : '0'; }
+
+/* ════════════════════════════════════════════
+   M-PESA DRAWER
+════════════════════════════════════════════ */
+function openMpesaDrawer(cfg) {
+    const activeModes = typeof cfg.integration_modes === 'object'
+        ? Object.values(cfg.integration_modes)
+        : String(cfg.integration_mode||'manual').split(',');
+
+    const modeChecks = [
+        {v:'stk_push', l:'STK Push',    d:'Prompt on customer\'s phone'},
+        {v:'callback', l:'Callback',    d:'Confirmed via server callback'},
+        {v:'manual',   l:'Manual Code', d:'Cashier enters transaction code'},
+    ].map(m => `
+    <label style="display:flex;align-items:flex-start;gap:.75rem;padding:.625rem .875rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;margin-bottom:.375rem;">
+        <input type="checkbox" name="integration_modes" value="${m.v}" ${activeModes.includes(m.v)?'checked':''}
+               onchange="enforceModeMinimum()"
+               style="accent-color:#4f46e5;width:15px;height:15px;flex-shrink:0;margin-top:2px;">
+        <div>
+            <p style="font-size:.875rem;font-weight:600;color:#111827;">${m.l}</p>
+            <p style="font-size:.75rem;color:#9ca3af;">${m.d}</p>
+        </div>
+    </label>`).join('');
+
+    const envOpts = [
+        {v:'sandbox',    l:'Sandbox — testing only'},
+        {v:'production', l:'Production — live transactions'},
+    ].map(e => `<option value="${e.v}" ${cfg.environment===e.v?'selected':''}>${e.l}</option>`).join('');
+
+    const urls = Array.isArray(cfg.forward_urls_decoded) ? cfg.forward_urls_decoded.join('\n') : '';
+
+    const isTill = cfg.type === 'buygoods';
+    const tillField = isTill ? `
+    <div>
+        <label class="s-label">Till number</label>
+        <input type="text" value="${esc(cfg.till_number??'')}" class="s-input" style="width:100%;font-family:monospace;background:#f9fafb;" readonly
+               title="Contact support to change till number">
+        <p class="s-hint">Managed by platform — contact support to change.</p>
+    </div>` : '';
+
+    const callbackInfo = (cfg.callback_url || cfg.confirmation_url) ? `
+    <div class="d-group">
+        <div class="d-group-title">Registered URLs</div>
+        <p style="font-size:.75rem;color:#9ca3af;margin-bottom:.75rem;line-height:1.5;">
+            Auto-generated when this config was created. Safaricom sends notifications to these endpoints.
+        </p>
+        ${cfg.callback_url ? `<div style="margin-bottom:.625rem;">
+            <p class="s-label">Callback URL</p>
+            <p style="font-size:.8125rem;font-family:monospace;color:#374151;word-break:break-all;">${esc(cfg.callback_url)}</p>
+        </div>` : ''}
+        ${cfg.confirmation_url ? `<div>
+            <p class="s-label">Confirmation URL</p>
+            <p style="font-size:.8125rem;font-family:monospace;color:#374151;word-break:break-all;">${esc(cfg.confirmation_url)}</p>
+        </div>` : ''}
+    </div>` : '';
+
+    let credentialsHtml;
+    if (!_canViewCredentials) {
+        credentialsHtml = `
+    <div class="d-group">
+        <div class="d-group-title">API Credentials</div>
+        <div style="padding:.875rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+            <p style="font-size:.875rem;font-weight:600;color:#374151;">Managed by platform administration</p>
+            <p style="font-size:.75rem;color:#9ca3af;margin-top:4px;">Contact a platform admin to view or update credentials.</p>
+        </div>
+    </div>`;
+    } else {
+        credentialsHtml = `
+    <div class="d-group">
+        <div class="d-group-title">API Credentials</div>
+        ${!_canEditCredentials ? '<p style="font-size:.75rem;color:#9ca3af;margin-bottom:.75rem;">Read-only — contact a platform owner to edit.</p>' : ''}
+        <div class="space-y-3">
+            ${secretField('mp-consumer-key',    'Consumer Key',        cfg.consumer_key_value,    _canEditCredentials)}
+            ${secretField('mp-consumer-secret', 'Consumer Secret',     cfg.consumer_secret_value, _canEditCredentials)}
+            ${secretField('mp-passkey',         'Passkey (STK Push)',  cfg.passkey_value,         _canEditCredentials)}
+        </div>
+    </div>`;
+    }
+
+    const html = `
+    <div id="drawer-error" class="hidden mb-4 px-3.5 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+    <div class="d-group">
+        <div class="d-group-title">Account</div>
+        <div class="space-y-3">
+            <div>
+                <label class="s-label" for="mp-name">Account label</label>
+                <input id="mp-name" type="text" value="${esc(cfg.account_name??'')}"
+                       placeholder="e.g. Main Till, Koma Nairobi" class="s-input" style="width:100%;">
+            </div>
+            <div class="d-row-2">
+                <div>
+                    <label class="s-label">Type</label>
+                    <input type="text" value="${isTill?'BuyGoods (Till)':'Paybill'}" class="s-input" style="width:100%;background:#f9fafb;" readonly>
+                </div>
+                <div>
+                    <label class="s-label">Shortcode</label>
+                    <input type="text" value="${esc(cfg.shortcode??'')}" class="s-input" style="width:100%;font-family:monospace;background:#f9fafb;" readonly
+                           title="Contact support to change shortcode">
+                </div>
+            </div>
+            ${tillField}
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Integration Modes</div>
+        <p style="font-size:.75rem;color:#9ca3af;margin-bottom:.75rem;">Select all modes this config should support. At least one is required.</p>
+        <div id="mp-modes-wrap">${modeChecks}</div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Environment</div>
+        <div class="s-select-wrap">
+            <select id="mp-env" class="s-input" style="width:100%;padding-right:2.25rem;">${envOpts}</select>
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Status</div>
+        <div class="space-y-2">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Active</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Config is live and selectable at POS.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="mp-active" ${cfg.is_active?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Require manual code</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Cashier must enter M-Pesa code before confirming.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="mp-manual-req" ${cfg.manual_code_required?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #fef3c7;background:#fffbeb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Auto-award loyalty points</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Only applies when loyalty automation is enabled and this config uses STK push or callback mode.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="mp-auto-award" ${cfg.auto_award_loyalty?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    ${credentialsHtml}
+    ${callbackInfo}
+
+    <div class="d-group">
+        <div class="d-group-title">Forwarding</div>
+        <div>
+            <label class="s-label" for="mp-forward">Forward URLs</label>
+            <textarea id="mp-forward" rows="3"
+                      placeholder="https://example.com/webhook&#10;One URL per line"
+                      style="width:100%;padding:.5rem .875rem;font-size:.8125rem;font-family:monospace;color:#111827;background:#fff;border:1px solid #d1d5db;border-radius:.5rem;outline:none;resize:none;transition:border-color .15s,box-shadow .15s;box-sizing:border-box;"
+                      onfocus="this.style.borderColor='#6366f1';this.style.boxShadow='0 0 0 3px rgba(99,102,241,.12)'"
+                      onblur="this.style.borderColor='#d1d5db';this.style.boxShadow='none'">${urls}</textarea>
+            <p class="s-hint">M-Pesa callbacks mirrored to each URL. One per line.</p>
+        </div>
+    </div>`;
+
+    openDrawer(
+        cfg.account_name || 'Configure M-Pesa',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitMpesa(${cfg.id})" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save changes</button>`
+    );
+    enforceModeMinimum();
+}
+
+function enforceModeMinimum() {
+    const all     = document.querySelectorAll('#mp-modes-wrap input[name="integration_modes"]');
+    const checked = Array.from(all).filter(el => el.checked);
+    all.forEach(el => {
+        el.disabled = checked.length === 1 && el.checked;
+    });
+}
+
+function submitMpesa(id) {
+    const modeBoxes = document.querySelectorAll('#mp-modes-wrap input[name="integration_modes"]:checked');
+    const modes = Array.from(modeBoxes).map(el => el.value);
+
+    const params = new URLSearchParams();
+    params.append('account_name',         val('mp-name'));
+    params.append('environment',          val('mp-env'));
+    params.append('manual_code_required', chk('mp-manual-req'));
+    params.append('is_active',            chk('mp-active'));
+    params.append('auto_award_loyalty',   chk('mp-auto-award'));
+    params.append('forward_urls',         val('mp-forward'));
+    modes.forEach(m => params.append('integration_modes[]', m));
+    if (_canEditCredentials) {
+        const ck = val('mp-consumer-key');
+        const cs = val('mp-consumer-secret');
+        const pk = val('mp-passkey');
+        if (ck) params.append('consumer_key', ck);
+        if (cs) params.append('consumer_secret', cs);
+        if (pk) params.append('passkey', pk);
+    }
+
+    adminFetch(replaceId(_mpesaBaseUrl, id), params, () => { closeDrawer(); turboReload(); });
+}
+
+/* ════════════════════════════════════════════
+   CASH DRAWER
+════════════════════════════════════════════ */
+function openCashDrawer(cfg) {
+    const html = `
+    <div id="drawer-error" class="hidden mb-4 px-3.5 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+    <div class="d-group">
+        <div class="d-group-title">Account</div>
+        <div class="space-y-3">
+            <div>
+                <label class="s-label" for="ca-name">Account name</label>
+                <input id="ca-name" type="text" value="${esc(cfg.account_name??'')}"
+                       placeholder="e.g. Main Cash Drawer" class="s-input" style="width:100%;">
+            </div>
+            <div>
+                <label class="s-label" for="ca-currency">Currency</label>
+                <input id="ca-currency" type="text" value="${esc(cfg.currency??'KES')}"
+                       placeholder="KES" class="s-input" style="width:100%;">
+                <p class="s-hint">3-letter ISO code, e.g. KES, USD.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Limits</div>
+        <div class="d-row-2">
+            <div>
+                <label class="s-label" for="ca-min">Min amount</label>
+                <input id="ca-min" type="number" value="${esc(cfg.min_amount??'')}"
+                       placeholder="0" min="0" step="0.01" class="s-input" style="width:100%;">
+                <p class="s-hint">Leave blank for no minimum.</p>
+            </div>
+            <div>
+                <label class="s-label" for="ca-max">Max amount</label>
+                <input id="ca-max" type="number" value="${esc(cfg.max_amount??'')}"
+                       placeholder="No limit" min="0" step="0.01" class="s-input" style="width:100%;">
+                <p class="s-hint">Leave blank for no maximum.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Float & Reconciliation</div>
+        <div class="space-y-3">
+            <div>
+                <label class="s-label" for="ca-float">Float amount</label>
+                <input id="ca-float" type="number" value="${esc(cfg.float_amount??'')}"
+                       placeholder="0" min="0" step="0.01" class="s-input" style="width:100%;">
+                <p class="s-hint">Starting float balance for this cash account.</p>
+            </div>
+            <div>
+                <label class="s-label" for="ca-approval-threshold">Approval threshold</label>
+                <input id="ca-approval-threshold" type="number" value="${esc(cfg.approval_threshold??'')}"
+                       placeholder="e.g. 50000" min="0" step="0.01" class="s-input" style="width:100%;">
+                <p class="s-hint">Transactions above this amount require manager approval.</p>
+            </div>
+            <div>
+                <label class="s-label" for="ca-email">Reconciliation email</label>
+                <input id="ca-email" type="email" value="${esc(cfg.reconciliation_email??'')}"
+                       placeholder="cashier@company.com" class="s-input" style="width:100%;">
+                <p class="s-hint">Receives end-of-day cash reconciliation reports.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Rules</div>
+        <div class="space-y-2">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Require receipt</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Print or email receipt for every cash transaction.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="ca-receipt" ${cfg.requires_receipt?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Require approval</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Transactions above the threshold need manager sign-off.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="ca-approval" ${cfg.requires_approval?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Active</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Cash is available as a payment method at POS.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="ca-active" ${cfg.is_active?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Notes</div>
+        <textarea id="ca-notes" rows="3"
+                  placeholder="Internal notes about this cash account..."
+                  style="width:100%;padding:.5rem .875rem;font-size:.875rem;color:#111827;background:#fff;border:1px solid #d1d5db;border-radius:.5rem;outline:none;resize:none;transition:border-color .15s,box-shadow .15s;box-sizing:border-box;"
+                  onfocus="this.style.borderColor='#6366f1';this.style.boxShadow='0 0 0 3px rgba(99,102,241,.12)'"
+                  onblur="this.style.borderColor='#d1d5db';this.style.boxShadow='none'">${esc(cfg.notes??'')}</textarea>
+    </div>`;
+
+    openDrawer(
+        cfg.account_name || 'Configure Cash',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitCash(${cfg.id})" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save changes</button>`
+    );
+}
+
+function submitCash(id) {
+    adminFetch(
+        replaceId(_cashBaseUrl, id),
+        {
+            account_name:        val('ca-name'),
+            currency:            val('ca-currency'),
+            min_amount:          val('ca-min'),
+            max_amount:          val('ca-max'),
+            requires_receipt:    chk('ca-receipt'),
+            requires_approval:   chk('ca-approval'),
+            approval_threshold:  val('ca-approval-threshold'),
+            float_amount:        val('ca-float'),
+            reconciliation_email:val('ca-email'),
+            notes:               val('ca-notes'),
+            is_active:           chk('ca-active'),
+        },
+        () => { closeDrawer(); turboReload(); }
+    );
+}
+
+/* ════════════════════════════════════════════
+   BANK DRAWER
+════════════════════════════════════════════ */
+function openBankDrawer(cfg) {
+    const html = `
+    <div id="drawer-error" class="hidden mb-4 px-3.5 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+    <div class="d-group">
+        <div class="d-group-title">Account</div>
+        <div class="space-y-3">
+            <div>
+                <label class="s-label" for="bk-name">Account label</label>
+                <input id="bk-name" type="text" value="${esc(cfg.account_name??'')}"
+                       placeholder="e.g. Main Bank Account" class="s-input" style="width:100%;">
+            </div>
+            <div class="d-row-2">
+                <div>
+                    <label class="s-label" for="bk-holder">Account holder</label>
+                    <input id="bk-holder" type="text" value="${esc(cfg.account_holder_name??'')}"
+                           placeholder="Full legal name" class="s-input" style="width:100%;">
+                </div>
+                <div>
+                    <label class="s-label" for="bk-accno">Account number</label>
+                    <input id="bk-accno" type="text" value="${esc(cfg.account_number??'')}"
+                           placeholder="0123456789" class="s-input" style="width:100%;font-family:monospace;">
+                </div>
+            </div>
+            <div>
+                <label class="s-label" for="bk-currency">Currency</label>
+                <input id="bk-currency" type="text" value="${esc(cfg.currency??'KES')}"
+                       placeholder="KES" class="s-input" style="width:100%;">
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Bank Details</div>
+        <div class="space-y-3">
+            <div class="d-row-2">
+                <div>
+                    <label class="s-label" for="bk-bank-name">Bank name</label>
+                    <input id="bk-bank-name" type="text" value="${esc(cfg.bank_name??'')}"
+                           placeholder="Equity Bank" class="s-input" style="width:100%;">
+                </div>
+                <div>
+                    <label class="s-label" for="bk-branch">Branch</label>
+                    <input id="bk-branch" type="text" value="${esc(cfg.bank_branch??'')}"
+                           placeholder="CBD Branch" class="s-input" style="width:100%;">
+                </div>
+            </div>
+            <div class="d-row-2">
+                <div>
+                    <label class="s-label" for="bk-code">Bank code</label>
+                    <input id="bk-code" type="text" value="${esc(cfg.bank_code??'')}"
+                           placeholder="63" class="s-input" style="width:100%;font-family:monospace;">
+                </div>
+                <div>
+                    <label class="s-label" for="bk-swift">SWIFT / BIC</label>
+                    <input id="bk-swift" type="text" value="${esc(cfg.bank_swift_code??'')}"
+                           placeholder="EQBLKENA" class="s-input" style="width:100%;font-family:monospace;">
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Payment Instructions</div>
+        <div class="space-y-3">
+            <div>
+                <label class="s-label" for="bk-ref">Reference format</label>
+                <input id="bk-ref" type="text" value="${esc(cfg.reference_format??'')}"
+                       placeholder="e.g. INV-{order_id}" class="s-input" style="width:100%;">
+                <p class="s-hint">Template for the payment reference customers should use.</p>
+            </div>
+            <div>
+                <label class="s-label" for="bk-instructions">Customer instructions</label>
+                <textarea id="bk-instructions" rows="3"
+                          placeholder="e.g. Transfer to Equity Bank, A/C 0123456789, use your order number as the reference."
+                          style="width:100%;padding:.5rem .875rem;font-size:.875rem;color:#111827;background:#fff;border:1px solid #d1d5db;border-radius:.5rem;outline:none;resize:none;transition:border-color .15s,box-shadow .15s;box-sizing:border-box;"
+                          onfocus="this.style.borderColor='#6366f1';this.style.boxShadow='0 0 0 3px rgba(99,102,241,.12)'"
+                          onblur="this.style.borderColor='#d1d5db';this.style.boxShadow='none'">${esc(cfg.payment_instructions??'')}</textarea>
+                <p class="s-hint">Shown to the customer at checkout.</p>
+            </div>
+            <div>
+                <label class="s-label" for="bk-email">Reconciliation email</label>
+                <input id="bk-email" type="email" value="${esc(cfg.reconciliation_email??'')}"
+                       placeholder="accounts@company.com" class="s-input" style="width:100%;">
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Settings</div>
+        <div class="space-y-2">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Auto-confirm payments</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Mark bank transfers as confirmed without manual verification.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="bk-autoconfirm" ${cfg.auto_confirm?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Active</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Bank transfer is available as a payment method at checkout.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="bk-active" ${cfg.is_active?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>`;
+
+    openDrawer(
+        cfg.account_name || cfg.bank_name || 'Configure Bank Transfer',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitBank(${cfg.id})" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save changes</button>`
+    );
+}
+
+function submitBank(id) {
+    adminFetch(
+        replaceId(_bankBaseUrl, id),
+        {
+            account_name:         val('bk-name'),
+            account_holder_name:  val('bk-holder'),
+            account_number:       val('bk-accno'),
+            currency:             val('bk-currency'),
+            bank_name:            val('bk-bank-name'),
+            bank_branch:          val('bk-branch'),
+            bank_code:            val('bk-code'),
+            bank_swift_code:      val('bk-swift'),
+            reference_format:     val('bk-ref'),
+            payment_instructions: val('bk-instructions'),
+            reconciliation_email: val('bk-email'),
+            auto_confirm:         chk('bk-autoconfirm'),
+            is_active:            chk('bk-active'),
+        },
+        () => { closeDrawer(); turboReload(); }
+    );
+}
+
+/* ════════════════════════════════════════════
+   PESAPAL DRAWER
+════════════════════════════════════════════ */
+function openPesapalDrawer(cfg) {
+    const envOpts = [
+        {v:'sandbox',    l:'Sandbox — testing only'},
+        {v:'production', l:'Production — live transactions'},
+    ].map(e => `<option value="${e.v}" ${cfg.environment===e.v?'selected':''}>${e.l}</option>`).join('');
+
+    const html = `
+    <div id="drawer-error" class="hidden mb-4 px-3.5 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+    <div class="d-group">
+        <div class="d-group-title">Environment</div>
+        <div class="s-select-wrap">
+            <select id="pp-env" class="s-input" style="width:100%;padding-right:2.25rem;">${envOpts}</select>
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">API Credentials</div>
+        <div class="space-y-3">
+            ${secretField('pp-consumer-key',    'Consumer Key',    cfg.consumer_key_value??'',    true)}
+            ${secretField('pp-consumer-secret', 'Consumer Secret', cfg.consumer_secret_value??'', true)}
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Callback URLs</div>
+        <div class="space-y-3">
+            ${urlInput('pp-ipn', 'IPN URL', cfg.ipn_url, 'https://yourdomain.com/pesapal/ipn')}
+            ${urlInput('pp-callback', 'Callback URL', cfg.callback_url, 'https://yourdomain.com/pesapal/callback')}
+            ${urlInput('pp-cancel', 'Cancellation URL', cfg.cancellation_url, 'https://yourdomain.com/pesapal/cancel')}
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Accepted Methods</div>
+        <div class="space-y-2">
+            ${['cards','mpesa','airtel','bank'].map(m => `
+            <label style="display:flex;align-items:center;gap:.75rem;padding:.625rem .875rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;cursor:pointer;">
+                <input type="checkbox" id="pp-${m}" ${cfg['accepts_'+m]?'checked':''} style="accent-color:#4f46e5;width:15px;height:15px;flex-shrink:0;">
+                <span style="font-size:.875rem;font-weight:600;color:#111827;">${m==='mpesa'?'M-Pesa':m==='airtel'?'Airtel Money':m==='cards'?'Cards (Visa/Mastercard)':'Bank Transfer'}</span>
+            </label>`).join('')}
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Status</div>
+        <div class="space-y-2">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Integration enabled</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Process payments via Pesapal gateway.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="pp-enabled" ${cfg.integration_enabled?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.75rem 1rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p style="font-size:.875rem;font-weight:600;color:#111827;">Active</p>
+                    <p style="font-size:.75rem;color:#9ca3af;margin-top:2px;">Pesapal is selectable as a payment method at checkout.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" id="pp-active" ${cfg.is_active?'checked':''}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>`;
+
+    openDrawer(
+        'Configure Pesapal',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitPesapal(${cfg.id})" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save changes</button>`
+    );
+}
+
+function submitPesapal(id) {
+    adminFetch(
+        replaceId(_pesapalBaseUrl, id),
+        {
+            environment:        val('pp-env'),
+            consumer_key:       val('pp-consumer-key'),
+            consumer_secret:    val('pp-consumer-secret'),
+            ipn_url:            val('pp-ipn'),
+            callback_url:       val('pp-callback'),
+            cancellation_url:   val('pp-cancel'),
+            accepts_cards:      chk('pp-cards'),
+            accepts_mpesa:      chk('pp-mpesa'),
+            accepts_airtel:     chk('pp-airtel'),
+            accepts_bank:       chk('pp-bank'),
+            integration_enabled:chk('pp-enabled'),
+            is_active:          chk('pp-active'),
+        },
+        () => { closeDrawer(); turboReload(); }
+    );
+}
+
+/* ════════════════════════════════════════════
+   CREATE M-PESA DRAWER
+════════════════════════════════════════════ */
+function openCreateMpesaDrawer() {
+    const html = `
+    <div id="drawer-error" class="hidden mb-4 px-3.5 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+    <div class="d-group">
+        <div class="d-group-title">Type</div>
+        <div class="s-select-wrap">
+            <select id="cmp-type" class="s-input" style="width:100%;padding-right:2.25rem;"
+                    onchange="document.getElementById('cmp-till-wrap').style.display=this.value==='buygoods'?'block':'none'">
+                <option value="paybill">Paybill</option>
+                <option value="buygoods">BuyGoods (Till)</option>
+            </select>
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Account</div>
+        <div class="space-y-3">
+            <div>
+                <label class="s-label" for="cmp-name">Account label</label>
+                <input id="cmp-name" type="text" placeholder="e.g. Main Paybill, Koma Nairobi" class="s-input" style="width:100%;">
+            </div>
+            <div>
+                <label class="s-label" for="cmp-shortcode">Shortcode <span style="color:#ef4444">*</span></label>
+                <input id="cmp-shortcode" type="text" placeholder="e.g. 174379" class="s-input" style="width:100%;font-family:monospace;">
+                <p class="s-hint">Paybill or BuyGoods number assigned by Safaricom.</p>
+            </div>
+            <div id="cmp-till-wrap" style="display:none;">
+                <label class="s-label" for="cmp-till">Till number</label>
+                <input id="cmp-till" type="text" placeholder="e.g. 123456" class="s-input" style="width:100%;font-family:monospace;">
+                <p class="s-hint">Required for BuyGoods type.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="d-group">
+        <div class="d-group-title">Environment</div>
+        <div class="s-select-wrap">
+            <select id="cmp-env" class="s-input" style="width:100%;padding-right:2.25rem;">
+                <option value="sandbox">Sandbox — testing only</option>
+                <option value="production">Production — live transactions</option>
+            </select>
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+    </div>
+
+    <p style="font-size:.75rem;color:#9ca3af;line-height:1.6;">
+        The new config will be created inactive. Configure integration modes and credentials after creation.
+    </p>`;
+
+    openDrawer(
+        'Add M-Pesa Config',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitCreateMpesa()" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Create</button>`
+    );
+}
+
+function submitCreateMpesa() {
+    const type = val('cmp-type');
+    const payload = {
+        type:        type,
+        account_name:val('cmp-name'),
+        shortcode:   val('cmp-shortcode'),
+        environment: val('cmp-env'),
+    };
+    if (type === 'buygoods') {
+        payload.till_number = val('cmp-till');
+    }
+    adminFetch(_createMpesaUrl, payload, () => { closeDrawer(); turboReload(); });
+}
+
+/* ════════════════════════════════════════════
+   CREATE BANK DRAWER
+════════════════════════════════════════════ */
+function openCreateBankDrawer() {
+    const html = `
+    <div id="drawer-error" class="hidden mb-4 px-3.5 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+    <div class="d-group">
+        <div class="d-group-title">Account</div>
+        <div class="space-y-3">
+            <div>
+                <label class="s-label" for="cbk-name">Account label <span style="color:#ef4444">*</span></label>
+                <input id="cbk-name" type="text" placeholder="e.g. Main Bank Account" class="s-input" style="width:100%;">
+            </div>
+            <div class="d-row-2">
+                <div>
+                    <label class="s-label" for="cbk-bank-name">Bank name</label>
+                    <input id="cbk-bank-name" type="text" placeholder="Equity Bank" class="s-input" style="width:100%;">
+                </div>
+                <div>
+                    <label class="s-label" for="cbk-holder">Account holder</label>
+                    <input id="cbk-holder" type="text" placeholder="Full legal name" class="s-input" style="width:100%;">
+                </div>
+            </div>
+            <div>
+                <label class="s-label" for="cbk-accno">Account number</label>
+                <input id="cbk-accno" type="text" placeholder="0123456789" class="s-input" style="width:100%;font-family:monospace;">
+            </div>
+            <div>
+                <label class="s-label" for="cbk-currency">Currency</label>
+                <input id="cbk-currency" type="text" placeholder="KES" value="KES" class="s-input" style="width:100%;">
+            </div>
+        </div>
+    </div>
+
+    <p style="font-size:.75rem;color:#9ca3af;line-height:1.6;">
+        The new account will be created inactive. Add full details and activate after creation.
+    </p>`;
+
+    openDrawer(
+        'Add Bank Account',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitCreateBank()" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Create</button>`
+    );
+}
+
+function submitCreateBank() {
+    adminFetch(_createBankUrl, {
+        account_name:        val('cbk-name'),
+        bank_name:           val('cbk-bank-name'),
+        account_holder_name: val('cbk-holder'),
+        account_number:      val('cbk-accno'),
+        currency:            val('cbk-currency'),
+    }, () => { closeDrawer(); turboReload(); });
+}
+
+/* ════════════════════════════════════════════
+   CREATE PESAPAL DRAWER
+════════════════════════════════════════════ */
+function openCreatePesapalDrawer() {
+    const html = `
+    <div id="drawer-error" class="hidden mb-4 px-3.5 py-3 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+    <div class="d-group">
+        <div class="d-group-title">Environment</div>
+        <div class="s-select-wrap">
+            <select id="cpp-env" class="s-input" style="width:100%;padding-right:2.25rem;">
+                <option value="sandbox">Sandbox — testing only</option>
+                <option value="production">Production — live transactions</option>
+            </select>
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+        </div>
+    </div>
+
+    <p style="font-size:.75rem;color:#9ca3af;line-height:1.6;">
+        Only one Pesapal integration is allowed per company. The config will be created inactive.
+        Add your API credentials after creation.
+    </p>`;
+
+    openDrawer(
+        'Add Pesapal Integration',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitCreatePesapal()" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Create</button>`
+    );
+}
+
+function submitCreatePesapal() {
+    adminFetch(_createPesapalUrl, {
+        environment: val('cpp-env'),
+    }, () => { closeDrawer(); turboReload(); });
+}
+
+/* ════════════════════════════════════════════
+   CARD
+════════════════════════════════════════════ */
+const _CARD_NETWORKS = [
+    { key: 'visa',       label: 'Visa' },
+    { key: 'mastercard', label: 'Mastercard' },
+    { key: 'amex',       label: 'Amex' },
+    { key: 'unionpay',   label: 'UnionPay' },
+    { key: 'discover',   label: 'Discover' },
+];
+
+function cardNetworkCheckboxes(selected) {
+    return _CARD_NETWORKS.map(n => `
+        <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:#374151;cursor:pointer;">
+            <input type="checkbox" name="accepted_cards[]" value="${n.key}" ${selected.includes(n.key) ? 'checked' : ''}
+                   style="width:1rem;height:1rem;accent-color:#6d28d9;">
+            ${n.label}
+        </label>`).join('');
+}
+
+const _CARD_TYPES = [
+    { key: 'pdq',     label: 'PDQ Machine',      hint: 'Countertop or portable card terminal' },
+    { key: 'mpos',    label: 'Mobile POS',        hint: 'Phone-attached reader (SumUp, iZettle, etc.)' },
+    { key: 'tap',     label: 'Tap & Pay',         hint: 'Contactless / NFC terminal' },
+    { key: 'virtual', label: 'Virtual Terminal',  hint: 'Manual card-not-present entry' },
+];
+
+function cardTypeOptions(selected) {
+    return _CARD_TYPES.map(t => `<option value="${t.key}" ${selected === t.key ? 'selected' : ''}>${t.label} — ${t.hint}</option>`).join('');
+}
+
+function openCreateCardDrawer() {
+    const html = `
+        <div class="space-y-3">
+            <div><label class="s-label">Terminal Type</label>
+                <select id="ccd-type" class="s-input">${cardTypeOptions('pdq')}</select></div>
+            <div><label class="s-label">Account / Terminal Label <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input id="ccd-name" class="s-input" placeholder="e.g. Main Counter PDQ"></div>
+            <div><label class="s-label">Acquiring Bank <span class="text-gray-400 font-normal">(optional)</span></label>
+                <input id="ccd-bank" class="s-input" placeholder="e.g. KCB, Equity, NCBA"></div>
+        </div>`;
+
+    openDrawer(
+        'Add Card Terminal',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitCreateCard()" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Create</button>`
+    );
+}
+
+function submitCreateCard() {
+    adminFetch(_createCardUrl, {
+        type:           val('ccd-type'),
+        account_name:   val('ccd-name'),
+        acquiring_bank: val('ccd-bank'),
+    }, () => { closeDrawer(); turboReload(); });
+}
+
+function openCardDrawer(cfg) {
+    const selected = cfg.accepted_cards_decoded ?? [];
+    const html = `
+        <div class="space-y-3">
+            <div><label class="s-label">Terminal Type</label>
+                <select id="cd-type" class="s-input">${cardTypeOptions(cfg.type ?? 'pdq')}</select></div>
+            <div><label class="s-label">Account / Terminal Label</label>
+                <input id="cd-name" class="s-input" value="${esc(cfg.account_name ?? '')}"></div>
+            <div><label class="s-label">Acquiring Bank</label>
+                <input id="cd-bank" class="s-input" value="${esc(cfg.acquiring_bank ?? '')}" placeholder="e.g. KCB, Equity, NCBA"></div>
+            <div><label class="s-label">Merchant ID</label>
+                <input id="cd-mid" class="s-input font-mono" value="${esc(cfg.merchant_id ?? '')}" placeholder="MID from your bank"></div>
+            <div><label class="s-label">Terminal ID</label>
+                <input id="cd-tid" class="s-input font-mono" value="${esc(cfg.terminal_id ?? '')}" placeholder="TID from your terminal"></div>
+            <div>
+                <label class="s-label">Accepted Card Networks</label>
+                <div style="display:grid;grid-template-columns:1fr 1fr;gap:.375rem .75rem;margin-top:.375rem;" id="cd-networks">
+                    ${cardNetworkCheckboxes(selected)}
+                </div>
+            </div>
+            <div style="display:flex;flex-wrap:wrap;gap:.75rem 1.5rem;">
+                <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:#374151;cursor:pointer;">
+                    <input type="checkbox" id="cd-active" ${cfg.is_active ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:#6d28d9;">
+                    Active
+                </label>
+                <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:#374151;cursor:pointer;">
+                    <input type="checkbox" id="cd-receipt" ${cfg.requires_receipt ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:#6d28d9;">
+                    Require receipt
+                </label>
+                <label style="display:flex;align-items:center;gap:.5rem;font-size:.8125rem;color:#374151;cursor:pointer;">
+                    <input type="checkbox" id="cd-code-req" ${cfg.transaction_code_required ? 'checked' : ''} style="width:1rem;height:1rem;accent-color:#6d28d9;">
+                    Transaction code required
+                </label>
+            </div>
+            <div><label class="s-label">Notes / Instructions</label>
+                <textarea id="cd-notes" class="s-input" rows="2" placeholder="Optional staff-facing instructions">${esc(cfg.notes ?? '')}</textarea></div>
+        </div>`;
+
+    openDrawer(
+        'Configure Card Terminal',
+        html,
+        `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+         <button data-primary onclick="submitCard(${cfg.id})" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save</button>`
+    );
+}
+
+function submitCard(id) {
+    const params = new URLSearchParams();
+    params.set('type',           val('cd-type'));
+    params.set('account_name',   val('cd-name'));
+    params.set('acquiring_bank', val('cd-bank'));
+    params.set('merchant_id',    val('cd-mid'));
+    params.set('terminal_id',    val('cd-tid'));
+    params.set('currency',       'KES');
+    params.set('is_active',                   document.getElementById('cd-active')?.checked   ? '1' : '0');
+    params.set('requires_receipt',            document.getElementById('cd-receipt')?.checked  ? '1' : '0');
+    params.set('transaction_code_required',   document.getElementById('cd-code-req')?.checked ? '1' : '0');
+    params.set('notes',          val('cd-notes'));
+
+    document.querySelectorAll('#cd-networks input[type=checkbox]:checked').forEach(cb => {
+        params.append('accepted_cards[]', cb.value);
+    });
+
+    adminFetch(replaceId(_cardBaseUrl, id), params, () => { closeDrawer(); turboReload(); });
+}
+
+/* ════════════════════════════════════════════
+   OTHER TOGGLE
+════════════════════════════════════════════ */
+function toggleOtherPayment(enable) {
+    const label = enable ? 'enable' : 'disable';
+    window.adminConfirm({
+        title:   (enable ? 'Enable' : 'Disable') + ' Other payments?',
+        message: enable
+            ? 'Cashiers at this branch will be able to record ad-hoc payments with a description.'
+            : 'Other will be removed from this branch\'s payment options.',
+        confirmLabel: enable ? 'Enable' : 'Disable',
+        onConfirm: () => {
+            adminFetch(_toggleOtherUrl, { enabled: enable ? '1' : '0' }, () => { turboReload(); });
+        },
+    });
+}
+
+/* ════════════════════════════════════════════
+   DELETE
+════════════════════════════════════════════ */
+function confirmDelete(type, id, label) {
+    const urlMap = { mpesa: _deleteMpesaUrl, bank: _deleteBankUrl, pesapal: _deletePesapalUrl, card: _deleteCardUrl };
+    const url    = urlMap[type].replace(/\/0\/delete/, '/' + id + '/delete');
+
+    window.adminConfirm({
+        title:   'Delete ' + label + '?',
+        message: 'This will permanently remove this configuration.',
+        type:    'danger',
+        confirm: 'Delete',
+        onConfirm: () => {
+            adminFetch(url, {}, () => { turboReload(); });
+        },
+    });
+}
+</script>
+
+{% endblock %}

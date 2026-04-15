@@ -38,8 +38,14 @@ final class PlatformCheckPermissionService
 
         // ── Tenant dashboard access ──────────────────────────────────────────
         'access_company_context' => ['ACCESS_COMPANY_CONTEXT'],
+        'view_settings' => ['VIEW_COMPANY_SETTINGS'],
+        'edit_settings' => ['EDIT_COMPANY_SETTINGS'],
         'view_company_org_chart' => ['VIEW_COMPANY_ORG_CHART'],
         'manage_company_org_chart' => ['MANAGE_COMPANY_ORG_CHART'],
+
+        // ── API credentials (payment configs) ────────────────────────────────
+        'view_api_credentials' => ['VIEW_API_CREDENTIALS'],
+        'edit_api_credentials' => ['EDIT_API_CREDENTIALS'],
 
         // ── Misc ─────────────────────────────────────────────────────────────
         'authorize_pos_terminal' => ['AUTHORIZE_TERMINALS'],

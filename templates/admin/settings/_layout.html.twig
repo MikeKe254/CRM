@@ -1,0 +1,192 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
+{% set _rp = {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch} %}
+{% set _route = app.request.attributes.get('_route') %}
+{% set _can_manage_module_overrides = isSuperAdmin() and platformCan('manage_tenant_overrides') %}
+
+{% block admin_title %}Settings{% endblock %}
+{% block admin_subtitle %}Manage your company preferences and integrations{% endblock %}
+
+{% block admin_content %}
+
+{# ── TOGGLE CSS — independent of Tailwind compilation ────────────────── #}
+<style>
+/* ── Toggles ── */
+.s-toggle { position:relative; display:inline-flex; align-items:center; cursor:pointer; flex-shrink:0; }
+.s-toggle input { position:absolute; opacity:0; width:0; height:0; pointer-events:none; }
+.s-toggle-track { display:block; width:44px; height:24px; border-radius:100px; background:#e5e7eb; transition:background .18s ease; }
+.s-toggle-knob { position:absolute; top:3px; left:3px; width:18px; height:18px; border-radius:50%; background:#fff; box-shadow:0 1px 3px rgba(0,0,0,.18), 0 0 0 .5px rgba(0,0,0,.06); transition:transform .18s ease; pointer-events:none; }
+.s-toggle input:checked ~ .s-toggle-track { background:#4f46e5; }
+.s-toggle input:checked ~ .s-toggle-track .s-toggle-knob { transform:translateX(20px); }
+
+/* ── Outer shell ── */
+.settings-shell { display:flex; align-items:flex-start; gap:2rem; }
+.settings-nav   { width:190px; flex-shrink:0; position:sticky; top:1.5rem; }
+.settings-body  { flex:1; min-width:0; }
+
+/* ── Card & sections ── */
+.settings-card,
+.settings-card-header,
+.settings-card-footer,
+.settings-card-list   { max-width:760px; }
+
+/* footer responsive padding */
+.settings-card-footer { padding-left:2rem; padding-right:2rem; }
+.settings-section { display:flex; align-items:flex-start; gap:3rem; padding:1.75rem 2rem; max-width:760px; }
+.settings-section-desc   { width:12rem; flex-shrink:0; }
+.settings-section-fields { flex:1; min-width:0; max-width:21rem; }
+
+/* ── Inputs ── */
+.s-input {
+    width:100%; height:2.25rem; padding:0 .875rem;
+    font-size:.875rem; color:#111827; background:#fff;
+    border:1px solid #d1d5db; border-radius:.5rem;
+    outline:none; transition:border-color .15s, box-shadow .15s;
+    appearance:none; box-sizing:border-box;
+}
+.s-input:focus { border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.12); }
+.s-input::placeholder { color:#9ca3af; }
+.s-select-wrap { position:relative; }
+.s-select-wrap svg { position:absolute; right:.75rem; top:50%; transform:translateY(-50%); pointer-events:none; color:#9ca3af; }
+.s-label { display:block; font-size:.8125rem; font-weight:600; color:#374151; margin-bottom:.375rem; }
+.s-hint  { font-size:.75rem; color:#9ca3af; margin-top:.375rem; line-height:1.5; }
+
+/* ── Tablet: compress sidebar, tighten section gap ── */
+@media (max-width: 1024px) {
+    .settings-nav { width:160px; }
+    .settings-section { gap:2rem; padding:1.5rem 1.5rem; }
+    .settings-section-desc { width:10rem; }
+}
+
+/* ── Mobile: sidebar becomes horizontal scrollable top nav ── */
+@media (max-width: 767px) {
+    .settings-shell { flex-direction:column; gap:0; }
+
+    .settings-nav {
+        width:100%; position:static;
+        display:flex; flex-direction:row; overflow-x:auto;
+        gap:0; padding-bottom:.75rem;
+        border-bottom:1px solid #e5e7eb; margin-bottom:1.25rem;
+        -webkit-overflow-scrolling:touch;
+        scrollbar-width:none;
+    }
+    .settings-nav::-webkit-scrollbar { display:none; }
+
+    /* Hide section labels on mobile */
+    .settings-nav p { display:none; }
+
+    .settings-nav a {
+        white-space:nowrap; flex-shrink:0;
+        padding:.5rem .875rem; border-radius:.5rem;
+        margin-right:.25rem;
+    }
+
+    .settings-section { flex-direction:column; gap:1rem; padding:1.25rem 1rem; }
+    .settings-section-desc  { width:100%; }
+    .settings-section-fields { width:100%; max-width:100%; }
+
+    .settings-card,
+    .settings-card-header,
+    .settings-card-footer,
+    .settings-card-list { max-width:100%; }
+
+    .settings-card-header,
+    .settings-card-footer { padding-left:1rem; padding-right:1rem; }
+
+    /* Stack 2-col grids inside fields */
+    .settings-section-fields .grid { grid-template-columns:1fr !important; }
+}
+</style>
+
+<div class="settings-shell">
+
+    {# ═══════════ VERTICAL NAV ═══════════ #}
+    <aside class="settings-nav">
+        <nav>
+
+            <p class="px-3 pb-2 text-xs font-semibold text-gray-400 uppercase tracking-widest">General</p>
+
+            <a href="{{ path('admin_settings_company', _rp) }}" data-turbo-action="replace"
+               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5
+                      {{ _route == 'admin_settings_company' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" class="flex-shrink-0">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                Company
+            </a>
+
+            <a href="{{ path('admin_settings_localisation', _rp) }}" data-turbo-action="replace"
+               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5
+                      {{ _route == 'admin_settings_localisation' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" class="flex-shrink-0">
+                    <circle cx="12" cy="12" r="10"/>
+                    <line x1="2" y1="12" x2="22" y2="12"/>
+                    <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/>
+                </svg>
+                Localisation
+            </a>
+
+            <p class="px-3 pb-2 pt-5 text-xs font-semibold text-gray-400 uppercase tracking-widest">Features</p>
+
+            {% if _can_manage_module_overrides %}
+            <a href="{{ path('admin_settings_modules', _rp) }}" data-turbo-action="replace"
+               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5
+                      {{ _route == 'admin_settings_modules' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" class="flex-shrink-0">
+                    <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
+                    <polyline points="3.27 6.96 12 12.01 20.73 6.96"/>
+                    <line x1="12" y1="22.08" x2="12" y2="12"/>
+                </svg>
+                Modules
+            </a>
+            {% endif %}
+
+            <a href="{{ path('admin_settings_loyalty', _rp) }}" data-turbo-action="replace"
+               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5
+                      {{ _route == 'admin_settings_loyalty' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" class="flex-shrink-0">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Loyalty
+            </a>
+
+            <a href="{{ path('admin_settings_terminal', _rp) }}" data-turbo-action="replace"
+               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5
+                      {{ _route == 'admin_settings_terminal' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" class="flex-shrink-0">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <path d="M8 21h8M12 17v4"/>
+                </svg>
+                Terminal
+            </a>
+
+            <p class="px-3 pb-2 pt-5 text-xs font-semibold text-gray-400 uppercase tracking-widest">Integrations</p>
+
+            {% if feature('payments') %}
+            <a href="{{ path('admin_settings_payment', _rp) }}" data-turbo-action="replace"
+               class="flex items-center gap-2.5 px-3 py-2 rounded-lg text-sm font-medium transition-colors mb-0.5
+                      {{ _route == 'admin_settings_payment' ? 'bg-indigo-50 text-indigo-700' : 'text-gray-600 hover:bg-gray-100 hover:text-gray-900' }}">
+                <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24" class="flex-shrink-0">
+                    <rect x="1" y="4" width="22" height="16" rx="2"/>
+                    <line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+                Payment
+            </a>
+            {% endif %}
+
+        </nav>
+    </aside>
+
+    {# ═══════════ CONTENT ═══════════ #}
+    <div class="settings-body">
+        {% block settings_content %}{% endblock %}
+    </div>
+
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}{% block settings_scripts %}{% endblock %}{% endblock %}

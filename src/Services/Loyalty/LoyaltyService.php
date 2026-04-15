@@ -31,8 +31,20 @@ final class LoyaltyService
      * Get the active loyalty program for a company.
      * Returns null if no program is configured.
      */
-    public function getProgram(int $companyId): ?array
+    public function getProgram(int $companyId, ?int $branchId = null): ?array
     {
+        if ($branchId !== null) {
+            return $this->db->fetchAssociative(
+                'SELECT * FROM loyalty_programs
+                  WHERE company_id = :company_id
+                    AND branch_id = :branch_id
+                    AND is_active = 1
+                  ORDER BY id ASC
+                  LIMIT 1',
+                ['company_id' => $companyId, 'branch_id' => $branchId],
+            ) ?: null;
+        }
+
         return $this->db->fetchAssociative(
             'SELECT * FROM loyalty_programs
               WHERE company_id = :company_id AND is_active = 1
@@ -50,14 +62,14 @@ final class LoyaltyService
      * Get loyalty account for a customer, with program branding and tier resolved.
      * Returns null if the customer is not enrolled.
      */
-    public function getAccount(int $companyId, string $msisdn): ?LoyaltyAccount
+    public function getAccount(int $companyId, string $msisdn, ?int $branchId = null): ?LoyaltyAccount
     {
         $msisdn = $this->customers->normalizePhone($msisdn);
         if ($msisdn === null) {
             return null;
         }
 
-        $row = $this->fetchAccountRow($companyId, $msisdn);
+        $row = $this->fetchAccountRow($companyId, $msisdn, $branchId);
 
         return $row ? LoyaltyAccount::fromRow($row) : null;
     }
@@ -67,14 +79,14 @@ final class LoyaltyService
      * If already enrolled, returns the existing account.
      * Also creates/links the customer record.
      */
-    public function findOrEnroll(int $companyId, string $msisdn, ?string $firstName = null): ?LoyaltyAccount
+    public function findOrEnroll(int $companyId, string $msisdn, ?string $firstName = null, ?int $branchId = null): ?LoyaltyAccount
     {
         $msisdn = $this->customers->normalizePhone($msisdn);
         if ($msisdn === null) {
             return null;
         }
 
-        $program = $this->getProgram($companyId);
+        $program = $this->getProgram($companyId, $branchId);
         if ($program === null) {
             return null;
         }
@@ -83,7 +95,7 @@ final class LoyaltyService
         $customer = $this->customers->findOrCreate($companyId, $msisdn, $firstName);
 
         // Check existing account
-        $existing = $this->fetchAccountRow($companyId, $msisdn);
+        $existing = $this->fetchAccountRow($companyId, $msisdn, $branchId);
         if ($existing !== null) {
             return LoyaltyAccount::fromRow($existing);
         }
@@ -103,8 +115,8 @@ final class LoyaltyService
         $accountId = (int) $this->db->lastInsertId();
 
         // Award enrollment bonus if configured
-        $bonusPoints = (int) ($program['enroll_bonus_points'] ?? 0);
-        if ($bonusPoints > 0) {
+        $bonusPoints = (float) ($program['enroll_bonus_points'] ?? 0);
+        if ($bonusPoints > 0.0) {
             $this->db->executeStatement(
                 'UPDATE loyalty_accounts
                     SET points_balance = :pts, total_points_earned = :pts, updated_at = NOW()
@@ -118,7 +130,7 @@ final class LoyaltyService
         // Resolve initial tier
         $this->resolveAndUpdateTier($accountId, $companyId);
 
-        $row = $this->fetchAccountRow($companyId, $msisdn);
+        $row = $this->fetchAccountRow($companyId, $msisdn, $branchId);
         return $row ? LoyaltyAccount::fromRow($row) : null;
     }
 
@@ -128,29 +140,30 @@ final class LoyaltyService
 
     /**
      * Calculate how many points will be awarded for a given amount.
-     * Returns 0 if no program is configured or amount is too low.
+     * Returns a decimal value (e.g. 0.99, 1.50) — never floors to zero.
+     * Returns 0.0 if no program is configured or amount is invalid.
      */
-    public function calculatePoints(int $companyId, float $amount): int
+    public function calculatePoints(int $companyId, float $amount, ?int $branchId = null): float
     {
-        $program = $this->getProgram($companyId);
+        $program = $this->getProgram($companyId, $branchId);
         if ($program === null || $amount <= 0) {
-            return 0;
+            return 0.0;
         }
 
-        $unitAmount  = (float) $program['unit_amount'];
-        $pointsPerUnit = (int) $program['points_per_unit'];
+        $unitAmount    = (float) $program['unit_amount'];
+        $pointsPerUnit = (int)   $program['points_per_unit'];
 
         if ($unitAmount <= 0) {
-            return 0;
+            return 0.0;
         }
 
-        return (int) floor(($amount / $unitAmount) * $pointsPerUnit);
+        return round(($amount / $unitAmount) * $pointsPerUnit, 2);
     }
 
     /**
      * Award points to a loyalty account after a completed transaction.
      * Writes to ledger, updates balance, resolves tier.
-     * Returns points awarded (0 if account not found or 0 points calculated).
+     * Returns points awarded as a decimal (0.0 if nothing awarded).
      */
     public function award(
         int $loyaltyAccountId,
@@ -158,11 +171,12 @@ final class LoyaltyService
         float $amount,
         int $posTransactionId,
         ?int $cashierUserId,
-    ): int {
-        $points = $this->calculatePoints($companyId, $amount);
+        ?int $branchId = null,
+    ): float {
+        $points = $this->calculatePoints($companyId, $amount, $branchId);
 
-        if ($points <= 0) {
-            return 0;
+        if ($points <= 0.0) {
+            return 0.0;
         }
 
         // Atomic update
@@ -176,7 +190,7 @@ final class LoyaltyService
         );
 
         // Fetch new balance for ledger
-        $newBalance = (int) $this->db->fetchOne(
+        $newBalance = (float) $this->db->fetchOne(
             'SELECT points_balance FROM loyalty_accounts WHERE id = :id',
             ['id' => $loyaltyAccountId],
         );
@@ -241,8 +255,22 @@ final class LoyaltyService
     /**
      * Get redemption config for a company's loyalty program (if enabled).
      */
-    public function getRedemptionConfig(int $companyId): ?array
+    public function getRedemptionConfig(int $companyId, ?int $branchId = null): ?array
     {
+        if ($branchId !== null) {
+            return $this->db->fetchAssociative(
+                'SELECT id, program_name, points_name, points_symbol,
+                        kes_per_point, max_redemption_pct
+                   FROM loyalty_programs
+                  WHERE company_id = :cid
+                    AND branch_id = :branch_id
+                    AND is_active = 1
+                    AND redemption_enabled = 1
+                  LIMIT 1',
+                ['cid' => $companyId, 'branch_id' => $branchId],
+            ) ?: null;
+        }
+
         return $this->db->fetchAssociative(
             'SELECT id, program_name, points_name, points_symbol,
                     kes_per_point, max_redemption_pct
@@ -283,7 +311,7 @@ final class LoyaltyService
             return false; // Insufficient balance
         }
 
-        $balanceAfter = (int) ($this->db->fetchOne(
+        $balanceAfter = (float) ($this->db->fetchOne(
             'SELECT points_balance FROM loyalty_accounts WHERE id = :id',
             ['id' => $loyaltyAccountId],
         ) ?? 0);
@@ -292,7 +320,7 @@ final class LoyaltyService
             loyaltyAccountId: $loyaltyAccountId,
             companyId:        $companyId,
             type:             'redeem',
-            points:           -$points,
+            points:           -(float) $points,
             balanceAfter:     $balanceAfter,
             note:             'Redeemed as payment',
             posTransactionId: $posTransactionId,
@@ -308,8 +336,36 @@ final class LoyaltyService
     // PRIVATE
     // =========================================================================
 
-    private function fetchAccountRow(int $companyId, string $msisdn): ?array
+    private function fetchAccountRow(int $companyId, string $msisdn, ?int $branchId = null): ?array
     {
+        if ($branchId !== null) {
+            $row = $this->db->fetchAssociative(
+                'SELECT
+                    la.*,
+                    lp.program_name,
+                    lp.points_name,
+                    lp.points_symbol,
+                    lt.id           AS tier_id,
+                    lt.name         AS tier_name,
+                    lt.color        AS tier_color,
+                    nt.name         AS next_tier_name,
+                    nt.min_points   AS next_tier_min_points
+                   FROM loyalty_accounts la
+                   JOIN loyalty_programs  lp ON lp.id = la.loyalty_program_id
+              LEFT JOIN loyalty_tiers     lt ON lt.id = la.loyalty_tier_id
+              LEFT JOIN loyalty_tiers     nt ON nt.loyalty_program_id = lp.id
+                                            AND nt.min_points > la.points_balance
+                  WHERE la.company_id = :company_id
+                    AND la.msisdn     = :msisdn
+                    AND lp.branch_id  = :branch_id
+                  ORDER BY nt.min_points ASC
+                  LIMIT 1',
+                ['company_id' => $companyId, 'msisdn' => $msisdn, 'branch_id' => $branchId],
+            );
+
+            return $row ?: null;
+        }
+
         $row = $this->db->fetchAssociative(
             'SELECT
                 la.*,
@@ -340,8 +396,8 @@ final class LoyaltyService
         int $loyaltyAccountId,
         int $companyId,
         string $type,
-        int $points,
-        int $balanceAfter,
+        float $points,
+        float $balanceAfter,
         ?string $note = null,
         ?int $posTransactionId = null,
         ?int $createdByUserId = null,

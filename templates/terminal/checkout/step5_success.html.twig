@@ -2,6 +2,7 @@
 {% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: app.request.attributes.get('branch')} %}
 
 {% set points_awarded  = draft.get('points_awarded', 0) %}
+{% set _pa_fmt = (points_awarded|round(0) == points_awarded) ? points_awarded|number_format(0) : points_awarded|number_format(2) %}
 {% set loyalty_phone   = draft.get('loyalty_phone', '') %}
 {% set loyalty_balance = draft.get('loyalty_balance') %}
 {% set loyalty_tier    = draft.get('loyalty_tier', '') %}
@@ -55,11 +56,11 @@
                 <div style="flex:1;text-align:left;">
                     <div style="color:#fde68a;font-size:13px;">Points Awarded</div>
                     <div style="color:#fff;font-size:22px;font-weight:800;">
-                        +{{ points_awarded }} <span style="color:#eab308;font-size:15px;font-weight:600;">{{ loyalty_name }}</span>
+                        +{{ _pa_fmt }} <span style="color:#eab308;font-size:15px;font-weight:600;">{{ loyalty_name }}</span>
                     </div>
                     {% if loyalty_balance is not null %}
                     <div style="color:#9ca3af;font-size:12px;margin-top:2px;">
-                        Balance: {{ loyalty_balance }} {{ loyalty_name }}{% if loyalty_tier %} · {{ loyalty_tier }}{% endif %}
+                        Balance: {{ (loyalty_balance|round(0) == loyalty_balance) ? loyalty_balance|number_format(0) : loyalty_balance|number_format(2) }} {{ loyalty_name }}{% if loyalty_tier %} · {{ loyalty_tier }}{% endif %}
                     </div>
                     {% endif %}
                 </div>

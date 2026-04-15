@@ -47,21 +47,37 @@ final class TransactionRecordService
         string  $mode,
         ?int    $mpesaConfigId = null,
         ?int    $pesapalConfigId = null,
+        ?string $revenueSourceType = null,
+        ?int    $revenueSourceId = null,
+        ?int    $eventId = null,
+        ?int    $covers = null,
+        float   $grossAmount = 0.0,
+        float   $discountAmount = 0.0,
+        ?string $discountReason = null,
+        ?int    $discountByUserId = null,
     ): int {
         $this->db->insert('pos_transactions', [
-            'company_id'          => $companyId,
-            'branch_id'           => $branchId,
-            'area_id'             => $areaId,
-            'terminal_identifier' => $terminalIdentifier,
-            'cashier_user_id'     => $cashierUserId,
-            'payment_method_id'   => $paymentMethodId,
-            'mpesa_config_id'     => $mpesaConfigId,
-            'pesapal_config_id'   => $pesapalConfigId,
-            'amount'              => $amount,
-            'description'         => $description,
-            'mode'                => $mode,
-            'status'              => 'pending',
-            'created_at'          => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            'company_id'             => $companyId,
+            'branch_id'              => $branchId,
+            'area_id'                => $areaId,
+            'terminal_identifier'    => $terminalIdentifier,
+            'cashier_user_id'        => $cashierUserId,
+            'payment_method_id'      => $paymentMethodId,
+            'mpesa_config_id'        => $mpesaConfigId,
+            'pesapal_config_id'      => $pesapalConfigId,
+            'amount'                 => $amount,
+            'gross_amount'           => $grossAmount > 0.0 ? $grossAmount : $amount,
+            'discount_amount'        => $discountAmount,
+            'discount_reason'        => $discountReason,
+            'discount_by_user_id'    => $discountByUserId,
+            'description'            => $description,
+            'mode'                   => $mode,
+            'revenue_source_type'    => $revenueSourceType,
+            'revenue_source_id'      => $revenueSourceId,
+            'event_id'               => $eventId,
+            'covers'                 => $covers,
+            'status'                 => 'pending',
+            'created_at'             => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -106,7 +122,7 @@ final class TransactionRecordService
         ?string $msisdn = null,
         ?int    $cashierUserId = null,
         ?float  $earnableAmount = null, // amount eligible for points (excludes loyalty-redeemed portion)
-    ): int {
+    ): float {
         $txn = $this->fetchTransaction($transactionId);
         if ($txn === null) {
             return 0;
@@ -114,13 +130,17 @@ final class TransactionRecordService
 
         $customerId       = null;
         $loyaltyAccountId = null;
-        $pointsAwarded    = 0;
+        $pointsAwarded    = (float) ($txn['loyalty_points_awarded'] ?? 0);
+        $alreadyAutoAwarded = (bool) ($txn['loyalty_auto_awarded'] ?? false);
+        $alreadyAutoAwardedAmount = (float) ($txn['loyalty_auto_awarded_amount'] ?? 0);
 
         // Amount eligible for points: defaults to full transaction amount
         $pointsBase = $earnableAmount ?? (float) $txn['amount'];
+        $manualPointsBase = max(0.0, $pointsBase - $alreadyAutoAwardedAmount);
 
-        // Resolve customer and award loyalty if msisdn provided
-        if ($msisdn !== null) {
+        // Resolve customer and award loyalty if msisdn provided and this transaction
+        // was not already awarded by the callback-side auto-award flow.
+        if ($msisdn !== null && $manualPointsBase > 0) {
             $normalised = $this->customers->normalizePhone($msisdn);
 
             if ($normalised !== null) {
@@ -128,19 +148,27 @@ final class TransactionRecordService
                 $customerId = (int) $customer['id'];
                 $this->customers->touchLastSeen($customerId);
 
-                $account = $this->loyalty->findOrEnroll($txn['company_id'], $normalised);
+                $account = $this->loyalty->findOrEnroll($txn['company_id'], $normalised, null, (int) $txn['branch_id']);
 
                 if ($account !== null) {
                     $loyaltyAccountId = $account->id;
-                    $pointsAwarded    = $this->loyalty->award(
+                    $manualPointsAwarded = $this->loyalty->award(
                         loyaltyAccountId: $account->id,
                         companyId:        $txn['company_id'],
-                        amount:           $pointsBase,
+                        amount:           $manualPointsBase,
                         posTransactionId: $transactionId,
                         cashierUserId:    $cashierUserId,
+                        branchId:         (int) $txn['branch_id'],
                     );
+                    $pointsAwarded += $manualPointsAwarded;
                 }
             }
+        }
+
+        if ($alreadyAutoAwarded) {
+            $customerId       = $txn['customer_id'] !== null ? (int) $txn['customer_id'] : null;
+            $loyaltyAccountId = $txn['loyalty_account_id'] !== null ? (int) $txn['loyalty_account_id'] : null;
+            $pointsAwarded    = max($pointsAwarded, (float) ($txn['loyalty_points_awarded'] ?? 0));
         }
 
         $this->db->executeStatement(
@@ -167,6 +195,97 @@ final class TransactionRecordService
         );
 
         return $pointsAwarded;
+    }
+
+    /**
+     * Sync callback-side loyalty award data from mpesa_payments into the linked
+     * POS transaction without re-awarding points.
+     */
+    public function syncAutoAwardedMpesaPaymentToTransaction(int $transactionId, int $mpesaPaymentId, ?float $awardedAmount = null): void
+    {
+        $payment = $this->db->fetchAssociative(
+            'SELECT id, transaction_id, msisdn, customer_id, loyalty_account_id,
+                    loyalty_points_awarded, loyalty_auto_awarded, loyalty_awarded_at
+               FROM mpesa_payments
+              WHERE id = :id
+              LIMIT 1',
+            ['id' => $mpesaPaymentId],
+        );
+
+        if (!$payment) {
+            return;
+        }
+
+        $alreadyLinked = (bool) $this->db->fetchOne(
+            'SELECT 1
+               FROM loyalty_ledger
+              WHERE mpesa_payment_id = :mpesa_id
+                AND pos_transaction_id = :txn_id
+              LIMIT 1',
+            [
+                'mpesa_id' => $mpesaPaymentId,
+                'txn_id' => $transactionId,
+            ],
+        );
+
+        $params = [
+            'id' => $transactionId,
+            'mpesa_id' => $mpesaPaymentId,
+            'receipt' => $payment['transaction_id'] ?: null,
+            'msisdn' => $payment['msisdn'] ?: null,
+            'customer_id' => $payment['customer_id'] !== null ? (int) $payment['customer_id'] : null,
+            'loyalty_account_id' => $payment['loyalty_account_id'] !== null ? (int) $payment['loyalty_account_id'] : null,
+            'points' => (float) ($payment['loyalty_points_awarded'] ?? 0),
+            'auto_awarded' => (int) ((bool) ($payment['loyalty_auto_awarded'] ?? false)),
+            'awarded_at' => $payment['loyalty_awarded_at'] ?: null,
+            'award_source' => (bool) ($payment['loyalty_auto_awarded'] ?? false) ? 'mpesa_callback' : null,
+            'awarded_amount' => $awardedAmount,
+            'already_linked' => (int) $alreadyLinked,
+        ];
+
+        $this->db->executeStatement(
+            'UPDATE pos_transactions
+                SET mpesa_payment_id = COALESCE(mpesa_payment_id, :mpesa_id),
+                    api_receipt = COALESCE(:receipt, api_receipt),
+                    msisdn = COALESCE(:msisdn, msisdn),
+                    customer_id = COALESCE(:customer_id, customer_id),
+                    loyalty_account_id = COALESCE(:loyalty_account_id, loyalty_account_id),
+                    loyalty_points_awarded = CASE
+                        WHEN :auto_awarded = 1 AND :already_linked = 0 THEN loyalty_points_awarded + :points
+                        ELSE loyalty_points_awarded
+                    END,
+                    loyalty_auto_awarded = CASE
+                        WHEN :auto_awarded = 1 THEN 1
+                        ELSE loyalty_auto_awarded
+                    END,
+                    loyalty_auto_awarded_amount = CASE
+                        WHEN :auto_awarded = 1 AND :already_linked = 0 THEN loyalty_auto_awarded_amount + COALESCE(:awarded_amount, 0)
+                        ELSE loyalty_auto_awarded_amount
+                    END,
+                    loyalty_awarded_at = CASE
+                        WHEN :auto_awarded = 1 THEN COALESCE(:awarded_at, loyalty_awarded_at)
+                        ELSE loyalty_awarded_at
+                    END,
+                    loyalty_award_source = CASE
+                        WHEN :auto_awarded = 1 THEN COALESCE(:award_source, loyalty_award_source)
+                        ELSE loyalty_award_source
+                    END,
+                    updated_at = NOW()
+              WHERE id = :id',
+            $params,
+        );
+
+        if ((bool) ($payment['loyalty_auto_awarded'] ?? false)) {
+            $this->db->executeStatement(
+                'UPDATE loyalty_ledger
+                    SET pos_transaction_id = COALESCE(pos_transaction_id, :txn_id)
+                  WHERE mpesa_payment_id = :mpesa_id',
+                [
+                    'txn_id' => $transactionId,
+                    'mpesa_id' => $mpesaPaymentId,
+                ],
+            );
+        }
     }
 
     /**
@@ -211,6 +330,7 @@ final class TransactionRecordService
         ?int    $mpesaConfigId = null,
         ?string $apiReceipt = null,
         ?int    $mpesaPaymentId = null,
+        ?string $paymentNotes = null,
     ): void {
         // Upsert: if the leg already exists (e.g. double-confirm) update the receipt only
         $existing = $this->db->fetchOne(
@@ -240,6 +360,7 @@ final class TransactionRecordService
             'mpesa_config_id'    => $mpesaConfigId,
             'api_receipt'        => $apiReceipt,
             'mpesa_payment_id'   => $mpesaPaymentId,
+            'payment_notes'      => $paymentNotes,
         ]);
     }
 

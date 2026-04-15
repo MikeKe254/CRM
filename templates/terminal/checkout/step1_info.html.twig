@@ -7,25 +7,25 @@
 <div style="display:flex;flex-direction:column;height:100%;overflow:hidden;">
 
     {# ── Top bar ─────────────────────────────────────────────────────────── #}
-    <div style="display:flex;align-items:center;gap:12px;padding:14px 16px;border-bottom:1px solid #1f2937;flex-shrink:0;">
+    <div style="display:flex;align-items:center;gap:12px;padding:10px 16px;border-bottom:1px solid #1f2937;flex-shrink:0;">
         <form method="post" action="{{ path('terminal_checkout_cancel', _p) }}" style="flex-shrink:0;">
             <button type="submit" class="keypad-btn"
-                    style="width:38px;height:38px;border-radius:10px;background:#1f2937;border:none;display:flex;align-items:center;justify-content:center;">
-                <svg width="18" height="18" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24">
+                    style="width:34px;height:34px;border-radius:10px;background:#1f2937;border:none;display:flex;align-items:center;justify-content:center;">
+                <svg width="16" height="16" fill="none" stroke="#9ca3af" stroke-width="2" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
             </button>
         </form>
         <div style="flex:1;">
-            <div style="color:#fff;font-weight:700;font-size:15px;line-height:1.2;">New Checkout</div>
-            <div style="color:#6b7280;font-size:11px;">Step 1 of 5 — Amount &amp; Area</div>
+            <div style="color:#fff;font-weight:700;font-size:14px;line-height:1.2;">New Checkout</div>
+            <div style="color:#6b7280;font-size:10px;">Step 1 of 5 — Amount, Item &amp; Area</div>
         </div>
         <div style="display:flex;gap:5px;align-items:center;">
-            <div style="width:8px;height:8px;border-radius:50%;background:#10b981;"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
-            <div style="width:8px;height:8px;border-radius:50%;background:#374151;"></div>
+            <div style="width:7px;height:7px;border-radius:50%;background:#10b981;"></div>
+            <div style="width:7px;height:7px;border-radius:50%;background:#374151;"></div>
+            <div style="width:7px;height:7px;border-radius:50%;background:#374151;"></div>
+            <div style="width:7px;height:7px;border-radius:50%;background:#374151;"></div>
+            <div style="width:7px;height:7px;border-radius:50%;background:#374151;"></div>
         </div>
     </div>
 
@@ -33,42 +33,96 @@
           style="display:flex;flex-direction:column;flex:1;overflow:hidden;">
 
         {# ── Amount display ──────────────────────────────────────────────── #}
-        <div style="padding:16px 16px 8px;flex-shrink:0;text-align:center;">
-            <div style="color:#6b7280;font-size:12px;margin-bottom:2px;">Enter Amount (KES)</div>
+        <div style="padding:8px 16px 4px;flex-shrink:0;text-align:center;">
+            <div style="color:#6b7280;font-size:11px;margin-bottom:1px;">Enter Amount (KES)</div>
             <div id="amount-display"
-                 style="color:#fff;font-size:56px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-1px;">
+                 style="color:#fff;font-size:40px;font-weight:800;font-variant-numeric:tabular-nums;line-height:1;letter-spacing:-1px;">
                 {{ draft.get('amount', 0) > 0 ? draft.get('amount')|number_format(0,'.', ',') : '0' }}
             </div>
             <input type="hidden" name="amount" id="amount-input"
                    value="{{ draft.get('amount', '') }}">
         </div>
 
-        {# ── Quick-add row ───────────────────────────────────────────────── #}
-        <div style="display:flex;gap:8px;padding:0 16px 10px;flex-shrink:0;justify-content:center;">
-            {% for n in [500, 1000, 2000, 5000] %}
-            <button type="button" class="keypad-btn" onclick="quickAdd({{ n }})"
-                    style="background:#1f2937;border:1px solid #374151;border-radius:10px;color:#d1d5db;padding:7px 12px;font-size:13px;font-weight:600;flex:1;">
-                +{{ n >= 1000 ? (n/1000)|number_format(0)~'k' : n }}
-            </button>
-            {% endfor %}
+        {# ── Catalog quick-pick — horizontal scroll, optional ───────────── #}
+        {% if catalog_items|length > 0 %}
+        <div style="flex-shrink:0;border-top:1px solid #1f2937;">
+            <div style="display:flex;align-items:center;overflow-x:auto;padding:7px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;"
+                 class="catalog-scroll-row" id="catalog-scroll">
+                <input type="hidden" name="catalog_item_id" id="catalog-item-id-input" value="{{ draft.get('catalog_item_id', '') }}">
+                <button type="button" class="keypad-btn catalog-chip"
+                        data-catalog-id=""
+                        data-price=""
+                        style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid #374151;font-size:11px;font-weight:500;margin-right:6px;white-space:nowrap;
+                               {{ not draft.get('catalog_item_id') ? 'background:#374151;color:#fff;border-color:#4b5563;' : 'background:#1f2937;color:#9ca3af;' }}">
+                    No Item
+                </button>
+                {% for item in catalog_items %}
+                <button type="button" class="keypad-btn catalog-chip"
+                        data-catalog-id="{{ item.id }}"
+                        data-price="{{ item.price ?: '' }}"
+                        style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid;font-size:11px;font-weight:600;margin-right:6px;white-space:nowrap;
+                               {{ draft.get('catalog_item_id') == item.id
+                                  ? 'background:#7c3aed;border-color:#a78bfa;color:#fff;'
+                                  : 'background:#1f2937;border-color:#374151;color:#d1d5db;' }}">
+                    {{ item.name }}{% if item.price %} · {{ item.price|number_format(0) }}{% endif %}
+                </button>
+                {% endfor %}
+            </div>
         </div>
+        {% endif %}
+
+        {# ── Active events — chip row, shown only when ≥1 event is live ──── #}
+        {# One event: single amber chip to link/unlink.                      #}
+        {# Multiple events: chips for each; tap to select, tap again to clear. #}
+        {% if active_events|length > 0 %}
+        <div style="flex-shrink:0;border-top:1px solid #1f2937;">
+            <div style="display:flex;align-items:center;overflow-x:auto;padding:7px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;"
+                 id="event-scroll">
+                <input type="hidden" name="event_id" id="event-id-input" value="{{ draft.get('event_id', '') }}">
+                {# Calendar icon — fixed left, not scrollable #}
+                <svg width="13" height="13" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24"
+                     style="flex-shrink:0;margin-right:8px;">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+                </svg>
+                {# "No Event" chip — lets cashier explicitly deselect #}
+                <button type="button" class="keypad-btn event-chip"
+                        data-event-id=""
+                        style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid;font-size:11px;font-weight:500;margin-right:6px;white-space:nowrap;
+                               {{ not draft.get('event_id') ? 'background:#374151;color:#fff;border-color:#4b5563;' : 'background:#1f2937;color:#9ca3af;border-color:#374151;' }}">
+                    No Event
+                </button>
+                {% for ev in active_events %}
+                <button type="button" class="keypad-btn event-chip"
+                        data-event-id="{{ ev.id }}"
+                        style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid;font-size:11px;font-weight:600;margin-right:6px;white-space:nowrap;
+                               {{ draft.get('event_id') == ev.id
+                                  ? 'background:#92400e;border-color:#d97706;color:#fde68a;'
+                                  : 'background:#1f2937;border-color:#d97706;color:#d97706;' }}">
+                    {{ ev.name }}
+                </button>
+                {% endfor %}
+            </div>
+        </div>
+        {% else %}
+        <input type="hidden" name="event_id" id="event-id-input" value="{{ draft.get('event_id', '') }}">
+        {% endif %}
 
         {# ── Area chips — horizontal single-row scroll ───────────────────── #}
         {% if areas|length > 0 %}
         <div style="flex-shrink:0;border-top:1px solid #1f2937;border-bottom:1px solid #1f2937;">
-            <div style="display:flex;align-items:center;overflow-x:auto;padding:10px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;"
+            <div style="display:flex;align-items:center;overflow-x:auto;padding:7px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;"
                  class="area-scroll-row" id="area-scroll">
                 <input type="hidden" name="area_id" id="area-id-input" value="{{ draft.get('area_id', '') }}">
                 <button type="button" class="keypad-btn area-chip"
                         data-area-id=""
-                        style="flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid #374151;background:#1f2937;color:#9ca3af;font-size:13px;font-weight:500;margin-right:8px;white-space:nowrap;
+                        style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1px solid #374151;background:#1f2937;color:#9ca3af;font-size:12px;font-weight:500;margin-right:6px;white-space:nowrap;
                                {{ not draft.get('area_id') ? 'background:#374151;color:#fff;border-color:#4b5563;' : '' }}">
                     No Area
                 </button>
                 {% for area in areas %}
                 <button type="button" class="keypad-btn area-chip"
                         data-area-id="{{ area.id }}"
-                        style="flex-shrink:0;padding:7px 14px;border-radius:20px;border:1px solid;font-size:13px;font-weight:600;margin-right:8px;white-space:nowrap;
+                        style="flex-shrink:0;padding:5px 12px;border-radius:20px;border:1px solid;font-size:12px;font-weight:600;margin-right:6px;white-space:nowrap;
                                {{ draft.get('area_id') == area.id
                                   ? 'background:#059669;border-color:#10b981;color:#fff;'
                                   : 'background:#1f2937;border-color:#374151;color:#d1d5db;' }}">
@@ -79,64 +133,128 @@
         </div>
         {% endif %}
 
-        {# ── Description — single compact row ────────────────────────────── #}
-        <div style="flex-shrink:0;padding:8px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1f2937;">
-            <svg width="16" height="16" fill="none" stroke="#6b7280" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;">
+        {# ── Description + Covers — combined single row ──────────────────── #}
+        <div style="flex-shrink:0;padding:5px 16px;display:flex;align-items:center;gap:8px;border-bottom:1px solid #1f2937;">
+            {# Description #}
+            <svg width="14" height="14" fill="none" stroke="#6b7280" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;">
                 <path stroke-linecap="round" stroke-linejoin="round" d="M16.862 4.487l1.687-1.688a1.875 1.875 0 112.652 2.652L6.832 19.82a4.5 4.5 0 01-1.897 1.13l-2.685.8.8-2.685a4.5 4.5 0 011.13-1.897L16.863 4.487zm0 0L19.5 7.125"/>
             </svg>
             <input type="text" name="description" id="desc-input"
-                   placeholder="Description (optional)…"
+                   placeholder="Description…"
                    value="{{ draft.get('description', '') }}"
-                   style="flex:1;background:transparent;border:none;color:#fff;font-size:14px;outline:none;padding:4px 0;"
+                   style="flex:1;min-width:0;background:transparent;border:none;color:#fff;font-size:13px;outline:none;padding:3px 0;"
                    autocomplete="off">
             <button type="button" id="desc-clear-btn"
-                    style="display:{{ draft.get('description') ? 'flex' : 'none' }};width:20px;height:20px;background:#374151;border:none;border-radius:50%;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;"
+                    style="display:{{ draft.get('description') ? 'flex' : 'none' }};width:18px;height:18px;background:#374151;border:none;border-radius:50%;align-items:center;justify-content:center;flex-shrink:0;cursor:pointer;"
                     onclick="document.getElementById('desc-input').value='';this.style.display='none';">
-                <svg width="10" height="10" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
+                <svg width="9" height="9" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
                     <path stroke-linecap="round" stroke-linejoin="round" d="M6 18L18 6M6 6l12 12"/>
                 </svg>
             </button>
-
-            {# Quick-pick description dropdown #}
             <button type="button" id="desc-pick-btn" onclick="toggleDescPicker()"
-                    style="background:#1f2937;border:1px solid #374151;border-radius:8px;padding:4px 10px;color:#9ca3af;font-size:12px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
+                    style="background:#1f2937;border:1px solid #374151;border-radius:6px;padding:3px 8px;color:#9ca3af;font-size:11px;cursor:pointer;white-space:nowrap;flex-shrink:0;">
                 Quick ▾
             </button>
+
+            {# Divider #}
+            <div style="width:1px;height:16px;background:#374151;flex-shrink:0;"></div>
+
+            {# Covers stepper — inline #}
+            <svg width="14" height="14" fill="none" stroke="#6b7280" stroke-width="1.5" viewBox="0 0 24 24" style="flex-shrink:0;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+            </svg>
+            <button type="button" class="keypad-btn" onclick="adjustCovers(-1)"
+                    style="width:22px;height:22px;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#9ca3af;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;">−</button>
+            <input type="number" name="covers" id="covers-input" min="1" max="255"
+                   value="{{ draft.get('covers', '') }}"
+                   placeholder="—"
+                   style="width:34px;background:transparent;border:none;color:#fff;font-size:13px;font-weight:600;text-align:center;outline:none;padding:0;flex-shrink:0;">
+            <button type="button" class="keypad-btn" onclick="adjustCovers(1)"
+                    style="width:22px;height:22px;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#9ca3af;font-size:16px;display:flex;align-items:center;justify-content:center;flex-shrink:0;line-height:1;">+</button>
         </div>
 
         {# Description quick-pick overlay #}
         <div id="desc-picker"
-             style="display:none;position:absolute;left:0;right:0;z-index:20;background:#111827;border-bottom:1px solid #1f2937;padding:10px 16px;flex-wrap:wrap;gap:8px;">
+             style="display:none;position:absolute;left:0;right:0;z-index:20;background:#111827;border-bottom:1px solid #1f2937;padding:8px 16px;flex-wrap:wrap;gap:6px;">
             {% for label in ['Food & Beverages', 'Room Charges', 'Event', 'Conference', 'Spa', 'Other'] %}
             <button type="button" class="keypad-btn"
                     onclick="pickDesc('{{ label|e('html_attr') }}')"
-                    style="padding:8px 14px;border-radius:20px;background:#1f2937;border:1px solid #374151;color:#d1d5db;font-size:13px;font-weight:500;">
+                    style="padding:6px 12px;border-radius:20px;background:#1f2937;border:1px solid #374151;color:#d1d5db;font-size:12px;font-weight:500;">
                 {{ label }}
             </button>
             {% endfor %}
         </div>
 
+        {# ── Discount row (only visible when cashier has apply_discount perm) ── #}
+        {% if can_discount %}
+        <div style="flex-shrink:0;border-top:1px solid #1f2937;" id="discount-section">
+            <div style="padding:3px 16px;display:flex;align-items:center;min-height:26px;">
+                <div id="discount-no-badge" style="display:flex;align-items:center;">
+                    <button type="button" onclick="toggleDiscountPanel()" id="discount-open-btn"
+                            style="background:none;border:none;color:#6b7280;font-size:11px;cursor:pointer;display:flex;align-items:center;gap:4px;padding:2px 0;">
+                        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/>
+                            <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"/>
+                        </svg>
+                        Apply Discount
+                    </button>
+                </div>
+                <div id="discount-badge" style="display:none;flex:1;align-items:center;gap:8px;">
+                    <svg width="11" height="11" fill="none" stroke="#ef4444" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9.568 3H5.25A2.25 2.25 0 003 5.25v4.318c0 .597.237 1.17.659 1.591l9.581 9.581c.699.699 1.78.872 2.607.33a18.095 18.095 0 005.223-5.223c.542-.827.369-1.908-.33-2.607L11.16 3.66A2.25 2.25 0 009.568 3z"/>
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6 6h.008v.008H6V6z"/>
+                    </svg>
+                    <span style="color:#ef4444;font-size:11px;font-weight:700;">−KES <span id="discount-badge-amt">0</span></span>
+                    <span id="discount-badge-rsn" style="color:#6b7280;font-size:10px;"></span>
+                    <button type="button" onclick="clearDiscount()"
+                            style="margin-left:auto;background:none;border:none;color:#6b7280;font-size:16px;line-height:1;cursor:pointer;padding:0;">×</button>
+                </div>
+            </div>
+            <div id="discount-panel" style="display:none;padding:0 16px 6px;">
+                <div style="display:flex;gap:5px;align-items:center;">
+                    <div style="display:flex;border:1px solid #374151;border-radius:6px;overflow:hidden;flex-shrink:0;">
+                        <button type="button" id="dt-pct" onclick="setDiscountType('pct')"
+                                style="padding:5px 8px;font-size:11px;font-weight:600;background:#374151;color:#fff;border:none;cursor:pointer;">%</button>
+                        <button type="button" id="dt-kes" onclick="setDiscountType('kes')"
+                                style="padding:5px 8px;font-size:11px;font-weight:600;background:transparent;color:#6b7280;border:none;cursor:pointer;">KES</button>
+                    </div>
+                    <input type="text" id="disc-val" placeholder="0" inputmode="decimal"
+                           style="width:60px;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#fff;font-size:13px;font-weight:600;text-align:center;padding:5px 4px;outline:none;flex-shrink:0;">
+                    <input type="text" id="disc-rsn" placeholder="Reason (required)"
+                           style="flex:1;min-width:0;background:#1f2937;border:1px solid #374151;border-radius:6px;color:#fff;font-size:12px;padding:5px 8px;outline:none;">
+                    <button type="button" onclick="applyDiscount()"
+                            style="padding:5px 10px;background:#dc2626;border:none;border-radius:6px;color:#fff;font-size:11px;font-weight:600;flex-shrink:0;cursor:pointer;">Apply</button>
+                    <button type="button" onclick="closeDiscountPanel()"
+                            style="padding:5px 8px;background:#1f2937;border:none;border-radius:6px;color:#6b7280;font-size:13px;cursor:pointer;flex-shrink:0;">×</button>
+                </div>
+            </div>
+            <input type="hidden" name="gross_amount"    id="gross-amount-input"    value="{{ draft.get('gross_amount') ?: '' }}">
+            <input type="hidden" name="discount_amount" id="discount-amount-input" value="{{ draft.get('discount_amount', 0) }}">
+            <input type="hidden" name="discount_reason" id="discount-reason-input" value="{{ draft.get('discount_reason', '') }}">
+        </div>
+        {% endif %}
+
         {# ── Keypad — fills remaining space ──────────────────────────────── #}
-        <div style="flex:1;display:flex;flex-direction:column;padding:10px 16px 20px;min-height:0;">
-            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:8px;flex:1;">
+        <div style="flex:1;display:flex;flex-direction:column;padding:8px 14px 14px;min-height:0;">
+            <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:6px;flex:1;">
                 {% for n in [1,2,3,4,5,6,7,8,9] %}
                 <button type="button" class="keypad-btn"
                         onclick="pressKey('{{ n }}')"
-                        style="background:#1f2937;border:none;border-radius:14px;color:#fff;font-size:24px;font-weight:600;cursor:pointer;">{{ n }}</button>
+                        style="background:#1f2937;border:none;border-radius:12px;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">{{ n }}</button>
                 {% endfor %}
                 <button type="button" class="keypad-btn"
                         onclick="clearKey()"
-                        style="background:#1f2937;border:none;border-radius:14px;color:#9ca3af;font-size:13px;font-weight:600;cursor:pointer;">CLR</button>
+                        style="background:#1f2937;border:none;border-radius:12px;color:#9ca3af;font-size:12px;font-weight:600;cursor:pointer;">CLR</button>
                 <button type="button" class="keypad-btn"
                         onclick="pressKey('0')"
-                        style="background:#1f2937;border:none;border-radius:14px;color:#fff;font-size:24px;font-weight:600;cursor:pointer;">0</button>
+                        style="background:#1f2937;border:none;border-radius:12px;color:#fff;font-size:22px;font-weight:600;cursor:pointer;">0</button>
                 <button type="button" class="keypad-btn"
                         onclick="backspaceKey()"
-                        style="background:#1f2937;border:none;border-radius:14px;color:#9ca3af;font-size:22px;cursor:pointer;">⌫</button>
+                        style="background:#1f2937;border:none;border-radius:12px;color:#9ca3af;font-size:20px;cursor:pointer;">⌫</button>
             </div>
 
             <button type="submit" id="next-btn"
-                    style="margin-top:10px;width:100%;height:54px;background:#059669;border:none;border-radius:14px;color:#fff;font-size:18px;font-weight:700;cursor:pointer;opacity:{{ draft.get('amount', 0) > 0 ? '1' : '0.4' }};"
+                    style="margin-top:8px;width:100%;height:50px;background:#059669;border:none;border-radius:12px;color:#fff;font-size:17px;font-weight:700;cursor:pointer;opacity:{{ draft.get('amount', 0) > 0 ? '1' : '0.4' }};"
                     {% if draft.get('amount', 0) <= 0 %}disabled{% endif %}>
                 Next — Select Payment →
             </button>
@@ -150,38 +268,217 @@
     const display  = document.getElementById('amount-display');
     const input    = document.getElementById('amount-input');
     const nextBtn  = document.getElementById('next-btn');
-    let raw = '{{ draft.get('amount', 0) > 0 ? draft.get('amount') : '' }}';
+    // raw = gross amount (pre-discount); amount-input = net (after discount)
+    let raw            = '{% if draft.get('gross_amount') %}{{ draft.get('gross_amount') }}{% elseif draft.get('amount', 0) > 0 %}{{ draft.get('amount') }}{% endif %}';
+    let discountAmount = {{ draft.get('discount_amount', 0) }};
+    let discountReason = '{{ draft.get('discount_reason', '')|e('js') }}';
+    let discountType   = 'pct';
 
     function render() {
-        const n = parseInt(raw) || 0;
-        display.textContent = n > 0 ? n.toLocaleString('en-KE') : '0';
-        input.value = n > 0 ? n : '0';
-        const ok = n > 0;
-        nextBtn.disabled    = !ok;
+        const gross = parseInt(raw) || 0;
+        const net   = Math.max(0, gross - discountAmount);
+        if (discountAmount > 0 && gross > 0) {
+            display.innerHTML =
+                '<span style="display:block;text-decoration:line-through;color:#6b7280;font-size:20px;font-weight:700;line-height:1.1;">'
+                + gross.toLocaleString('en-KE') + '</span>'
+                + '<span style="color:#ef4444;font-size:12px;font-weight:600;">−' + discountAmount.toLocaleString('en-KE') + '&nbsp;&nbsp;</span>'
+                + '<span style="font-size:40px;font-weight:800;letter-spacing:-1px;">' + net.toLocaleString('en-KE') + '</span>';
+        } else {
+            display.textContent = gross > 0 ? gross.toLocaleString('en-KE') : '0';
+        }
+        input.value = net > 0 ? net : '0';
+        const gaEl = document.getElementById('gross-amount-input');
+        const daEl = document.getElementById('discount-amount-input');
+        const drEl = document.getElementById('discount-reason-input');
+        if (gaEl) gaEl.value = gross > 0 ? gross : '';
+        if (daEl) daEl.value = discountAmount;
+        if (drEl) drEl.value = discountReason;
+        const ok = net > 0;
+        nextBtn.disabled      = !ok;
         nextBtn.style.opacity = ok ? '1' : '0.4';
     }
 
     window.pressKey     = k => { if (raw.length < 7) { raw += k; render(); } };
     window.backspaceKey = () => { raw = raw.slice(0,-1); render(); };
     window.clearKey     = () => { raw = ''; render(); };
-    window.quickAdd     = n => { raw = String(Math.min((parseInt(raw)||0) + n, 9999999)); render(); };
     render();
 
-    // Area chips
+    // ── Catalog chips ──
+    const catalogInput = document.getElementById('catalog-item-id-input');
+    document.querySelectorAll('.catalog-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            document.querySelectorAll('.catalog-chip').forEach(b => {
+                b.style.background  = '#1f2937';
+                b.style.borderColor = '#374151';
+                b.style.color       = '#d1d5db';
+            });
+            btn.style.background  = '#7c3aed';
+            btn.style.borderColor = '#a78bfa';
+            btn.style.color       = '#fff';
+            if (catalogInput) catalogInput.value = btn.dataset.catalogId;
+            // Auto-fill amount if item has a price and amount is currently 0
+            const p = parseFloat(btn.dataset.price);
+            if (p > 0 && (parseInt(raw) || 0) === 0) {
+                raw = String(Math.round(p));
+                render();
+            }
+        });
+    });
+
+    // Mouse-drag scroll on catalog row
+    const catalogRow = document.getElementById('catalog-scroll');
+    if (catalogRow) {
+        let cDown = false, cStartX, cScrollLeft;
+        catalogRow.addEventListener('mousedown', e => {
+            cDown = true; cStartX = e.pageX - catalogRow.offsetLeft; cScrollLeft = catalogRow.scrollLeft;
+            catalogRow.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mouseup', () => { cDown = false; if (catalogRow) catalogRow.style.cursor = 'grab'; });
+        catalogRow.addEventListener('mousemove', e => {
+            if (!cDown) return; e.preventDefault();
+            catalogRow.scrollLeft = cScrollLeft - (e.pageX - catalogRow.offsetLeft - cStartX);
+        });
+        catalogRow.style.cursor = 'grab';
+    }
+
+    // ── Event chips ──
+    const eventInput = document.getElementById('event-id-input');
+    function resetEventChips() {
+        document.querySelectorAll('.event-chip').forEach(b => {
+            const isNone = b.dataset.eventId === '';
+            b.style.background  = isNone ? '#1f2937' : '#1f2937';
+            b.style.borderColor = isNone ? '#374151' : '#d97706';
+            b.style.color       = isNone ? '#9ca3af' : '#d97706';
+        });
+    }
+    document.querySelectorAll('.event-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+            resetEventChips();
+            if (eventInput) eventInput.value = btn.dataset.eventId;
+            if (btn.dataset.eventId === '') {
+                // "No Event" selected
+                btn.style.background  = '#374151';
+                btn.style.borderColor = '#4b5563';
+                btn.style.color       = '#fff';
+            } else {
+                btn.style.background  = '#92400e';
+                btn.style.borderColor = '#d97706';
+                btn.style.color       = '#fde68a';
+            }
+        });
+    });
+
+    // Mouse-drag scroll on event row
+    const eventRow = document.getElementById('event-scroll');
+    if (eventRow) {
+        let eDown = false, eStartX, eScrollLeft;
+        eventRow.addEventListener('mousedown', e => {
+            eDown = true; eStartX = e.pageX - eventRow.offsetLeft; eScrollLeft = eventRow.scrollLeft;
+            eventRow.style.cursor = 'grabbing';
+        });
+        document.addEventListener('mouseup', () => { eDown = false; if (eventRow) eventRow.style.cursor = 'grab'; });
+        eventRow.addEventListener('mousemove', e => {
+            if (!eDown) return; e.preventDefault();
+            eventRow.scrollLeft = eScrollLeft - (e.pageX - eventRow.offsetLeft - eStartX);
+        });
+        eventRow.style.cursor = 'grab';
+    }
+
+    // ── Covers stepper ──
+    window.adjustCovers = delta => {
+        const inp = document.getElementById('covers-input');
+        if (!inp) return;
+        const nxt = Math.max(0, (parseInt(inp.value) || 0) + delta);
+        inp.value = nxt > 0 ? nxt : '';
+    };
+
+    // ── Area chips ──
     const areaInput = document.getElementById('area-id-input');
     document.querySelectorAll('.area-chip').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.area-chip').forEach(b => {
-                b.style.background   = '#1f2937';
-                b.style.borderColor  = '#374151';
-                b.style.color        = '#d1d5db';
+                b.style.background  = '#1f2937';
+                b.style.borderColor = '#374151';
+                b.style.color       = '#d1d5db';
             });
             btn.style.background  = '#059669';
             btn.style.borderColor = '#10b981';
             btn.style.color       = '#fff';
-            areaInput.value = btn.dataset.areaId;
+            if (areaInput) areaInput.value = btn.dataset.areaId;
         });
     });
+
+    // ── Discount ──
+    window.toggleDiscountPanel = () => {
+        const p = document.getElementById('discount-panel');
+        if (p) p.style.display = p.style.display === 'none' ? 'block' : 'none';
+    };
+    window.closeDiscountPanel = () => {
+        const p = document.getElementById('discount-panel');
+        if (p) p.style.display = 'none';
+    };
+    window.setDiscountType = type => {
+        discountType = type;
+        const pEl = document.getElementById('dt-pct');
+        const kEl = document.getElementById('dt-kes');
+        if (!pEl || !kEl) return;
+        pEl.style.background = type === 'pct' ? '#374151' : 'transparent';
+        pEl.style.color      = type === 'pct' ? '#fff'    : '#6b7280';
+        kEl.style.background = type === 'kes' ? '#374151' : 'transparent';
+        kEl.style.color      = type === 'kes' ? '#fff'    : '#6b7280';
+    };
+    window.applyDiscount = () => {
+        const gross = parseInt(raw) || 0;
+        if (gross <= 0) return;
+        const val    = parseFloat(document.getElementById('disc-val')?.value) || 0;
+        const reason = (document.getElementById('disc-rsn')?.value || '').trim();
+        if (val <= 0) return;
+        if (!reason) {
+            const rEl = document.getElementById('disc-rsn');
+            if (rEl) { rEl.style.borderColor = '#dc2626'; rEl.focus(); }
+            return;
+        }
+        let disc = discountType === 'pct'
+            ? Math.round(gross * Math.min(val, 99) / 100)
+            : Math.min(Math.round(val), gross - 1);
+        if (disc <= 0) return;
+        discountAmount = disc;
+        discountReason = reason;
+        const bAmt  = document.getElementById('discount-badge-amt');
+        const bRsn  = document.getElementById('discount-badge-rsn');
+        const badge = document.getElementById('discount-badge');
+        const oBtn  = document.getElementById('discount-open-btn');
+        if (bAmt)  bAmt.textContent    = disc.toLocaleString('en-KE');
+        if (bRsn)  bRsn.textContent    = '· ' + reason;
+        if (badge) badge.style.display = 'flex';
+        if (oBtn)  oBtn.style.display  = 'none';
+        closeDiscountPanel();
+        render();
+    };
+    window.clearDiscount = () => {
+        discountAmount = 0;
+        discountReason = '';
+        const badge = document.getElementById('discount-badge');
+        const oBtn  = document.getElementById('discount-open-btn');
+        if (badge) badge.style.display = 'none';
+        if (oBtn)  oBtn.style.display  = 'flex';
+        const vEl = document.getElementById('disc-val');
+        const rEl = document.getElementById('disc-rsn');
+        if (vEl) { vEl.value = ''; vEl.style.borderColor = '#374151'; }
+        if (rEl) { rEl.value = ''; rEl.style.borderColor = '#374151'; }
+        render();
+    };
+    // Restore discount badge state on page load (when navigating back)
+    if (discountAmount > 0) {
+        const bAmt  = document.getElementById('discount-badge-amt');
+        const bRsn  = document.getElementById('discount-badge-rsn');
+        const badge = document.getElementById('discount-badge');
+        const oBtn  = document.getElementById('discount-open-btn');
+        if (bAmt)  bAmt.textContent    = discountAmount.toLocaleString('en-KE');
+        if (bRsn)  bRsn.textContent    = '· ' + discountReason;
+        if (badge) badge.style.display = 'flex';
+        if (oBtn)  oBtn.style.display  = 'none';
+    }
 
     // Description clear button
     document.getElementById('desc-input')?.addEventListener('input', function() {
@@ -210,10 +507,7 @@
             scrollLeft = areaRow.scrollLeft;
             areaRow.style.cursor = 'grabbing';
         });
-        document.addEventListener('mouseup', () => {
-            isDown = false;
-            areaRow.style.cursor = 'grab';
-        });
+        document.addEventListener('mouseup', () => { isDown = false; if (areaRow) areaRow.style.cursor = 'grab'; });
         areaRow.addEventListener('mousemove', e => {
             if (!isDown) return;
             e.preventDefault();

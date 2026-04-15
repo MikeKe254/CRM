@@ -1,0 +1,125 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+
+{% set s = settings %}
+
+<form method="POST" action="{{ path('admin_settings_save_terminal', _rp) }}">
+<div class="settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+
+    <div class="settings-card-header flex items-center px-8 py-5 border-b border-gray-100">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">POS Terminal</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Configure what cashiers can see and do at the point-of-sale terminal for this branch.</p>
+        </div>
+    </div>
+
+    {# ── M-Pesa Feed ──────────────────────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">M-Pesa Feed</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Let cashiers view incoming M-Pesa payments in real time from the terminal dashboard.</p>
+        </div>
+        <div class="settings-section-fields space-y-4">
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Show M-Pesa Feed</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Display the quick M-Pesa payments panel on the terminal dashboard.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="show_mpesa_feed" value="1" id="toggle-feed" {{ s.show_mpesa_feed ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+
+            <div id="feed-options" style="{{ not s.show_mpesa_feed ? 'opacity:.45;pointer-events:none;' : '' }}">
+
+                <div>
+                    <label class="s-label" for="feed-refresh">Auto-refresh interval</label>
+                    <div class="s-select-wrap">
+                        <select id="feed-refresh" name="mpesa_feed_refresh_seconds" class="s-input" style="padding-right:2.25rem;">
+                            <option value="5"  {{ s.mpesa_feed_refresh_seconds == 5  ? 'selected' : '' }}>Every 5 seconds</option>
+                            <option value="10" {{ s.mpesa_feed_refresh_seconds == 10 ? 'selected' : '' }}>Every 10 seconds</option>
+                        </select>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M6 9l6 6 6-6"/></svg>
+                    </div>
+                    <p class="s-hint">How often the feed polls for new payments.</p>
+                </div>
+
+                <div class="grid grid-cols-2 gap-3 mt-4">
+                    <div>
+                        <label class="s-label" for="feed-hours">Max hours history</label>
+                        <div style="position:relative;">
+                            <input id="feed-hours" type="number" name="mpesa_feed_max_hours"
+                                   value="{{ s.mpesa_feed_max_hours }}" min="1" max="168" class="s-input"
+                                   style="padding-right:2.75rem;">
+                            <span style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#9ca3af;pointer-events:none;">hrs</span>
+                        </div>
+                        <p class="s-hint">How far back to show payments (max 168 h / 7 days). Per-user permission constraints may narrow this further.</p>
+                    </div>
+                    <div>
+                        <label class="s-label" for="feed-visible">Max transactions visible</label>
+                        <div style="position:relative;">
+                            <input id="feed-visible" type="number" name="mpesa_feed_max_visible"
+                                   value="{{ s.mpesa_feed_max_visible }}" min="1" max="200" class="s-input"
+                                   style="padding-right:2.5rem;">
+                            <span style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#9ca3af;pointer-events:none;">rows</span>
+                        </div>
+                        <p class="s-hint">Maximum payments shown per refresh (max 200). Per-user constraints may narrow this further.</p>
+                    </div>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    {# ── Quick STK ────────────────────────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Quick STK Prompt</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">A one-tap shortcut that lets cashiers send an M-Pesa STK push directly from the terminal dashboard without going through full checkout.</p>
+        </div>
+        <div class="settings-section-fields">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Show Quick STK Prompt</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Requires the user to also hold the <strong>Send STK Push</strong> permission to actually use it.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="show_quick_stk" value="1" {{ s.show_quick_stk ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="settings-card-footer flex items-center justify-between px-8 py-4 border-t border-gray-100 bg-gray-50">
+        <p class="text-xs text-gray-400">Changes apply immediately across all terminals in this branch.</p>
+        <button type="submit"
+                class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 active:bg-indigo-800 text-white text-sm font-semibold rounded-lg transition-colors">
+            Save changes
+        </button>
+    </div>
+
+</div>
+</form>
+
+{% endblock %}
+
+{% block settings_scripts %}
+<script>
+(function () {
+    const toggle  = document.getElementById('toggle-feed');
+    const options = document.getElementById('feed-options');
+    if (!toggle || !options) return;
+
+    toggle.addEventListener('change', function () {
+        options.style.opacity        = this.checked ? '1'    : '.45';
+        options.style.pointerEvents  = this.checked ? ''     : 'none';
+    });
+})();
+</script>
+{% endblock %}

@@ -3,17 +3,12 @@
 {% set current_branch = session.branch is defined and session.branch ? session.branch.slug : app.request.attributes.get('branch') %}
 
 {#
- # Multi-branch gate — all branch switching, hierarchy, and network features
- # depend on this being true. When false, /head-office-branch/ is the only branch.
+ # Multi-branch gate
  #}
 {% set multi_branch_enabled = feature('branch_create') %}
 
 {#
- # Navigation context — drives which menu section renders:
- #   'overall'     → /overall/ route  — Overall Manager strategic view (multi-branch only)
- #   'operational' + type='hq'     → HQ branch operational view (multi-branch only)
- #   'operational' + type='region' → Regional management view (multi-branch only)
- #   'operational' + type='branch' → Branch operational view (default, always available)
+ # Navigation context
  #}
 {% set nav_context   = session.context ?? 'operational' %}
 {% set branch_type   = (session.branch is defined and session.branch) ? session.branch.type : 'branch' %}
@@ -23,7 +18,10 @@
 {% set can_view_tenant_activity_logs = isSuperAdmin()
     ? (platformCan('view_superadmin_activity_logs') or platformCan('view_owner_activity_logs'))
     : can('view_user_activity') %}
-{# everything else is branch-level operational — the default when multi-branch is off #}
+{% set can_view_settings = isSuperAdmin() ? platformCan('view_settings') : can('view_settings') %}
+
+{# Active route shorthand #}
+{% set _r = app.request.attributes.get('_route') %}
 
 <div id="sidebar-overlay"></div>
 
@@ -52,7 +50,6 @@
     </div>
 
     {# ── CONTEXT BADGE ────────────────────────────────────────────────────── #}
-    {# Shows a clear label of the current operating context #}
     {% if session is defined and session.branch is defined and session.branch %}
     <div style="padding:6px 8px 0;">
         <div style="display:flex;align-items:center;gap:6px;padding:6px 10px;border-radius:8px;
@@ -70,7 +67,6 @@
     {% endif %}
 
     {# ── CONTEXT SWITCHER ─────────────────────────────────────────────────── #}
-    {# Only shown when multi-branch is enabled AND user has multiple contexts #}
     {% set has_overall_access = multi_branch_enabled and can('assign_branch_heads') %}
     {% set has_multiple = multi_branch_enabled and session is defined and session.availableBranches is defined and session.availableBranches|length > 1 %}
     {% if has_multiple or has_overall_access %}
@@ -96,7 +92,6 @@
             <div id="branch-switcher-dropdown" class="navbar-dropdown"
                  style="position:absolute;left:0;right:0;top:calc(100% + 4px);background:#1e1b4b;border:1px solid rgba(255,255,255,0.12);border-radius:8px;overflow:hidden;z-index:150;box-shadow:0 8px 24px rgba(0,0,0,0.4);">
 
-                {# ── Overall Manager entry (always first, if user has OM access) ── #}
                 {% if has_overall_access %}
                 <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
                    style="display:flex;align-items:center;gap:8px;padding:9px 12px;text-decoration:none;transition:background 0.1s;{% if is_overall %}background:rgba(124,58,237,0.35);{% endif %}border-bottom:1px solid rgba(255,255,255,0.08);"
@@ -118,7 +113,6 @@
                 </a>
                 {% endif %}
 
-                {# ── All accessible operational branches ── #}
                 {% if session is defined and session.availableBranches is defined %}
                 {% for branch in session.availableBranches %}
                 <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: branch.slug}) }}"
@@ -154,641 +148,635 @@
 
     {# =========================================================================
        OVERALL CONTEXT — Company-wide strategic view (/overall/)
-       Who sees this: Overall Manager, superadmin
-       Pages: Org chart, Branches, Role templates, Permissions, Activity logs
     ========================================================================= #}
     {% if is_overall %}
 
-        <div class="sidebar-section-label">Overview</div>
-
         <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'app_dashboard' %}active{% endif %}"
+           class="sidebar-link {% if _r == 'app_dashboard' %}active{% endif %}"
            data-tooltip="Dashboard">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
             <span class="sidebar-label">Dashboard</span>
         </a>
 
-        <div class="sidebar-section-label" style="margin-top:8px;">Organisation</div>
-
-        {% if can('assign_branch_heads') %}
-        <a href="{{ path('admin_org', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_org' %}active{% endif %}"
-           data-tooltip="Org Chart">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="8" y="2" width="8" height="4" rx="1"/>
-                <rect x="1" y="14" width="6" height="4" rx="1"/>
-                <rect x="9" y="14" width="6" height="4" rx="1"/>
-                <rect x="17" y="14" width="6" height="4" rx="1"/>
-                <path d="M4 14v-3h16v3M12 6v5"/>
-            </svg>
-            <span class="sidebar-label">Org Chart</span>
-        </a>
+        {# Organisation group #}
+        {% if can('assign_branch_heads') or can('manage_branches') %}
+        {% set _oa = (_r starts with 'admin_org' or _r starts with 'admin_branches') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _oa %}has-active{% endif %}"
+                    data-group="ov-org" data-tooltip="Organisation" onclick="toggleGroup('ov-org')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="8" y="2" width="8" height="4" rx="1"/>
+                    <rect x="1" y="14" width="6" height="4" rx="1"/><rect x="9" y="14" width="6" height="4" rx="1"/>
+                    <rect x="17" y="14" width="6" height="4" rx="1"/>
+                    <path d="M4 14v-3h16v3M12 6v5"/>
+                </svg>
+                <span class="sidebar-label">Organisation</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-ov-org">
+                {% if can('assign_branch_heads') %}
+                <a href="{{ path('admin_org', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_org' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Org Chart</span>
+                </a>
+                {% endif %}
+                {% if can('manage_branches') %}
+                <a href="{{ path('admin_branches', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_branches' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Branches</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
-        {% if can('manage_branches') %}
-        <a href="{{ path('admin_branches', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_branches' %}active{% endif %}"
-           data-tooltip="Branches">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-            <span class="sidebar-label">Branches</span>
-        </a>
-        {% endif %}
-
-        <div class="sidebar-section-label" style="margin-top:8px;">Configuration</div>
-
-        {% if can('view_roles') %}
-        <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_roles' %}active{% endif %}"
-           data-tooltip="Role Templates">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            <span class="sidebar-label">Role Templates</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_permissions') %}
-        <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_permissions' %}active{% endif %}"
-           data-tooltip="Permissions">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            <span class="sidebar-label">Permissions</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_departments') %}
-        <a href="{{ path('admin_departments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_departments' %}active{% endif %}"
-           data-tooltip="Departments">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span class="sidebar-label">Departments</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_areas') %}
-        <a href="{{ path('admin_areas', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_areas' %}active{% endif %}"
-           data-tooltip="Areas">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            <span class="sidebar-label">Areas</span>
-        </a>
-        {% endif %}
-
-        {% if can_view_tenant_activity_logs %}
-        <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_activity' %}active{% endif %}"
-           data-tooltip="Activity Logs">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 20h9"/>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <span class="sidebar-label">Activity Logs</span>
-        </a>
+        {# Configuration group #}
+        {% if can('view_roles') or can('view_permissions') or can('view_departments') or can('view_areas') or can('view_catalog') or can('view_events') or can_view_settings or can_view_tenant_activity_logs %}
+        {% set _ca = (_r starts with 'admin_roles' or _r starts with 'admin_permissions' or _r starts with 'admin_departments' or _r starts with 'admin_areas' or _r starts with 'admin_catalog' or _r starts with 'admin_events' or _r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _ca %}has-active{% endif %}"
+                    data-group="ov-config" data-tooltip="Configuration" onclick="toggleGroup('ov-config')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="3"/>
+                    <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+                </svg>
+                <span class="sidebar-label">Configuration</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-ov-config">
+                {% if can('view_roles') %}
+                <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_roles' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Roles</span>
+                </a>
+                {% endif %}
+                {% if can('view_permissions') %}
+                <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_permissions' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Permissions</span>
+                </a>
+                {% endif %}
+                {% if can('view_departments') %}
+                <a href="{{ path('admin_departments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_departments' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Departments</span>
+                </a>
+                {% endif %}
+                {% if can('view_areas') %}
+                <a href="{{ path('admin_areas', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_areas' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Areas</span>
+                </a>
+                {% endif %}
+                {% if can('view_catalog') %}
+                <a href="{{ path('admin_catalog', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_catalog' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Catalog</span>
+                </a>
+                {% endif %}
+                {% if can('view_events') %}
+                <a href="{{ path('admin_events', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_events' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Events &amp; Offers</span>
+                </a>
+                {% endif %}
+                {% if can_view_settings %}
+                <a href="{{ path('admin_settings', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_settings' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Settings</span>
+                </a>
+                {% endif %}
+                {% if can_view_tenant_activity_logs %}
+                <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_activity' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Activity Logs</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
     {# =========================================================================
-       HQ OFFICE CONTEXT — Head office administrative hub (/{hq-slug}/)
-       Who sees this: Directors, Overall Managers, senior HQ staff
-       Distinct from a branch — no transactional ops, focused on company-wide
-       administration: network overview, people, finance, compliance.
+       HQ BRANCH CONTEXT — Head office administrative hub
     ========================================================================= #}
     {% elseif is_hq_branch %}
 
-        {# ── Overview ── #}
-        <div class="sidebar-section-label">Overview</div>
-
         <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'app_dashboard' %}active{% endif %}"
+           class="sidebar-link {% if _r == 'app_dashboard' %}active{% endif %}"
            data-tooltip="Dashboard">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
             <span class="sidebar-label">Dashboard</span>
         </a>
 
-        <a href="#" class="sidebar-link" data-tooltip="Company Analytics">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <line x1="18" y1="20" x2="18" y2="10"/>
-                <line x1="12" y1="20" x2="12" y2="4"/>
-                <line x1="6" y1="20" x2="6" y2="14"/>
-            </svg>
-            <span class="sidebar-label">Company Analytics</span>
-        </a>
+        {# Analytics group #}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn" data-group="hq-analytics" data-tooltip="Analytics" onclick="toggleGroup('hq-analytics')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                <span class="sidebar-label">Analytics</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-hq-analytics">
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Company Analytics</span></a>
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Financial Summary</span></a>
+            </div>
+        </div>
 
-        <a href="#" class="sidebar-link" data-tooltip="Financial Summary">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="2" y="5" width="20" height="14" rx="2"/>
-                <line x1="2" y1="10" x2="22" y2="10"/>
-            </svg>
-            <span class="sidebar-label">Financial Summary</span>
-        </a>
-
-        {# ── Network (multi-branch only) ── #}
+        {# Network group #}
         {% if multi_branch_enabled and (can('view_all_branch_data') or can('manage_branches') or can('assign_branch_heads')) %}
-        <div class="sidebar-section-label" style="margin-top:8px;">Network</div>
-
-        {% if can('view_all_branch_data') %}
-        <a href="{{ path('admin_branches', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_branches' %}active{% endif %}"
-           data-tooltip="All Branches">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-            <span class="sidebar-label">All Branches</span>
-        </a>
+        {% set _na = (_r starts with 'admin_branches' or _r starts with 'admin_org') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _na %}has-active{% endif %}"
+                    data-group="hq-network" data-tooltip="Network" onclick="toggleGroup('hq-network')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <span class="sidebar-label">Network</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-hq-network">
+                {% if can('view_all_branch_data') %}
+                <a href="{{ path('admin_branches', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_branches' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">All Branches</span>
+                </a>
+                {% endif %}
+                {% if can('assign_branch_heads') %}
+                <a href="{{ path('admin_org', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_org' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Org Chart</span>
+                </a>
+                {% endif %}
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Branch Performance</span></a>
+            </div>
+        </div>
         {% endif %}
 
-        {% if can('assign_branch_heads') %}
-        <a href="{{ path('admin_org', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_org' %}active{% endif %}"
-           data-tooltip="Org Chart">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="8" y="2" width="8" height="4" rx="1"/>
-                <rect x="1" y="14" width="6" height="4" rx="1"/>
-                <rect x="9" y="14" width="6" height="4" rx="1"/>
-                <rect x="17" y="14" width="6" height="4" rx="1"/>
-                <path d="M4 14v-3h16v3M12 6v5"/>
-            </svg>
-            <span class="sidebar-label">Org Chart</span>
-        </a>
+        {# People group #}
+        {% if can('view_users') or can('view_roles') or can('view_permissions') or can('view_departments') or can('view_areas') %}
+        {% set _pa = (_r starts with 'admin_users' or _r starts with 'admin_roles' or _r starts with 'admin_permissions' or _r starts with 'admin_departments' or _r starts with 'admin_areas') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _pa %}has-active{% endif %}"
+                    data-group="hq-people" data-tooltip="People" onclick="toggleGroup('hq-people')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span class="sidebar-label">People</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-hq-people">
+                {% if can('view_users') %}
+                <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_users' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Staff Directory</span>
+                </a>
+                {% endif %}
+                {% if can('view_roles') %}
+                <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_roles' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Roles</span>
+                </a>
+                {% endif %}
+                {% if can('view_permissions') %}
+                <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_permissions' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Permissions</span>
+                </a>
+                {% endif %}
+                {% if can('view_departments') %}
+                <a href="{{ path('admin_departments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_departments' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Departments</span>
+                </a>
+                {% endif %}
+                {% if can('view_areas') %}
+                <a href="{{ path('admin_areas', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_areas' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Areas</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
-        <a href="#" class="sidebar-link" data-tooltip="Branch Performance">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            <span class="sidebar-label">Branch Performance</span>
-        </a>
+        {# Revenue group #}
+        {% if can('view_catalog') or can('view_events') %}
+        {% set _ra = (_r starts with 'admin_catalog' or _r starts with 'admin_events') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _ra %}has-active{% endif %}"
+                    data-group="hq-revenue" data-tooltip="Revenue" onclick="toggleGroup('hq-revenue')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                <span class="sidebar-label">Revenue</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-hq-revenue">
+                {% if can('view_catalog') %}
+                <a href="{{ path('admin_catalog', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_catalog' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Catalog</span>
+                </a>
+                {% endif %}
+                {% if can('view_events') %}
+                <a href="{{ path('admin_events', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_events' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Events &amp; Offers</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
-        {# ── People ── #}
-        {% if can('view_users') or can('view_roles') or can('view_permissions') %}
-        <div class="sidebar-section-label" style="margin-top:8px;">People</div>
+        {# Operations group #}
+        <div class="sidebar-group">
+            {% set _opa = (_r == 'app_customers' or _r starts with 'admin_terminals') %}
+            <button class="sidebar-group-btn {% if _opa %}has-active{% endif %}"
+                    data-group="hq-ops" data-tooltip="Operations" onclick="toggleGroup('hq-ops')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <span class="sidebar-label">Operations</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-hq-ops">
+                {% if can('view_transactions') %}
+                <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'app_customers' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Customers</span>
+                </a>
+                {% endif %}
+                {% if can('authorize_pos_terminal') %}
+                <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_terminals' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Terminals</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
 
-        {% if can('view_users') %}
-        <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_users' %}active{% endif %}"
-           data-tooltip="Staff Directory">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span class="sidebar-label">Staff Directory</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_roles') %}
-        <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_roles' %}active{% endif %}"
-           data-tooltip="Roles">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            <span class="sidebar-label">Roles</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_permissions') %}
-        <a href="{{ path('admin_permissions', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_permissions' %}active{% endif %}"
-           data-tooltip="Permissions">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="3" y="11" width="18" height="11" rx="2"/>
-                <path d="M7 11V7a5 5 0 0 1 10 0v4"/>
-            </svg>
-            <span class="sidebar-label">Permissions</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_departments') %}
-        <a href="{{ path('admin_departments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_departments' %}active{% endif %}"
-           data-tooltip="Departments">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span class="sidebar-label">Departments</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_areas') %}
-        <a href="{{ path('admin_areas', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_areas' %}active{% endif %}"
-           data-tooltip="Areas">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            <span class="sidebar-label">Areas</span>
-        </a>
-        {% endif %}
-        {% endif %}
-
-        {# ── Operations ── #}
-        <div class="sidebar-section-label" style="margin-top:8px;">Operations</div>
-
-        {% if can('view_transactions') %}
-        <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'app_customers' %}active{% endif %}"
-           data-tooltip="Customers">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span class="sidebar-label">Customers</span>
-        </a>
-        {% endif %}
-
-        {% if can('authorize_pos_terminal') %}
-        <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_terminals' %}active{% endif %}"
-           data-tooltip="POS Terminals">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2"/>
-                <line x1="8" y1="21" x2="16" y2="21"/>
-                <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-            <span class="sidebar-label">POS Terminals</span>
-        </a>
-        {% endif %}
-
-        <a href="#" class="sidebar-link" data-tooltip="Payment Configs">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-                <path d="M9 12l2 2 4-4"/>
-            </svg>
-            <span class="sidebar-label">Payment Configs</span>
-        </a>
-
-        {# ── Audit ── #}
-        {% if can('view_audit_logs') or can_view_tenant_activity_logs %}
-        <div class="sidebar-section-label" style="margin-top:8px;">Audit</div>
-
-        {% if can('view_audit_logs') %}
-        <a href="#" class="sidebar-link" data-tooltip="Audit Trail">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-                <polyline points="10 9 9 9 8 9"/>
-            </svg>
-            <span class="sidebar-label">Audit Trail</span>
-        </a>
-        {% endif %}
-
-        {% if can_view_tenant_activity_logs %}
-        <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_activity' %}active{% endif %}"
-           data-tooltip="Activity Logs">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 20h9"/>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <span class="sidebar-label">Activity Logs</span>
-        </a>
-        {% endif %}
+        {# System group #}
+        {% if can_view_settings or can_view_tenant_activity_logs or can('view_audit_logs') %}
+        {% set _sa = (_r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _sa %}has-active{% endif %}"
+                    data-group="hq-system" data-tooltip="System" onclick="toggleGroup('hq-system')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="sidebar-label">System</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-hq-system">
+                {% if can_view_settings %}
+                <a href="{{ path('admin_settings', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_settings' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Settings</span>
+                </a>
+                {% endif %}
+                {% if can_view_tenant_activity_logs %}
+                <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_activity' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Activity Logs</span>
+                </a>
+                {% endif %}
+                {% if can('view_audit_logs') %}
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Audit Trail</span></a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
     {# =========================================================================
-       REGIONAL OFFICE CONTEXT — Regional management hub (/{region-slug}/)
-       Who sees this: Regional Manager, any regional-role user
-       Distinct from a branch — oversees multiple branches under the region.
-       Focused on: sub-branch oversight, staff across region, performance.
+       REGIONAL CONTEXT — Regional management hub
     ========================================================================= #}
     {% elseif is_region %}
 
-        {# ── Overview ── #}
-        <div class="sidebar-section-label">Overview</div>
-
         <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'app_dashboard' %}active{% endif %}"
+           class="sidebar-link {% if _r == 'app_dashboard' %}active{% endif %}"
            data-tooltip="Dashboard">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
             <span class="sidebar-label">Dashboard</span>
         </a>
 
-        <a href="#" class="sidebar-link" data-tooltip="Regional Analytics">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <line x1="18" y1="20" x2="18" y2="10"/>
-                <line x1="12" y1="20" x2="12" y2="4"/>
-                <line x1="6" y1="20" x2="6" y2="14"/>
-            </svg>
-            <span class="sidebar-label">Regional Analytics</span>
-        </a>
+        {# Analytics group #}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn" data-group="rg-analytics" data-tooltip="Analytics" onclick="toggleGroup('rg-analytics')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                <span class="sidebar-label">Analytics</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-rg-analytics">
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Regional Analytics</span></a>
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Branch Performance</span></a>
+            </div>
+        </div>
 
-        <a href="#" class="sidebar-link" data-tooltip="Branch Performance">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>
-            </svg>
-            <span class="sidebar-label">Branch Performance</span>
-        </a>
-
-        {# ── Branches (multi-branch only) ── #}
+        {# Branches group #}
         {% if multi_branch_enabled and (can('view_all_branch_data') or can('manage_branches') or can('assign_branch_heads')) %}
-        <div class="sidebar-section-label" style="margin-top:8px;">Branches</div>
-
-        {% if can('view_all_branch_data') or can('manage_branches') %}
-        <a href="{{ path('admin_branches', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_branches' %}active{% endif %}"
-           data-tooltip="Sub-branches">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
-                <polyline points="9 22 9 12 15 12 15 22"/>
-            </svg>
-            <span class="sidebar-label">Sub-branches</span>
-        </a>
+        {% set _bra = (_r starts with 'admin_branches' or _r starts with 'admin_org') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _bra %}has-active{% endif %}"
+                    data-group="rg-branches" data-tooltip="Branches" onclick="toggleGroup('rg-branches')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M3 9l9-7 9 7v11a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>
+                    <polyline points="9 22 9 12 15 12 15 22"/>
+                </svg>
+                <span class="sidebar-label">Branches</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-rg-branches">
+                {% if can('view_all_branch_data') or can('manage_branches') %}
+                <a href="{{ path('admin_branches', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_branches' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Sub-branches</span>
+                </a>
+                {% endif %}
+                {% if can('assign_branch_heads') %}
+                <a href="{{ path('admin_org', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_org' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Branch Heads</span>
+                </a>
+                {% endif %}
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Branch Targets</span></a>
+            </div>
+        </div>
         {% endif %}
 
-        {% if can('assign_branch_heads') %}
-        <a href="{{ path('admin_org', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_org' %}active{% endif %}"
-           data-tooltip="Branch Heads">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="8" y="2" width="8" height="4" rx="1"/>
-                <rect x="1" y="14" width="6" height="4" rx="1"/>
-                <rect x="9" y="14" width="6" height="4" rx="1"/>
-                <rect x="17" y="14" width="6" height="4" rx="1"/>
-                <path d="M4 14v-3h16v3M12 6v5"/>
-            </svg>
-            <span class="sidebar-label">Branch Heads</span>
-        </a>
+        {# Staff group #}
+        {% if can('view_users') or can('view_roles') %}
+        {% set _sta = (_r starts with 'admin_users' or _r starts with 'admin_roles') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _sta %}has-active{% endif %}"
+                    data-group="rg-staff" data-tooltip="Staff" onclick="toggleGroup('rg-staff')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span class="sidebar-label">Staff</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-rg-staff">
+                {% if can('view_users') %}
+                <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_users' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Regional Staff</span>
+                </a>
+                {% endif %}
+                {% if can('view_roles') %}
+                <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_roles' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Roles</span>
+                </a>
+                {% endif %}
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Transfers &amp; Assignments</span></a>
+            </div>
+        </div>
         {% endif %}
 
-        <a href="#" class="sidebar-link" data-tooltip="Branch Targets">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <circle cx="12" cy="12" r="10"/>
-                <circle cx="12" cy="12" r="6"/>
-                <circle cx="12" cy="12" r="2"/>
-            </svg>
-            <span class="sidebar-label">Branch Targets</span>
-        </a>
-        {% endif %}
+        {# Operations group #}
+        <div class="sidebar-group">
+            {% set _opa = (_r == 'app_customers' or _r starts with 'admin_terminals') %}
+            <button class="sidebar-group-btn {% if _opa %}has-active{% endif %}"
+                    data-group="rg-ops" data-tooltip="Operations" onclick="toggleGroup('rg-ops')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <span class="sidebar-label">Operations</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-rg-ops">
+                {% if can('view_transactions') %}
+                <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'app_customers' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Customers</span>
+                </a>
+                {% endif %}
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Transactions</span></a>
+                {% if can('authorize_pos_terminal') %}
+                <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_terminals' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Terminals</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
 
-        {# ── Staff ── #}
-        {% if can('view_users') or can('assign_users_to_branches') %}
-        <div class="sidebar-section-label" style="margin-top:8px;">Staff</div>
-
-        {% if can('view_users') %}
-        <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_users' %}active{% endif %}"
-           data-tooltip="Regional Staff">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span class="sidebar-label">Regional Staff</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_roles') %}
-        <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_roles' %}active{% endif %}"
-           data-tooltip="Roles">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            <span class="sidebar-label">Roles</span>
-        </a>
-        {% endif %}
-
-        <a href="#" class="sidebar-link" data-tooltip="Transfers & Assignments">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <polyline points="17 1 21 5 17 9"/>
-                <path d="M3 11V9a4 4 0 0 1 4-4h14"/>
-                <polyline points="7 23 3 19 7 15"/>
-                <path d="M21 13v2a4 4 0 0 1-4 4H3"/>
-            </svg>
-            <span class="sidebar-label">Transfers & Assignments</span>
-        </a>
-        {% endif %}
-
-        {# ── Operations ── #}
-        <div class="sidebar-section-label" style="margin-top:8px;">Operations</div>
-
-        {% if can('view_transactions') %}
-        <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'app_customers' %}active{% endif %}"
-           data-tooltip="Customers">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
-                <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span class="sidebar-label">Customers</span>
-        </a>
-        {% endif %}
-
-        <a href="#" class="sidebar-link" data-tooltip="Regional Transactions">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <line x1="12" y1="1" x2="12" y2="23"/>
-                <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
-            </svg>
-            <span class="sidebar-label">Transactions</span>
-        </a>
-
-        {% if can('authorize_pos_terminal') %}
-        <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_terminals' %}active{% endif %}"
-           data-tooltip="POS Terminals">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2"/>
-                <line x1="8" y1="21" x2="16" y2="21"/>
-                <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-            <span class="sidebar-label">POS Terminals</span>
-        </a>
-        {% endif %}
-
-        {# ── Audit ── #}
-        {% if can('view_audit_logs') or can_view_tenant_activity_logs %}
-        <div class="sidebar-section-label" style="margin-top:8px;">Audit</div>
-
-        {% if can_view_tenant_activity_logs %}
-        <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_activity' %}active{% endif %}"
-           data-tooltip="Activity Logs">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 20h9"/>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <span class="sidebar-label">Activity Logs</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_audit_logs') %}
-        <a href="#" class="sidebar-link" data-tooltip="Audit Trail">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/>
-                <polyline points="14 2 14 8 20 8"/>
-                <line x1="16" y1="13" x2="8" y2="13"/>
-                <line x1="16" y1="17" x2="8" y2="17"/>
-            </svg>
-            <span class="sidebar-label">Audit Trail</span>
-        </a>
-        {% endif %}
+        {# System group #}
+        {% if can_view_settings or can_view_tenant_activity_logs or can('view_audit_logs') %}
+        {% set _sa = (_r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _sa %}has-active{% endif %}"
+                    data-group="rg-system" data-tooltip="System" onclick="toggleGroup('rg-system')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="sidebar-label">System</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-rg-system">
+                {% if can_view_settings %}
+                <a href="{{ path('admin_settings', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_settings' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Settings</span>
+                </a>
+                {% endif %}
+                {% if can_view_tenant_activity_logs %}
+                <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_activity' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Activity Logs</span>
+                </a>
+                {% endif %}
+                {% if can('view_audit_logs') %}
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Audit Trail</span></a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
     {# =========================================================================
-       BRANCH OPERATIONAL CONTEXT — any leaf branch (/{branch-slug}/)
-       Who sees this: Branch Manager, Cashier, any operational role
-       Pages: Users (this branch), Roles (this branch), Terminals, Logs
-       NOT shown: Org chart, Branches tree, Permissions, Role templates
+       BRANCH OPERATIONAL CONTEXT — leaf branch (default when multi-branch off)
     ========================================================================= #}
     {% else %}
 
-        <div class="sidebar-section-label">Main</div>
-
         <a href="{{ path('app_dashboard', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'app_dashboard' %}active{% endif %}"
+           class="sidebar-link {% if _r == 'app_dashboard' %}active{% endif %}"
            data-tooltip="Dashboard">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="3" y="3" width="7" height="7" rx="1"/>
-                <rect x="14" y="3" width="7" height="7" rx="1"/>
-                <rect x="3" y="14" width="7" height="7" rx="1"/>
-                <rect x="14" y="14" width="7" height="7" rx="1"/>
+                <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                <rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/>
             </svg>
             <span class="sidebar-label">Dashboard</span>
         </a>
 
         {% if can('view_transactions') %}
         <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') == 'app_customers' %}active{% endif %}"
+           class="sidebar-link {% if _r == 'app_customers' %}active{% endif %}"
            data-tooltip="Customers">
             <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
                 <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
                 <circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
-                <path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
             </svg>
             <span class="sidebar-label">Customers</span>
         </a>
         {% endif %}
 
-        {# Analytics — available in all operational contexts #}
-        <div class="sidebar-section-label" style="margin-top:8px;">Analytics</div>
+        {# Analytics group #}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn" data-group="br-analytics" data-tooltip="Analytics" onclick="toggleGroup('br-analytics')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/>
+                </svg>
+                <span class="sidebar-label">Analytics</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-br-analytics">
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Revenue Reports</span></a>
+                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Churn Analysis</span></a>
+            </div>
+        </div>
 
-        <a href="#" class="sidebar-link" data-tooltip="Revenue Reports">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <line x1="18" y1="20" x2="18" y2="10"/>
-                <line x1="12" y1="20" x2="12" y2="4"/>
-                <line x1="6" y1="20" x2="6" y2="14"/>
-            </svg>
-            <span class="sidebar-label">Revenue Reports</span>
-        </a>
-
-        <a href="#" class="sidebar-link" data-tooltip="Churn Analysis">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/>
-            </svg>
-            <span class="sidebar-label">Churn Analysis</span>
-        </a>
-
-        {% if can('view_users') or can('view_roles') or can('authorize_pos_terminal') or can_view_tenant_activity_logs %}
-        <div class="sidebar-section-label" style="margin-top:8px;">Branch Admin</div>
-
-        {% if can('view_users') %}
-        <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_users' %}active{% endif %}"
-           data-tooltip="Users">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/>
-                <circle cx="12" cy="7" r="4"/>
-            </svg>
-            <span class="sidebar-label">Users</span>
-        </a>
+        {# People group #}
+        {% if can('view_users') or can('view_roles') or can('view_departments') or can('view_areas') %}
+        {% set _ppl = (_r starts with 'admin_users' or _r starts with 'admin_roles' or _r starts with 'admin_departments' or _r starts with 'admin_areas') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _ppl %}has-active{% endif %}"
+                    data-group="br-people" data-tooltip="People" onclick="toggleGroup('br-people')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
+                    <circle cx="9" cy="7" r="4"/>
+                    <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
+                </svg>
+                <span class="sidebar-label">People</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-br-people">
+                {% if can('view_users') %}
+                <a href="{{ path('admin_users', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_users' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Users</span>
+                </a>
+                {% endif %}
+                {% if can('view_roles') %}
+                <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_roles' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Roles</span>
+                </a>
+                {% endif %}
+                {% if can('view_departments') %}
+                <a href="{{ path('admin_departments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_departments' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Departments</span>
+                </a>
+                {% endif %}
+                {% if can('view_areas') %}
+                <a href="{{ path('admin_areas', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_areas' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Areas</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
-        {% if can('view_roles') %}
-        <a href="{{ path('admin_roles', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_roles' %}active{% endif %}"
-           data-tooltip="Roles">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
-            </svg>
-            <span class="sidebar-label">Roles</span>
-        </a>
+        {# Revenue group #}
+        {% if can('view_catalog') or can('view_events') %}
+        {% set _rev = (_r starts with 'admin_catalog' or _r starts with 'admin_events') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _rev %}has-active{% endif %}"
+                    data-group="br-revenue" data-tooltip="Revenue" onclick="toggleGroup('br-revenue')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <line x1="12" y1="1" x2="12" y2="23"/>
+                    <path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>
+                </svg>
+                <span class="sidebar-label">Revenue</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-br-revenue">
+                {% if can('view_catalog') %}
+                <a href="{{ path('admin_catalog', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_catalog' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Catalog</span>
+                </a>
+                {% endif %}
+                {% if can('view_events') %}
+                <a href="{{ path('admin_events', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_events' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Events &amp; Offers</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
-        {% if can('view_departments') %}
-        <a href="{{ path('admin_departments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_departments' %}active{% endif %}"
-           data-tooltip="Departments">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/>
-                <path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>
-            </svg>
-            <span class="sidebar-label">Departments</span>
-        </a>
-        {% endif %}
-
-        {% if can('view_areas') %}
-        <a href="{{ path('admin_areas', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_areas' %}active{% endif %}"
-           data-tooltip="Areas">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/>
-            </svg>
-            <span class="sidebar-label">Areas</span>
-        </a>
-        {% endif %}
-
+        {# Operations group #}
         {% if can('authorize_pos_terminal') %}
-        <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_terminals' %}active{% endif %}"
-           data-tooltip="POS Terminals">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <rect x="2" y="3" width="20" height="14" rx="2"/>
-                <line x1="8" y1="21" x2="16" y2="21"/>
-                <line x1="12" y1="17" x2="12" y2="21"/>
-            </svg>
-            <span class="sidebar-label">POS Terminals</span>
-        </a>
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _r starts with 'admin_terminals' %}has-active{% endif %}"
+                    data-group="br-ops" data-tooltip="Operations" onclick="toggleGroup('br-ops')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="2" y="3" width="20" height="14" rx="2"/>
+                    <line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>
+                </svg>
+                <span class="sidebar-label">Operations</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-br-ops">
+                <a href="{{ path('admin_terminals', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_terminals' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Terminals</span>
+                </a>
+            </div>
+        </div>
         {% endif %}
 
-        {% if can_view_tenant_activity_logs %}
-        <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
-           class="sidebar-link {% if app.request.attributes.get('_route') starts with 'admin_activity' %}active{% endif %}"
-           data-tooltip="Activity Logs">
-            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
-                <path d="M12 20h9"/>
-                <path d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"/>
-            </svg>
-            <span class="sidebar-label">Activity Logs</span>
-        </a>
-        {% endif %}
+        {# System group #}
+        {% if can_view_settings or can_view_tenant_activity_logs %}
+        {% set _sys = (_r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        <div class="sidebar-group">
+            <button class="sidebar-group-btn {% if _sys %}has-active{% endif %}"
+                    data-group="br-system" data-tooltip="System" onclick="toggleGroup('br-system')">
+                <svg class="group-icon" width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+                </svg>
+                <span class="sidebar-label">System</span>
+                <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </button>
+            <div class="sidebar-group-content" id="sg-br-system">
+                {% if can_view_settings %}
+                <a href="{{ path('admin_settings', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_settings' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Settings</span>
+                </a>
+                {% endif %}
+                {% if can_view_tenant_activity_logs %}
+                <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_activity' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Activity Logs</span>
+                </a>
+                {% endif %}
+            </div>
+        </div>
         {% endif %}
 
     {% endif %}

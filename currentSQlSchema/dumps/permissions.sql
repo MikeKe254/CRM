@@ -89,7 +89,9 @@ INSERT INTO `permissions` (`id`, `name`, `category`, `description`, `action_key`
 (46, 'Cross-Branch Login', 'access', 'User can log into any branch in the company without an explicit assignment', 'CROSS_BRANCH_LOGIN', '2026-03-21 22:30:12'),
 (47, 'Cross-Branch Data View', 'access', 'User can view data from branches they are not directly assigned to', 'CROSS_BRANCH_VIEW', '2026-03-21 22:30:12'),
 (48, 'View Roles Hierarchy', 'roles', 'View the role hierarchy structure', 'VIEW_ROLES_HIERARCHY', '2026-03-24 00:00:00'),
-(49, 'Edit Roles Hierarchy', 'roles', 'Edit role hierarchy parent relationships and levels', 'EDIT_ROLES_HIERARCHY', '2026-03-24 00:00:00');
+(49, 'Edit Roles Hierarchy', 'roles', 'Edit role hierarchy parent relationships and levels', 'EDIT_ROLES_HIERARCHY', '2026-03-24 00:00:00'),
+(50, 'View Settings', 'settings', 'View company settings pages and configuration screens', 'VIEW_SETTINGS', '2026-04-06 00:00:00'),
+(51, 'Edit Settings', 'settings', 'Edit company settings and save configuration changes', 'EDIT_SETTINGS', '2026-04-06 00:00:00');
 
 --
 -- Indexes for dumped tables
@@ -110,7 +112,7 @@ ALTER TABLE `permissions`
 -- AUTO_INCREMENT for table `permissions`
 --
 ALTER TABLE `permissions`
-  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=50;
+  MODIFY `id` int(11) NOT NULL AUTO_INCREMENT, AUTO_INCREMENT=52;
 COMMIT;
 
 /*!40101 SET CHARACTER_SET_CLIENT=@OLD_CHARACTER_SET_CLIENT */;

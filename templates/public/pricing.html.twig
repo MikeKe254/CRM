@@ -1,0 +1,208 @@
+{% extends 'layouts/public.html.twig' %}
+
+{% block title %}Pricing{% endblock %}
+
+{% block content %}
+<section class="max-w-7xl mx-auto">
+    <div class="rounded-[2rem] border border-slate-200 bg-gradient-to-br from-white via-slate-50 to-blue-50 px-6 py-12 shadow-sm md:px-10 md:py-14">
+        <div class="max-w-3xl">
+            <span class="inline-flex items-center rounded-full border border-blue-100 bg-white/80 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.24em] text-blue-700">
+                Pricing
+            </span>
+            <h1 class="mt-5 text-4xl font-black tracking-tight text-slate-950 md:text-6xl">
+                Clear plans for businesses growing with Patronr.
+            </h1>
+            <p class="mt-5 max-w-2xl text-base leading-7 text-slate-600 md:text-lg">
+                Start small, unlock more operational power as you grow, and compare every plan in one place. No vague packaging. No hidden structure.
+            </p>
+        </div>
+
+        <div class="mt-8 flex flex-wrap gap-3 text-sm text-slate-600">
+            <span class="rounded-full bg-white px-4 py-2 shadow-sm ring-1 ring-slate-200">Monthly and annual pricing</span>
+            <span class="rounded-full bg-white px-4 py-2 shadow-sm ring-1 ring-slate-200">Free trial on paid plans</span>
+            <span class="rounded-full bg-white px-4 py-2 shadow-sm ring-1 ring-slate-200">Detailed comparison below</span>
+        </div>
+    </div>
+
+    <div class="mt-10 grid gap-6 xl:grid-cols-4 md:grid-cols-2">
+        {% for plan in plans %}
+            {% set users = plan.limit_summary.users ?? null %}
+            {% set branches = plan.limit_summary.branches ?? null %}
+            {% set sms = plan.limit_summary.sms ?? null %}
+            <article class="relative flex h-full flex-col rounded-[2rem] border {% if plan.featured %}border-blue-300 bg-slate-950 text-white shadow-2xl shadow-blue-200/40{% else %}border-slate-200 bg-white text-slate-900 shadow-sm{% endif %} p-6">
+                {% if plan.featured %}
+                    <div class="absolute -top-3 left-6 rounded-full bg-blue-600 px-3 py-1 text-[11px] font-bold uppercase tracking-[0.22em] text-white">
+                        Most Popular
+                    </div>
+                {% endif %}
+
+                <div class="flex items-start justify-between gap-4">
+                    <div>
+                        <h2 class="text-2xl font-black tracking-tight">{{ plan.name }}</h2>
+                        {% if plan.description %}
+                            <p class="mt-2 text-sm leading-6 {% if plan.featured %}text-slate-300{% else %}text-slate-500{% endif %}">
+                                {{ plan.description }}
+                            </p>
+                        {% endif %}
+                    </div>
+                    <span class="rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.2em] {% if plan.featured %}bg-white/10 text-blue-100{% else %}bg-slate-100 text-slate-500{% endif %}">
+                        {{ plan.slug }}
+                    </span>
+                </div>
+
+                <div class="mt-8">
+                    {% if plan.monthly_price == 0 %}
+                        <div class="text-4xl font-black tracking-tight">Free</div>
+                        <p class="mt-2 text-sm {% if plan.featured %}text-slate-300{% else %}text-slate-500{% endif %}">
+                            Start without billing.
+                        </p>
+                    {% else %}
+                        <div class="flex items-end gap-2">
+                            <span class="text-4xl font-black tracking-tight">KES {{ plan.monthly_price|number_format(0) }}</span>
+                            <span class="pb-1 text-sm {% if plan.featured %}text-slate-300{% else %}text-slate-500{% endif %}">/ month</span>
+                        </div>
+                        <p class="mt-2 text-sm {% if plan.featured %}text-slate-300{% else %}text-slate-500{% endif %}">
+                            Annual: KES {{ plan.annual_price|number_format(0) }}
+                            {% if plan.trial_days > 0 %}
+                                · {{ plan.trial_days }}-day trial
+                            {% endif %}
+                        </p>
+                    {% endif %}
+                </div>
+
+                <div class="mt-6 grid gap-3 rounded-2xl {% if plan.featured %}bg-white/5 ring-1 ring-white/10{% else %}bg-slate-50 ring-1 ring-slate-200{% endif %} p-4">
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="{% if plan.featured %}text-slate-300{% else %}text-slate-500{% endif %}">Users</span>
+                        <strong>{{ users == -1 ? 'Unlimited' : (users is null ? '—' : users|number_format(0)) }}</strong>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="{% if plan.featured %}text-slate-300{% else %}text-slate-500{% endif %}">Branches</span>
+                        <strong>{{ branches == -1 ? 'Unlimited' : (branches is null ? '—' : branches|number_format(0)) }}</strong>
+                    </div>
+                    <div class="flex items-center justify-between text-sm">
+                        <span class="{% if plan.featured %}text-slate-300{% else %}text-slate-500{% endif %}">SMS / month</span>
+                        <strong>{{ sms == -1 ? 'Unlimited' : (sms is null ? '—' : sms|number_format(0)) }}</strong>
+                    </div>
+                </div>
+
+                <ul class="mt-6 space-y-3 text-sm">
+                    {% for highlight in plan.highlights %}
+                        <li class="flex items-start gap-3">
+                            <span class="mt-0.5 inline-flex h-5 w-5 items-center justify-center rounded-full {% if plan.featured %}bg-blue-500/20 text-blue-100{% else %}bg-blue-50 text-blue-700{% endif %}">
+                                {{ ux_icon('lucide:check', {width:12,height:12}) }}
+                            </span>
+                            <span class="{% if plan.featured %}text-slate-200{% else %}text-slate-600{% endif %}">{{ highlight }}</span>
+                        </li>
+                    {% endfor %}
+                </ul>
+
+                <div class="mt-auto pt-8">
+                    <a href="/register?plan={{ plan.slug }}"
+                       class="inline-flex w-full items-center justify-center rounded-2xl px-5 py-3 text-sm font-semibold transition {% if plan.featured %}bg-blue-500 text-white hover:bg-blue-400{% else %}bg-slate-950 text-white hover:bg-slate-800{% endif %}">
+                        {% if plan.monthly_price == 0 %}
+                            Get Started
+                        {% else %}
+                            Start {{ plan.trial_days }}-Day Trial
+                        {% endif %}
+                    </a>
+                </div>
+            </article>
+        {% endfor %}
+    </div>
+
+    <section class="mt-16">
+        <div class="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
+            <div>
+                <h2 class="text-3xl font-black tracking-tight text-slate-950 md:text-4xl">Detailed plan comparison</h2>
+                <p class="mt-2 text-sm leading-6 text-slate-600 md:text-base">
+                    Compare operational capabilities and key limits across every public plan.
+                </p>
+            </div>
+            <a href="/contact" class="inline-flex items-center rounded-2xl border border-slate-200 bg-white px-4 py-2 text-sm font-semibold text-slate-700 shadow-sm transition hover:bg-slate-50">
+                Need a custom setup?
+            </a>
+        </div>
+
+        <div class="mt-8 overflow-hidden rounded-[2rem] border border-slate-200 bg-white shadow-sm">
+            <div class="overflow-x-auto">
+                <table class="min-w-full border-collapse">
+                    <thead class="bg-slate-50">
+                        <tr class="text-left">
+                            <th class="sticky left-0 z-10 bg-slate-50 px-5 py-4 text-xs font-bold uppercase tracking-[0.2em] text-slate-400">Capability</th>
+                            {% for plan in plans %}
+                                <th class="px-5 py-4 text-sm font-bold text-slate-900">
+                                    <div>{{ plan.name }}</div>
+                                    <div class="mt-1 text-xs font-medium text-slate-400">
+                                        {% if plan.monthly_price == 0 %}
+                                            Free
+                                        {% else %}
+                                            KES {{ plan.monthly_price|number_format(0) }}/mo
+                                        {% endif %}
+                                    </div>
+                                </th>
+                            {% endfor %}
+                        </tr>
+                    </thead>
+                    <tbody>
+                        {% for section in comparison_sections %}
+                            <tr class="border-t border-slate-200 bg-slate-50/70">
+                                <td colspan="{{ plans|length + 1 }}" class="px-5 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                                    {{ section.title }}
+                                </td>
+                            </tr>
+
+                            {% for row in section.rows %}
+                                <tr class="border-t border-slate-100">
+                                    <td class="sticky left-0 bg-white px-5 py-4 text-sm font-medium text-slate-700">{{ row.label }}</td>
+                                    {% for plan in plans %}
+                                        <td class="px-5 py-4">
+                                            {% if row.plans[plan.id] %}
+                                                <span class="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                                                    {{ ux_icon('lucide:check', {width:12,height:12}) }} Included
+                                                </span>
+                                            {% else %}
+                                                <span class="inline-flex items-center gap-2 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-400">
+                                                    {{ ux_icon('lucide:minus', {width:12,height:12}) }} Not included
+                                                </span>
+                                            {% endif %}
+                                        </td>
+                                    {% endfor %}
+                                </tr>
+                            {% endfor %}
+                        {% endfor %}
+
+                        <tr class="border-t border-slate-200 bg-slate-50/70">
+                            <td colspan="{{ plans|length + 1 }}" class="px-5 py-3 text-xs font-bold uppercase tracking-[0.18em] text-slate-500">
+                                Plan limits
+                            </td>
+                        </tr>
+
+                        {% for row in limit_rows %}
+                            <tr class="border-t border-slate-100">
+                                <td class="sticky left-0 bg-white px-5 py-4 text-sm font-medium text-slate-700">{{ row.label }}</td>
+                                {% for plan in plans %}
+                                    <td class="px-5 py-4 text-sm text-slate-600">{{ row.values[plan.id] }}</td>
+                                {% endfor %}
+                            </tr>
+                        {% endfor %}
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </section>
+
+    <section class="mt-12 rounded-[2rem] border border-slate-200 bg-slate-950 px-6 py-8 text-white shadow-sm md:px-8">
+        <div class="flex flex-col gap-6 md:flex-row md:items-center md:justify-between">
+            <div class="max-w-2xl">
+                <h3 class="text-2xl font-black tracking-tight md:text-3xl">Need a custom plan?</h3>
+                <p class="mt-3 text-sm leading-6 text-slate-300 md:text-base">
+                    For larger operations, special rollouts, or tailored feature access, we can structure a custom commercial setup around your business.
+                </p>
+            </div>
+            <a href="/contact" class="inline-flex items-center justify-center rounded-2xl bg-white px-5 py-3 text-sm font-semibold text-slate-950 transition hover:bg-slate-100">
+                Talk to sales
+            </a>
+        </div>
+    </section>
+</section>
+{% endblock %}

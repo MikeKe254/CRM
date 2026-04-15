@@ -1,0 +1,505 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set _branch = app.request.attributes.get('branch') %}
+{% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: _branch} %}
+
+{% block admin_title %}Settings{% endblock %}
+{% block admin_subtitle %}Manage your company configuration and integrations{% endblock %}
+
+{% block admin_content %}
+
+{# ── Tab Navigation ─────────────────────────────────────────────────────── #}
+<div class="border-b border-gray-200 mb-7">
+    <nav class="flex gap-1 -mb-px" aria-label="Settings tabs">
+        {% set tabs = [
+            {id: 'company',  label: 'Company Profile', icon: '<path d="M19 21V5a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v16m14 0h2m-2 0H5m-2 0h2M9 7h1m-1 4h1m4-4h1m-1 4h1m-2 10v-5a1 1 0 0 1 1-1h2a1 1 0 0 1 1 1v5m-4 0H9"/>'},
+            {id: 'modules',  label: 'Modules',         icon: '<rect x="2" y="3" width="6" height="6" rx="1"/><rect x="9" y="3" width="6" height="6" rx="1"/><rect x="16" y="3" width="6" height="6" rx="1"/><rect x="2" y="10" width="6" height="6" rx="1"/><rect x="9" y="10" width="6" height="6" rx="1"/><rect x="16" y="10" width="6" height="6" rx="1"/>'},
+            {id: 'payment',  label: 'Payment',         icon: '<rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>'},
+            {id: 'loyalty',  label: 'Loyalty',         icon: '<path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 0 0 .95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 0 0-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 0 0-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 0 0-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 0 0 .951-.69l1.519-4.674z"/>'},
+        ] %}
+        {% for tab in tabs %}
+        <button id="btn-{{ tab.id }}"
+                onclick="switchTab('{{ tab.id }}')"
+                class="settings-tab flex items-center gap-2 px-4 py-3 text-sm font-medium border-b-2 transition-colors whitespace-nowrap
+                       {{ active_tab == tab.id
+                          ? 'border-indigo-600 text-indigo-600'
+                          : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+            <svg width="15" height="15" fill="none" stroke="currentColor" stroke-width="1.6" viewBox="0 0 24 24">{{ tab.icon|raw }}</svg>
+            {{ tab.label }}
+        </button>
+        {% endfor %}
+    </nav>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{#  TAB: COMPANY                                                               #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div id="tab-company" class="settings-panel {{ active_tab != 'company' ? 'hidden' : '' }}">
+    <div class="max-w-2xl">
+        <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+            <div class="px-6 py-4 border-b border-gray-100">
+                <div class="text-sm font-semibold text-gray-900">Company Profile</div>
+                <div class="text-xs text-gray-500 mt-0.5">Basic information about your organisation</div>
+            </div>
+            <form method="post" action="{{ path('admin_settings_save_company', _p) }}" class="px-6 py-5 space-y-4">
+                <div>
+                    <label class="block text-xs font-medium text-gray-600 mb-1.5">Company Name <span class="text-red-500">*</span></label>
+                    <input type="text" name="name" value="{{ company.name }}" required
+                           class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                </div>
+                <div class="grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Email Address</label>
+                        <input type="email" name="email" value="{{ company.email ?? '' }}"
+                               class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Phone Number</label>
+                        <input type="text" name="phone" value="{{ company.phone ?? '' }}"
+                               class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm text-gray-900 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition">
+                    </div>
+                </div>
+                <div class="pt-2">
+                    <button type="submit"
+                            class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                        Save Changes
+                    </button>
+                </div>
+            </form>
+        </div>
+    </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{#  TAB: MODULES                                                               #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div id="tab-modules" class="settings-panel {{ active_tab != 'modules' ? 'hidden' : '' }}">
+    <div class="max-w-2xl">
+        <form method="post" action="{{ path('admin_settings_save_modules', _p) }}">
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden mb-4">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <div class="text-sm font-semibold text-gray-900">Module Settings</div>
+                    <div class="text-xs text-gray-500 mt-0.5">Enable or disable feature modules for your company</div>
+                </div>
+
+                {# Loyalty module #}
+                <div class="px-6 py-4 flex items-start gap-4">
+                    <div class="w-10 h-10 bg-yellow-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg width="20" height="20" fill="#eab308" viewBox="0 0 24 24">
+                            <path d="M11.049 2.927c.3-.921 1.603-.921 1.902 0l1.519 4.674a1 1 0 00.95.69h4.915c.969 0 1.371 1.24.588 1.81l-3.976 2.888a1 1 0 00-.363 1.118l1.518 4.674c.3.922-.755 1.688-1.538 1.118l-3.976-2.888a1 1 0 00-1.176 0l-3.976 2.888c-.783.57-1.838-.197-1.538-1.118l1.518-4.674a1 1 0 00-.363-1.118l-3.976-2.888c-.784-.57-.38-1.81.588-1.81h4.914a1 1 0 00.951-.69l1.519-4.674z"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="flex items-center justify-between">
+                            <div>
+                                <div class="text-sm font-semibold text-gray-900">Loyalty Programme</div>
+                                <div class="text-xs text-gray-500 mt-0.5">Points earning, redemption, enrolment and the Points Checker on POS terminals</div>
+                            </div>
+                            <label class="relative inline-flex items-center cursor-pointer ml-4 flex-shrink-0">
+                                <input type="checkbox" name="loyalty_module_enabled" value="1" class="sr-only peer"
+                                       {{ company.loyalty_module_enabled ? 'checked' : '' }}>
+                                <div class="w-11 h-6 bg-gray-200 rounded-full peer
+                                            peer-focus:ring-2 peer-focus:ring-indigo-300
+                                            peer-checked:bg-indigo-600
+                                            after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                            after:bg-white after:border after:border-gray-300 after:rounded-full
+                                            after:h-5 after:w-5 after:transition-all
+                                            peer-checked:after:translate-x-5 peer-checked:after:border-white"></div>
+                            </label>
+                        </div>
+                    </div>
+                </div>
+
+                {# Future modules placeholder #}
+                <div class="px-6 py-4 flex items-start gap-4 bg-gray-50/50 border-t border-gray-100">
+                    <div class="w-10 h-10 bg-gray-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                        <svg width="18" height="18" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
+                            <circle cx="12" cy="12" r="10"/><path d="M12 8v4m0 4h.01"/>
+                        </svg>
+                    </div>
+                    <div class="flex-1 min-w-0">
+                        <div class="text-sm font-medium text-gray-400">More modules coming soon</div>
+                        <div class="text-xs text-gray-400 mt-0.5">Advanced analytics, inventory, and more</div>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit"
+                    class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                Save Module Settings
+            </button>
+        </form>
+    </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{#  TAB: PAYMENT                                                               #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div id="tab-payment" class="settings-panel {{ active_tab != 'payment' ? 'hidden' : '' }}">
+
+    {% if mpesa_configs is empty %}
+    <div class="max-w-2xl">
+        <div class="bg-white border border-gray-200 rounded-2xl px-8 py-12 text-center">
+            <div class="w-12 h-12 bg-gray-100 rounded-2xl flex items-center justify-center mx-auto mb-3">
+                <svg width="22" height="22" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
+                    <rect x="1" y="4" width="22" height="16" rx="2"/><line x1="1" y1="10" x2="23" y2="10"/>
+                </svg>
+            </div>
+            <div class="text-sm font-semibold text-gray-700">No payment configurations found</div>
+            <div class="text-xs text-gray-400 mt-1">Contact support to add payment methods to your account</div>
+        </div>
+    </div>
+    {% else %}
+
+    <div class="text-xs font-medium text-gray-500 mb-3 uppercase tracking-wide">M-Pesa Configurations</div>
+    <div class="grid gap-4 max-w-3xl">
+        {% for cfg in mpesa_configs %}
+        {% set typeLabel  = cfg.type == 'buygoods' ? 'Till / Buy Goods' : 'Paybill' %}
+        {% set typeColor  = cfg.type == 'buygoods' ? 'bg-teal-50 text-teal-700' : 'bg-blue-50 text-blue-700' %}
+        {% set envLabel   = cfg.environment == 'production' ? 'Live' : 'Sandbox' %}
+        {% set envColor   = cfg.environment == 'production' ? 'bg-emerald-50 text-emerald-700' : 'bg-amber-50 text-amber-700' %}
+        {% set modeLabels = {stk_push: 'STK Push', callback: 'C2B Callback', manual: 'Manual'} %}
+        {% set modeColors = {stk_push: 'bg-indigo-50 text-indigo-700', callback: 'bg-purple-50 text-purple-700', manual: 'bg-gray-100 text-gray-600'} %}
+        {% set modeKey    = cfg.integration_mode in ['stk_push','callback','manual'] ? cfg.integration_mode : 'manual' %}
+
+        <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden hover:border-gray-300 transition-colors">
+            <div class="px-5 py-4 flex items-start gap-4">
+                {# M-Pesa logo icon #}
+                <div class="w-10 h-10 bg-green-50 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="#16a34a">
+                        <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm0 18c-4.41 0-8-3.59-8-8s3.59-8 8-8 8 3.59 8 8-3.59 8-8 8zm-.5-13v5.25l4.5 2.67-.75 1.23L10 13V7h1.5z"/>
+                    </svg>
+                </div>
+
+                <div class="flex-1 min-w-0">
+                    <div class="flex items-start justify-between gap-3">
+                        <div>
+                            <div class="text-sm font-semibold text-gray-900">
+                                {{ cfg.account_name ?? 'M-Pesa Config #' ~ cfg.id }}
+                            </div>
+                            <div class="flex items-center gap-1.5 mt-1.5 flex-wrap">
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ typeColor }}">{{ typeLabel }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ envColor }}">{{ envLabel }}</span>
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium {{ modeColors[modeKey] }}">{{ modeLabels[modeKey] }}</span>
+                                {% if not cfg.is_active %}
+                                <span class="inline-flex items-center px-2 py-0.5 rounded-md text-xs font-medium bg-red-50 text-red-600">Inactive</span>
+                                {% endif %}
+                            </div>
+                        </div>
+                        <button onclick="openPaymentDrawer({{ {
+                            id:                    cfg.id,
+                            account_name:          cfg.account_name ?? '',
+                            type:                  cfg.type,
+                            shortcode:             cfg.shortcode,
+                            till_number:           cfg.till_number ?? '',
+                            environment:           cfg.environment,
+                            integration_mode:      cfg.integration_mode,
+                            manual_code_required:  cfg.manual_code_required ? 1 : 0,
+                            forward_urls:          cfg.forward_urls_decoded|join('\n'),
+                        }|json_encode|raw }})"
+                                class="flex-shrink-0 h-8 px-3 text-xs font-semibold text-indigo-600 bg-indigo-50 hover:bg-indigo-100 border border-indigo-200 rounded-lg transition-colors">
+                            Configure
+                        </button>
+                    </div>
+
+                    {# Details row #}
+                    <div class="mt-3 flex flex-wrap gap-x-5 gap-y-1.5">
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                            <span class="font-medium text-gray-400">Shortcode</span>
+                            <span class="font-mono font-semibold text-gray-700">{{ cfg.shortcode }}</span>
+                        </div>
+                        {% if cfg.till_number %}
+                        <div class="flex items-center gap-1.5 text-xs text-gray-500">
+                            <span class="font-medium text-gray-400">Till</span>
+                            <span class="font-mono font-semibold text-gray-700">{{ cfg.till_number }}</span>
+                        </div>
+                        {% endif %}
+                        {% if cfg.manual_code_required %}
+                        <div class="flex items-center gap-1 text-xs text-amber-600">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/>
+                            </svg>
+                            Transaction code required
+                        </div>
+                        {% endif %}
+                        {% if cfg.forward_urls_decoded is not empty %}
+                        <div class="flex items-center gap-1 text-xs text-purple-600">
+                            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                                <path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"/><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"/>
+                            </svg>
+                            {{ cfg.forward_urls_decoded|length }} forward URL{{ cfg.forward_urls_decoded|length != 1 ? 's' : '' }}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+        </div>
+        {% endfor %}
+    </div>
+    {% endif %}
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+{#  TAB: LOYALTY                                                               #}
+{# ═══════════════════════════════════════════════════════════════════════════ #}
+<div id="tab-loyalty" class="settings-panel {{ active_tab != 'loyalty' ? 'hidden' : '' }}">
+    {% set lp = loyalty_program %}
+    <div class="max-w-2xl">
+
+        {% if not company.loyalty_module_enabled %}
+        <div class="mb-5 px-4 py-3 bg-amber-50 border border-amber-200 rounded-xl flex items-center gap-2.5 text-sm text-amber-700">
+            <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24">
+                <path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/>
+            </svg>
+            The Loyalty module is currently <strong>disabled</strong>. Enable it under <button onclick="switchTab('modules')" class="underline font-semibold hover:text-amber-900">Modules</button> for it to take effect on the POS.
+        </div>
+        {% endif %}
+
+        <form method="post" action="{{ path('admin_settings_save_loyalty', _p) }}" class="space-y-5">
+
+            {# Programme Identity #}
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-900">Programme Identity</div>
+                        <div class="text-xs text-gray-500 mt-0.5">How the loyalty programme is named and branded</div>
+                    </div>
+                    {# Active toggle #}
+                    <label class="relative inline-flex items-center cursor-pointer gap-2 flex-shrink-0">
+                        <span class="text-xs font-medium text-gray-500">Active</span>
+                        <input type="checkbox" name="is_active" value="1" class="sr-only peer"
+                               {{ (lp and lp.is_active) ? 'checked' : '' }}>
+                        <div class="w-10 h-5 bg-gray-200 rounded-full peer
+                                    peer-focus:ring-2 peer-focus:ring-indigo-300
+                                    peer-checked:bg-indigo-600
+                                    after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                    after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                                    peer-checked:after:translate-x-5"></div>
+                    </label>
+                </div>
+                <div class="px-6 py-5 grid grid-cols-3 gap-4">
+                    <div class="col-span-2">
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Programme Name</label>
+                        <input type="text" name="program_name" value="{{ lp ? lp.program_name : 'Loyalty Program' }}"
+                               class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Points Symbol</label>
+                        <input type="text" name="points_symbol" value="{{ lp ? (lp.points_symbol ?? '') : '' }}"
+                               placeholder="e.g. pts" maxlength="10"
+                               class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                    </div>
+                    <div class="col-span-3">
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Points Currency Name</label>
+                        <input type="text" name="points_name" value="{{ lp ? lp.points_name : 'Points' }}"
+                               placeholder="e.g. Stars, Coins, Points"
+                               class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                    </div>
+                </div>
+            </div>
+
+            {# Earning Rules #}
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100">
+                    <div class="text-sm font-semibold text-gray-900">Earning Rules</div>
+                    <div class="text-xs text-gray-500 mt-0.5">How customers earn points per spend</div>
+                </div>
+                <div class="px-6 py-5 space-y-4">
+                    <div class="flex items-end gap-3">
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1.5">Points Earned</label>
+                            <input type="number" name="points_per_unit" value="{{ lp ? lp.points_per_unit : 1 }}" min="1"
+                                   class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        </div>
+                        <div class="h-10 flex items-center text-sm text-gray-500 px-1 pb-0">per every</div>
+                        <div class="flex-1">
+                            <label class="block text-xs font-medium text-gray-600 mb-1.5">KES Spent</label>
+                            <input type="number" name="unit_amount" value="{{ lp ? lp.unit_amount : 100 }}" min="1" step="0.01"
+                                   class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        </div>
+                        <div class="h-10 flex items-center text-sm text-gray-500 px-1 pb-0">KES</div>
+                    </div>
+                    <div class="p-3 bg-gray-50 rounded-xl text-xs text-gray-500 font-medium">
+                        Preview: <span class="text-gray-700" id="earning-preview">Loading…</span>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Enrolment Bonus Points</label>
+                        <input type="number" name="enroll_bonus_points" value="{{ lp ? lp.enroll_bonus_points : 0 }}" min="0"
+                               class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        <p class="text-xs text-gray-400 mt-1">Points awarded instantly when a new customer enrols. Set to 0 to disable.</p>
+                    </div>
+                </div>
+            </div>
+
+            {# Redemption #}
+            <div class="bg-white border border-gray-200 rounded-2xl overflow-hidden">
+                <div class="px-6 py-4 border-b border-gray-100 flex items-center justify-between">
+                    <div>
+                        <div class="text-sm font-semibold text-gray-900">Redemption</div>
+                        <div class="text-xs text-gray-500 mt-0.5">Allow customers to spend their points as currency</div>
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer gap-2 flex-shrink-0">
+                        <span class="text-xs font-medium text-gray-500">Enabled</span>
+                        <input type="checkbox" name="redemption_enabled" value="1" class="sr-only peer"
+                               {{ (lp and lp.redemption_enabled) ? 'checked' : '' }}>
+                        <div class="w-10 h-5 bg-gray-200 rounded-full peer
+                                    peer-focus:ring-2 peer-focus:ring-indigo-300
+                                    peer-checked:bg-indigo-600
+                                    after:content-[''] after:absolute after:top-[2px] after:left-[2px]
+                                    after:bg-white after:rounded-full after:h-4 after:w-4 after:transition-all
+                                    peer-checked:after:translate-x-5"></div>
+                    </label>
+                </div>
+                <div class="px-6 py-5 grid grid-cols-2 gap-4">
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">KES Value per Point</label>
+                        <div class="relative">
+                            <span class="absolute left-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">KES</span>
+                            <input type="number" name="kes_per_point" value="{{ lp ? lp.kes_per_point : 1.00 }}" min="0.01" step="0.01"
+                                   class="w-full h-10 pl-10 pr-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">How much 1 point is worth in KES when redeeming</p>
+                    </div>
+                    <div>
+                        <label class="block text-xs font-medium text-gray-600 mb-1.5">Max Redemption per Transaction</label>
+                        <div class="relative">
+                            <input type="number" name="max_redemption_pct" value="{{ lp ? lp.max_redemption_pct : 100 }}" min="1" max="100"
+                                   class="w-full h-10 px-3 pr-8 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 transition">
+                            <span class="absolute right-3 top-1/2 -translate-y-1/2 text-xs font-medium text-gray-400">%</span>
+                        </div>
+                        <p class="text-xs text-gray-400 mt-1">Maximum % of transaction value payable via points</p>
+                    </div>
+                </div>
+            </div>
+
+            <button type="submit"
+                    class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+                Save Loyalty Settings
+            </button>
+        </form>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+// ── Tab switching ──────────────────────────────────────────────────────────
+function switchTab(name) {
+    document.querySelectorAll('.settings-panel').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.settings-tab').forEach(el => {
+        el.classList.remove('border-indigo-600', 'text-indigo-600');
+        el.classList.add('border-transparent', 'text-gray-500');
+    });
+    const panel = document.getElementById('tab-' + name);
+    const btn   = document.getElementById('btn-' + name);
+    if (panel) panel.classList.remove('hidden');
+    if (btn)   { btn.classList.remove('border-transparent', 'text-gray-500'); btn.classList.add('border-indigo-600', 'text-indigo-600'); }
+    history.replaceState(null, '', '?tab=' + name);
+}
+
+// ── Earning preview ────────────────────────────────────────────────────────
+function updateEarningPreview() {
+    const pts    = parseFloat(document.querySelector('[name="points_per_unit"]')?.value) || 1;
+    const amount = parseFloat(document.querySelector('[name="unit_amount"]')?.value) || 100;
+    const name   = document.querySelector('[name="points_name"]')?.value || 'Points';
+    const symbol = document.querySelector('[name="points_symbol"]')?.value || 'pts';
+    const el     = document.getElementById('earning-preview');
+    if (el) el.textContent = `Customer earns ${pts} ${symbol} (${name}) for every KES ${amount} spent`;
+}
+
+document.addEventListener('input', e => {
+    if (['points_per_unit','unit_amount','points_name','points_symbol'].includes(e.target?.name)) {
+        updateEarningPreview();
+    }
+});
+
+updateEarningPreview();
+
+// ── Payment config drawer ──────────────────────────────────────────────────
+const _paymentSaveUrl = (id) =>
+    '{{ path('admin_settings_save_payment', _p|merge({configId: '__ID__'})) }}'.replace('__ID__', id);
+
+function openPaymentDrawer(cfg) {
+    const modeOptions = [
+        {v: 'stk_push', label: 'STK Push — prompt on customer phone'},
+        {v: 'callback', label: 'C2B Callback — wait for paybill notification'},
+        {v: 'manual',   label: 'Manual — cashier confirms receipt'},
+    ].map(o => `<option value="${o.v}" ${cfg.integration_mode === o.v ? 'selected' : ''}>${o.label}</option>`).join('');
+
+    const body = `
+        <div id="drawer-error" class="hidden mb-3 text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2"></div>
+
+        <div class="mb-4">
+            <div class="text-xs font-medium text-gray-500 mb-0.5">Type</div>
+            <div class="text-sm font-semibold text-gray-900 capitalize">${cfg.type === 'buygoods' ? 'Till / Buy Goods' : 'Paybill'}</div>
+        </div>
+        <div class="mb-4 grid grid-cols-2 gap-3">
+            <div>
+                <div class="text-xs font-medium text-gray-500 mb-0.5">Shortcode</div>
+                <div class="text-sm font-mono font-bold text-gray-900">${cfg.shortcode}</div>
+            </div>
+            ${cfg.till_number ? `<div><div class="text-xs font-medium text-gray-500 mb-0.5">Till Number</div><div class="text-sm font-mono font-bold text-gray-900">${cfg.till_number}</div></div>` : ''}
+        </div>
+
+        <div class="border-t border-gray-100 pt-4 space-y-4">
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1.5">Account / Display Name</label>
+                <input id="pf-name" type="text" value="${escHtml(cfg.account_name)}"
+                       class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500">
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1.5">Integration Mode</label>
+                <select id="pf-mode" class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    ${modeOptions}
+                </select>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1.5">Environment</label>
+                <select id="pf-env" class="w-full h-10 px-3 border border-gray-200 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-500">
+                    <option value="sandbox" ${cfg.environment === 'sandbox' ? 'selected' : ''}>Sandbox (Testing)</option>
+                    <option value="production" ${cfg.environment === 'production' ? 'selected' : ''}>Production (Live)</option>
+                </select>
+            </div>
+            <div class="flex items-start gap-3">
+                <input id="pf-code-req" type="checkbox" class="mt-0.5 h-4 w-4 rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                       ${cfg.manual_code_required ? 'checked' : ''}>
+                <div>
+                    <label for="pf-code-req" class="text-xs font-medium text-gray-700 cursor-pointer">Require transaction code on manual confirmation</label>
+                    <div class="text-xs text-gray-400 mt-0.5">Cashier must enter the M-Pesa code before marking payment received</div>
+                </div>
+            </div>
+            <div>
+                <label class="block text-xs font-medium text-gray-700 mb-1.5">
+                    Forward URLs
+                    <span class="ml-1 font-normal text-gray-400">(one per line — receive Safaricom payload instantly)</span>
+                </label>
+                <textarea id="pf-urls" rows="3" placeholder="https://yourapp.com/webhook/mpesa"
+                          class="w-full px-3 py-2 border border-gray-200 rounded-lg text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-indigo-500">${escHtml(cfg.forward_urls)}</textarea>
+                <div class="text-xs text-gray-400 mt-1">Raw Safaricom payload is forwarded to these URLs before any processing. MSISDN is unhashed before storage.</div>
+            </div>
+        </div>
+    `;
+
+    const footer = `
+        <button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+        <button data-primary onclick="submitPaymentConfig(${cfg.id})" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save Changes</button>
+    `;
+
+    openDrawer((cfg.account_name || 'M-Pesa Config') + ' · Configure', body, footer);
+}
+
+function submitPaymentConfig(configId) {
+    adminFetch(_paymentSaveUrl(configId), {
+        account_name:           document.getElementById('pf-name').value,
+        integration_mode:       document.getElementById('pf-mode').value,
+        environment:            document.getElementById('pf-env').value,
+        manual_code_required:   document.getElementById('pf-code-req').checked ? '1' : '0',
+        forward_urls:           document.getElementById('pf-urls').value,
+    }, () => turboReload());
+}
+
+function escHtml(str) {
+    return String(str ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+}
+</script>
+{% endblock %}

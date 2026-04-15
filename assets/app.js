@@ -17,3 +17,7 @@ import './sidebar.js';
 import './navbar.js';
 import './admin.js';
 import './updateUi.js';
+import './js/admin/catalog.js';
+import './js/admin/areas.js';
+import './js/admin/departments.js';
+import './js/admin/events.js';

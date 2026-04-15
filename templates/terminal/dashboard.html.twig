@@ -15,8 +15,12 @@
      style="display:{{ is_locked ? 'none' : 'flex' }};flex-direction:column;height:100%;overflow:hidden;">
 
     {# ── Top bar ─────────────────────────────────────────────────────────── #}
-    <div style="display:flex;align-items:center;justify-content:space-between;padding:14px 20px;border-bottom:1px solid #1f2937;flex-shrink:0;">
-        <div>
+    {# Uses flex-wrap so that when the screen is too narrow the buttons spill #}
+    {# onto their own second row below — clock always stays in the first row. #}
+    <div style="display:flex;flex-wrap:wrap;align-items:center;padding:14px 20px 0;border-bottom:1px solid #1f2937;flex-shrink:0;gap:8px;">
+
+        {# Branch / user — grows to fill space, never wraps itself #}
+        <div style="flex:1 1 140px;min-width:0;padding-bottom:14px;">
             <div style="color:#fff;font-weight:700;font-size:16px;line-height:1.2;">
                 {{ app.request.attributes.get('branch')|replace({'-': ' '})|title }}
             </div>
@@ -24,8 +28,36 @@
                 POS Terminal{% if user_name is defined and user_name %} &nbsp;·&nbsp; <span style="color:#9ca3af;">{{ user_name }}</span>{% endif %}
             </div>
         </div>
+
+        {# Buttons — flex-shrink:0 keeps them together; when they can't fit   #}
+        {# alongside the branch name they wrap as a group onto the next row.  #}
+        {% if (quick_stk_enabled is defined and quick_stk_enabled) or (mpesa_feed_enabled is defined and mpesa_feed_enabled) %}
+        <div style="display:flex;gap:8px;flex:0 0 auto;padding-bottom:14px;order:3;width:100%;border-top:1px solid #1f2937;padding-top:10px;"
+             id="tb-btn-row">
+            {% if quick_stk_enabled is defined and quick_stk_enabled %}
+            <a href="{{ path('terminal_quick_stk', _p) }}" class="action-btn"
+               style="flex:1;height:38px;background:#052e16;border:1px solid rgba(16,185,129,0.35);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;">
+                <svg width="15" height="15" fill="none" stroke="#34d399" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M6 12L3.269 3.126A59.768 59.768 0 0121.485 12 59.77 59.77 0 013.27 20.876L5.999 12zm0 0h7.5"/>
+                </svg>
+                <span style="color:#34d399;font-size:12px;font-weight:600;white-space:nowrap;">Quick STK</span>
+            </a>
+            {% endif %}
+            {% if mpesa_feed_enabled is defined and mpesa_feed_enabled %}
+            <a href="{{ path('terminal_mpesa_feed', _p) }}" class="action-btn"
+               style="flex:1;height:38px;background:#052e16;border:1px solid rgba(16,185,129,0.35);border-radius:12px;display:flex;align-items:center;justify-content:center;gap:7px;text-decoration:none;">
+                <svg width="15" height="15" fill="none" stroke="#34d399" stroke-width="2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.5 1.5H8.25A2.25 2.25 0 006 3.75v16.5a2.25 2.25 0 002.25 2.25h7.5A2.25 2.25 0 0018 20.25V3.75a2.25 2.25 0 00-2.25-2.25H13.5m-3 0V3h3V1.5m-3 0h3m-3 15.75h3"/>
+                </svg>
+                <span style="color:#34d399;font-size:12px;font-weight:600;white-space:nowrap;">M-Pesa Feed</span>
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {# Clock — always stays right in the first row #}
         <div id="terminal-clock"
-             style="color:#fff;font-family:ui-monospace,monospace;font-size:20px;font-variant-numeric:tabular-nums;font-weight:600;"></div>
+             style="flex:0 0 auto;color:#fff;font-family:ui-monospace,monospace;font-size:20px;font-variant-numeric:tabular-nums;font-weight:600;padding-bottom:14px;margin-left:auto;order:2;"></div>
     </div>
 
     {# ── Action cards — flex:1 each so they fill available space ─────────── #}
@@ -65,6 +97,7 @@
             </svg>
         </a>
 
+        {% if loyalty_enabled %}
         <a href="{{ path('terminal_loyalty_enroll', _p) }}" class="action-btn"
            style="flex:1;display:flex;align-items:center;gap:16px;background:#111827;border:1px solid #1f2937;border-radius:18px;padding:0 20px;text-decoration:none;min-height:0;">
             <div style="width:44px;height:44px;background:#1f2937;border-radius:12px;display:flex;align-items:center;justify-content:center;flex-shrink:0;">
@@ -96,10 +129,17 @@
                 <path stroke-linecap="round" stroke-linejoin="round" d="M8.25 4.5l7.5 7.5-7.5 7.5"/>
             </svg>
         </a>
+        {% endif %}
 
     </div>
 
     {# ── Lock button ─────────────────────────────────────────────────────── #}
+<style>
+@media (max-width: 480px) {
+    .tb-btn-label { display: none !important; }
+    .tb-btn       { padding: 0 !important; width: 40px !important; }
+}
+</style>
     <div style="padding:0 16px 24px;flex-shrink:0;">
         <button id="patronr-lock-btn" class="action-btn"
                 style="width:100%;height:48px;background:#111827;border:1px solid #1f2937;border-radius:14px;color:#9ca3af;font-size:14px;font-weight:600;display:flex;align-items:center;justify-content:center;gap:8px;cursor:pointer;">

@@ -4,8 +4,10 @@ declare(strict_types=1);
 
 namespace App\Controller\Terminal;
 
+use App\Services\ActivityLog\UserActivityLogService;
 use App\Services\Auth\AuthService;
 use App\Services\Auth\Exception\AuthException;
+use App\Services\Permission\CheckPermissionService;
 use App\Services\Terminal\TerminalBranchAccessService;
 use App\Support\DomainHelper;
 use Doctrine\DBAL\Connection;
@@ -26,6 +28,8 @@ class TransactionController extends AbstractController
         private readonly DomainHelper $domains,
         private readonly TerminalBranchAccessService $terminalBranchAccess,
         private readonly Connection $db,
+        private readonly CheckPermissionService $can,
+        private readonly UserActivityLogService $activityLog,
     ) {}
 
     #[Route('/transactions', name: 'terminal_transactions', methods: ['GET'])]
@@ -60,13 +64,32 @@ class TransactionController extends AbstractController
             return $this->redirectToRoute('terminal_login_page', $routeParams);
         }
 
+        // Attach branch for branch-aware permission checks
+        $session->branch = $branchNode;
+
+        // Gate: must hold VIEW_TRANSACTIONS
+        if (!$this->can->check($session, 'VIEW_TRANSACTIONS')) {
+            return $this->redirectToRoute('terminal_dashboard', $routeParams);
+        }
+
+        // Resolve effective limits — permission constraints cap the branch/company defaults
+        $permHours   = $this->can->constraint($session, 'VIEW_TRANSACTIONS', 'max_hours_history',        null);
+        $permVisible = $this->can->constraint($session, 'VIEW_TRANSACTIONS', 'max_transactions_visible', null);
+
+        $maxHours   = $permHours   !== null ? max(1, (int) $permHours)   : 24;
+        $maxVisible = $permVisible !== null ? max(1, (int) $permVisible) : 50;
+
+        $cutoff = (new \DateTimeImmutable())->modify("-{$maxHours} hours")->format('Y-m-d H:i:s');
+
+        // VIEW_FULL_CUSTOMER_PHONE controls whether the full number is shown
+        $canSeeFullPhone = $this->can->check($session, 'VIEW_FULL_CUSTOMER_PHONE');
+
         $rows = $this->db->fetchAllAssociative(
             "SELECT pt.*,
                     pm.name        AS payment_method_name,
                     pm.method_key,
                     a.name         AS area_name,
                     c.first_name   AS customer_first_name,
-                    -- Best-effort M-Pesa receipt (stored > time-proximity fallback)
                     COALESCE(
                         NULLIF(pt.api_receipt, ''),
                         IF(pm.method_key = 'mpesa', (
@@ -88,10 +111,17 @@ class TransactionController extends AbstractController
           LEFT JOIN customers         c  ON c.id  = pt.customer_id
               WHERE pt.cashier_user_id = :user_id
                 AND pt.company_id      = :company_id
+                AND pt.branch_id       = :branch_id
                 AND pt.status IN ('complete', 'processing', 'cancelled')
+                AND pt.created_at     >= :cutoff
               ORDER BY pt.created_at DESC
-              LIMIT 50",
-            ['user_id' => $session->user->id, 'company_id' => $session->company->id],
+              LIMIT {$maxVisible}",
+            [
+                'user_id'    => $session->user->id,
+                'company_id' => $session->company->id,
+                'branch_id'  => $branchNode->id,
+                'cutoff'     => $cutoff,
+            ],
         );
 
         // Fetch split legs for all returned transactions in one query
@@ -116,10 +146,20 @@ class TransactionController extends AbstractController
             return $row;
         }, $rows);
 
+        $this->activityLog->view(
+            session:     $session,
+            module:      UserActivityLogService::MODULE_TRANSACTIONS,
+            description: sprintf('Viewed transaction history (%d transactions, last %dh)', count($txns), $maxHours),
+            permission:  'VIEW_TRANSACTIONS',
+            subjectType: 'pos_transactions',
+            request:     $request,
+        );
+
         return $this->render('terminal/transactions.html.twig', [
-            'transactions' => $txns,
-            'user_name'    => $session->user->name,
-            'route_params' => $routeParams,
+            'transactions'    => $txns,
+            'user_name'       => $session->user->name,
+            'can_see_full_phone' => $canSeeFullPhone,
+            'route_params'    => $routeParams,
         ]);
     }
 }

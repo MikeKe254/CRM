@@ -15,7 +15,7 @@
         </a>
         <div style="flex:1;">
             <div style="color:#fff;font-weight:700;font-size:15px;">My Transactions</div>
-            <div style="color:#6b7280;font-size:12px;">{{ user_name ?? 'This session' }} · last 50</div>
+            <div style="color:#6b7280;font-size:12px;">{{ user_name ?? 'This session' }}</div>
         </div>
     </div>
 
@@ -41,8 +41,10 @@
                                 : txn.status == 'processing' ? '#93c5fd'
                                 : txn.status == 'cancelled'  ? '#6b7280' : '#fbbf24' %}
 
-            {# Mask phone: last 3 digits only #}
-            {% set masked_phone = txn.msisdn ? ('···' ~ txn.msisdn|slice(-3)) : null %}
+            {# Phone: full number or masked tail depending on VIEW_FULL_CUSTOMER_PHONE permission #}
+            {% set masked_phone = txn.msisdn
+                ? (can_see_full_phone ? txn.msisdn : ('···' ~ txn.msisdn|slice(-3)))
+                : null %}
 
             {# Date line: show full date if not today #}
             {% set txn_date = txn.created_at|date('Y-m-d') %}
@@ -130,8 +132,15 @@
 
                 {# ── Loyalty points ───────────────────────────────────────── #}
                 {% if txn.loyalty_points_awarded and txn.loyalty_points_awarded > 0 %}
-                <div style="margin-top:6px;padding-left:16px;color:#eab308;font-size:11px;font-weight:600;">
-                    +{{ txn.loyalty_points_awarded }} pts awarded
+                <div style="margin-top:6px;padding-left:16px;display:flex;align-items:center;gap:6px;">
+                    <span style="color:#eab308;font-size:11px;font-weight:600;">
+                        +{{ (txn.loyalty_points_awarded|round(0) == txn.loyalty_points_awarded) ? txn.loyalty_points_awarded|number_format(0) : txn.loyalty_points_awarded|number_format(2) }} pts awarded
+                    </span>
+                    {% if txn.loyalty_auto_awarded %}
+                    <span style="background:rgba(234,179,8,0.15);border:1px solid rgba(234,179,8,0.3);border-radius:4px;padding:1px 5px;font-size:10px;color:#ca8a04;font-weight:600;letter-spacing:0.02em;">
+                        AUTO
+                    </span>
+                    {% endif %}
                 </div>
                 {% endif %}
 

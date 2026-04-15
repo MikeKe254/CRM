@@ -1,0 +1,163 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+
+<div class="settings-card bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.06);">
+    <div class="settings-card-header flex items-center justify-between px-8 py-5 border-b border-gray-100">
+        <div>
+            <h3 class="text-base font-semibold text-gray-900">Feature Overrides</h3>
+            <p class="text-sm text-gray-500 mt-1">Temporary support overrides on top of the company plan. Plan access stays the source of truth.</p>
+        </div>
+        {% if subscription %}
+        <div class="text-right">
+            <div class="text-xs uppercase tracking-[0.14em] text-gray-400 font-semibold">Current Plan</div>
+            <div class="text-sm font-semibold text-gray-900 mt-1">{{ subscription.plan_name }}</div>
+            <div class="text-xs text-gray-500 mt-1">Status: {{ subscription.status|replace({'_': ' '})|title }}</div>
+        </div>
+        {% endif %}
+    </div>
+
+    <div class="px-8 py-5 bg-amber-50 border-b border-amber-100">
+        <div class="flex items-start gap-3">
+            <div class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center flex-shrink-0">
+                <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="1.9" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m0 3.75h.008v.008H12v-.008z"/>
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/>
+                </svg>
+            </div>
+            <div>
+                <div class="text-sm font-semibold text-amber-950">Support-only controls</div>
+                <p class="text-sm text-amber-900/80 mt-1 leading-relaxed">
+                    This page is for platform support overrides only. Every override needs an explanation and an expiry date, and restoring a module returns the company to whatever their active plan allows.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div class="divide-y divide-gray-100">
+        {% for module in modules %}
+        {% set plan_on = module.plan_feature_count > 0 %}
+        {% set overridden_off = module.state == 'overridden_off' %}
+        {% set overridden_on = module.state == 'overridden_on' %}
+        {% set partially_overridden = module.state == 'partially_overridden' %}
+        {% set partially_overridden_on = module.state == 'partially_overridden_on' %}
+        <div class="px-8 py-6">
+            <div class="flex items-start justify-between gap-6">
+                <div class="min-w-0">
+                    <div class="flex items-center gap-2 flex-wrap">
+                        <h4 class="text-sm font-semibold text-gray-900">{{ module.name }}</h4>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold {{ plan_on ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-600' }}">
+                            {{ plan_on ? 'Included by plan' : 'Not in plan' }}
+                        </span>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold
+                            {% if overridden_off %}bg-rose-50 text-rose-700
+                            {% elseif overridden_on %}bg-emerald-50 text-emerald-700
+                            {% elseif partially_overridden %}bg-amber-50 text-amber-700
+                            {% elseif partially_overridden_on %}bg-amber-50 text-amber-700
+                            {% elseif module.effective_enabled %}bg-indigo-50 text-indigo-700
+                            {% else %}bg-gray-100 text-gray-600{% endif %}">
+                            {% if overridden_off %}Overridden off
+                            {% elseif overridden_on %}Overridden on
+                            {% elseif partially_overridden %}Partially overridden
+                            {% elseif partially_overridden_on %}Partially overridden on
+                            {% elseif module.effective_enabled %}Effective: on
+                            {% else %}Effective: off{% endif %}
+                        </span>
+                        <span class="inline-flex items-center rounded-full px-2.5 py-1 text-[11px] font-semibold bg-gray-100 text-gray-600">
+                            {{ module.plan_feature_count }}/{{ module.total_feature_count }} plan features
+                        </span>
+                    </div>
+                    <p class="text-sm text-gray-500 mt-2 leading-relaxed">
+                        {{ module.description ?: 'No module description available.' }}
+                    </p>
+                    {% if module.override_reason %}
+                    <div class="mt-3 rounded-xl border border-amber-200 bg-amber-50 px-4 py-3">
+                        <div class="text-xs uppercase tracking-[0.12em] font-semibold text-amber-700">Active Override</div>
+                        <div class="text-sm text-amber-950 mt-1">{{ module.override_reason }}</div>
+                        <div class="text-xs text-amber-800/80 mt-2">
+                            Ends {{ module.override_expires_at ? module.override_expires_at|date('d M Y, H:i') : 'when cleared manually' }}
+                        </div>
+                    </div>
+                    {% endif %}
+                </div>
+
+                <div class="w-full max-w-sm flex-shrink-0">
+                    {% if overridden_off or partially_overridden or overridden_on or partially_overridden_on %}
+                    <form method="POST" action="{{ path('admin_settings_save_modules', _rp) }}" class="rounded-xl border border-emerald-200 bg-emerald-50 px-4 py-4">
+                        <input type="hidden" name="module_id" value="{{ module.id }}">
+                        <input type="hidden" name="action" value="restore">
+                        <div class="text-sm font-semibold text-emerald-900">Restore plan default</div>
+                        <p class="text-sm text-emerald-800/80 mt-1 leading-relaxed">
+                            Clears the active override and returns {{ module.name }} to the subscription plan state.
+                        </p>
+                        <button type="submit"
+                                style="margin-top:1rem;display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border:none;border-radius:10px;background:#059669;color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(5,150,105,.18);">
+                            Restore module
+                        </button>
+                    </form>
+                    {% elseif not plan_on %}
+                    <form method="POST" action="{{ path('admin_settings_save_modules', _rp) }}" class="rounded-xl border border-indigo-200 bg-indigo-50 px-4 py-4 space-y-3">
+                        <input type="hidden" name="module_id" value="{{ module.id }}">
+                        <input type="hidden" name="action" value="enable">
+                        <div>
+                            <div class="text-sm font-semibold text-indigo-900">Temporary enable override</div>
+                            <p class="text-sm text-indigo-800/80 mt-1 leading-relaxed">
+                                Use this when support needs to unlock {{ module.name }} even though the current plan does not include it.
+                            </p>
+                        </div>
+                        <div>
+                            <label class="s-label">Reason *</label>
+                            <textarea name="reason" rows="3"
+                                      class="w-full rounded-lg border border-indigo-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-indigo-400 focus:ring-4 focus:ring-indigo-100"
+                                      placeholder="Why is this temporary enable being applied?" required></textarea>
+                        </div>
+                        <div>
+                            <label class="s-label">Override ends at *</label>
+                            <input type="datetime-local" name="expires_at" class="s-input" required>
+                            <div class="s-hint">Required. This override will expire automatically and revert to the plan state.</div>
+                        </div>
+                        <button type="submit"
+                                style="display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border:none;border-radius:10px;background:#4f46e5;color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(79,70,229,.18);">
+                            Override on
+                        </button>
+                    </form>
+                    {% else %}
+                    <form method="POST" action="{{ path('admin_settings_save_modules', _rp) }}" class="rounded-xl border border-rose-200 bg-rose-50 px-4 py-4 space-y-3">
+                        <input type="hidden" name="module_id" value="{{ module.id }}">
+                        <input type="hidden" name="action" value="disable">
+                        <div>
+                            <div class="text-sm font-semibold text-rose-900">Temporary disable override</div>
+                            <p class="text-sm text-rose-800/80 mt-1 leading-relaxed">
+                                Use this only when support needs to pause the module before the subscription itself changes.
+                            </p>
+                        </div>
+                        <div>
+                            <label class="s-label">Reason *</label>
+                            <textarea name="reason" rows="3"
+                                      class="w-full rounded-lg border border-rose-200 bg-white px-3 py-2 text-sm text-gray-900 outline-none focus:border-rose-400 focus:ring-4 focus:ring-rose-100"
+                                      placeholder="Why is this override being applied?" required></textarea>
+                        </div>
+                        <div>
+                            <label class="s-label">Override ends at *</label>
+                            <input type="datetime-local" name="expires_at" class="s-input" required>
+                            <div class="s-hint">Required. This keeps every override time-bound and auditable.</div>
+                        </div>
+                        <button type="submit"
+                                style="display:inline-flex;align-items:center;justify-content:center;min-height:40px;padding:0 16px;border:none;border-radius:10px;background:#e11d48;color:#fff;font-size:14px;font-weight:700;cursor:pointer;box-shadow:0 8px 18px rgba(225,29,72,.16);">
+                            Override off
+                        </button>
+                    </form>
+                    {% endif %}
+                </div>
+            </div>
+        </div>
+        {% else %}
+        <div class="px-8 py-12 text-center">
+            <div class="text-sm font-semibold text-gray-900">No released modules found</div>
+            <p class="text-sm text-gray-500 mt-2">Once modules and features are released platform-wide, they will appear here for plan override support.</p>
+        </div>
+        {% endfor %}
+    </div>
+</div>
+
+{% endblock %}

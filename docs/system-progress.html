@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Patronr System Progress</title>
+    <style>
+        :root {
+            --bg: #f4f7fb;
+            --panel: #ffffff;
+            --ink: #0f172a;
+            --muted: #475569;
+            --line: #dbe3ee;
+            --brand: #1d4ed8;
+            --brand-soft: #dbeafe;
+            --green: #0f766e;
+            --green-soft: #ccfbf1;
+        }
+        * { box-sizing: border-box; }
+        body {
+            margin: 0;
+            font-family: "Segoe UI", -apple-system, BlinkMacSystemFont, sans-serif;
+            background: linear-gradient(180deg, #edf4fb 0%, var(--bg) 100%);
+            color: var(--ink);
+            line-height: 1.68;
+        }
+        .wrap {
+            max-width: 980px;
+            margin: 0 auto;
+            padding: 40px 20px 72px;
+        }
+        .hero {
+            background:
+                radial-gradient(circle at top right, rgba(29, 78, 216, .10), transparent 28%),
+                radial-gradient(circle at top left, rgba(15, 118, 110, .08), transparent 24%),
+                var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 28px;
+            padding: 32px;
+            box-shadow: 0 24px 48px rgba(15, 23, 42, .06);
+            margin-bottom: 24px;
+        }
+        .eyebrow {
+            display: inline-block;
+            padding: 6px 10px;
+            border-radius: 999px;
+            background: var(--brand-soft);
+            color: var(--brand);
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+        h1 {
+            margin: 0;
+            font-size: 36px;
+            line-height: 1.08;
+            letter-spacing: -.03em;
+        }
+        .intro {
+            font-size: 17px;
+            color: var(--muted);
+            max-width: 760px;
+            margin-top: 14px;
+        }
+        .panel {
+            background: var(--panel);
+            border: 1px solid var(--line);
+            border-radius: 24px;
+            padding: 28px 30px;
+            box-shadow: 0 18px 38px rgba(15, 23, 42, .05);
+        }
+        .toc {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+            gap: 10px 18px;
+            margin-bottom: 28px;
+            padding-bottom: 20px;
+            border-bottom: 1px solid var(--line);
+        }
+        .toc a {
+            color: var(--brand);
+            text-decoration: none;
+            font-size: 14px;
+            font-weight: 600;
+        }
+        .toc a:hover { text-decoration: underline; }
+        .toc-group {
+            grid-column: 1 / -1;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .08em;
+            text-transform: uppercase;
+            color: var(--muted);
+            margin: 10px 0 2px;
+        }
+        section {
+            padding: 18px 0 10px;
+            border-bottom: 1px solid #edf2f7;
+        }
+        section:last-child { border-bottom: none; }
+        h2 {
+            margin: 0 0 14px;
+            font-size: 24px;
+            line-height: 1.2;
+            letter-spacing: -.02em;
+        }
+        h3 {
+            margin: 20px 0 8px;
+            font-size: 17px;
+            line-height: 1.3;
+        }
+        p { margin: 0 0 12px; }
+        ul, ol {
+            margin: 0 0 14px 22px;
+            padding: 0;
+        }
+        li { margin-bottom: 6px; }
+        .callout {
+            display: block;
+            padding: 14px 16px;
+            border-radius: 16px;
+            background: #f0fdfa;
+            border: 1px solid #99f6e4;
+            color: #115e59;
+            margin: 14px 0 18px;
+            font-weight: 700;
+        }
+        .note {
+            background: #eff6ff;
+            border: 1px solid #bfdbfe;
+            color: #1e40af;
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin: 14px 0 18px;
+            font-size: 15px;
+        }
+        .warn {
+            background: #fff7ed;
+            border: 1px solid #fed7aa;
+            color: #9a3412;
+            border-radius: 14px;
+            padding: 12px 14px;
+            margin: 14px 0 18px;
+            font-size: 15px;
+        }
+        code {
+            background: #eff6ff;
+            color: #1d4ed8;
+            border-radius: 8px;
+            padding: 2px 6px;
+            font-family: Consolas, "Courier New", monospace;
+            font-size: 90%;
+        }
+        .small {
+            font-size: 14px;
+            color: var(--muted);
+        }
+        /* Phase / roadmap table */
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 14px;
+            margin: 14px 0 20px;
+        }
+        th {
+            text-align: left;
+            padding: 8px 12px;
+            background: #f8fafc;
+            border-bottom: 2px solid var(--line);
+            font-weight: 700;
+            color: var(--muted);
+            font-size: 12px;
+            letter-spacing: .04em;
+            text-transform: uppercase;
+        }
+        td {
+            padding: 8px 12px;
+            border-bottom: 1px solid #f1f5f9;
+            vertical-align: top;
+        }
+        tr:last-child td { border-bottom: none; }
+        .badge {
+            display: inline-block;
+            padding: 2px 9px;
+            border-radius: 999px;
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: .04em;
+        }
+        .badge-done    { background: #dcfce7; color: #15803d; }
+        .badge-active  { background: #dbeafe; color: #1d4ed8; }
+        .badge-pending { background: #f1f5f9; color: #64748b; }
+        /* Pillar tags */
+        .tag {
+            display: inline-block;
+            padding: 2px 8px;
+            border-radius: 8px;
+            font-size: 11px;
+            font-weight: 700;
+        }
+        .tag-capture    { background: #dcfce7; color: #15803d; }
+        .tag-understand { background: #dbeafe; color: #1d4ed8; }
+        .tag-act        { background: #f3e8ff; color: #7e22ce; }
+        .tag-measure    { background: #fff7ed; color: #c2410c; }
+        /* Priority list */
+        .priority-list {
+            counter-reset: priority;
+            list-style: none;
+            margin: 0 0 14px;
+            padding: 0;
+        }
+        .priority-list li {
+            counter-increment: priority;
+            display: flex;
+            gap: 12px;
+            align-items: flex-start;
+            padding: 10px 0;
+            border-bottom: 1px solid #f1f5f9;
+        }
+        .priority-list li:last-child { border-bottom: none; }
+        .priority-num {
+            flex-shrink: 0;
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            background: var(--brand-soft);
+            color: var(--brand);
+            font-size: 13px;
+            font-weight: 800;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .priority-text strong { display: block; font-size: 15px; }
+        .priority-text span { font-size: 13px; color: var(--muted); }
+        @media (max-width: 720px) {
+            .wrap { padding: 20px 14px 48px; }
+            .hero, .panel { padding: 22px 18px; border-radius: 20px; }
+            h1 { font-size: 29px; }
+            h2 { font-size: 22px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="wrap">
+        <div class="hero">
+            <div class="eyebrow">Progress Doc</div>
+            <h1>Patronr System Progress</h1>
+            <p class="intro">
+                This document explains where Patronr is right now, why the current sequencing is intentional,
+                and what the full ROS build roadmap looks like — so the system grows on stable ground in the right order.
+            </p>
+        </div>
+
+        <div class="panel">
+            <div class="toc">
+                <div class="toc-group">Where We Are</div>
+                <a href="#current-phase">1. Current Phase</a>
+                <a href="#prioritized">2. What Has Been Prioritized</a>
+                <a href="#why-sequence">3. Why This Sequence Is Correct</a>
+                <a href="#groundwork">4. What Groundwork Is Already In Place</a>
+                <a href="#not-yet-built">5. What Is Not Yet Built</a>
+
+                <div class="toc-group">Sequencing Rationale</div>
+                <a href="#build-order">6. Current Intentional Build Order</a>
+                <a href="#terminal-first">7. Why Terminal First Makes Sense</a>
+                <a href="#sms-email-next">8. Why SMS and WhatsApp Foundation Next Makes Sense</a>
+                <a href="#messaging-scope">9. Recommended Scope For Communications Foundation</a>
+                <a href="#next-decision">10. Decision Guidance For What Comes After</a>
+                <a href="#maturity-read">11. Current Product Maturity Read</a>
+                <a href="#strategic-summary">12. Current Strategic Summary</a>
+
+                <div class="toc-group">Full Roadmap</div>
+                <a href="#immediate-next-steps">13. Immediate Next Steps</a>
+                <a href="#ros-roadmap">14. Full ROS Build Roadmap</a>
+                <a href="#priority-sequence">15. Priority Sequence For What Comes After Terminal</a>
+                <a href="#pillar-test">16. The Four ROS Pillars as a Build Test</a>
+                <a href="#progress-rule">17. Progress Rule</a>
+            </div>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- WHERE WE ARE -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="current-phase">
+                <h2>1. Current Phase</h2>
+                <p>Patronr is currently in <strong>core systems foundation and architectural stabilization</strong>.</p>
+                <p>The priority has not yet been broad feature expansion. The focus has been on building and correcting the load-bearing parts of the system that future modules will depend on. This is intentional.</p>
+            </section>
+
+            <section id="prioritized">
+                <h2>2. What Has Been Prioritized On Purpose</h2>
+                <p>The work so far has focused more on structural correctness than visible product breadth.</p>
+                <ul>
+                    <li>Permission services and hierarchy enforcement</li>
+                    <li>Platform vs tenant authority separation</li>
+                    <li>Branch-first operational context</li>
+                    <li>Org and role structure</li>
+                    <li>Feature entitlement and plan override design</li>
+                    <li>Activity logging as a first-class concern</li>
+                    <li>Terminal architecture</li>
+                    <li>M-Pesa and STK/callback foundations</li>
+                    <li>Loyalty execution rules</li>
+                    <li>System design and architectural direction</li>
+                </ul>
+                <p>Progress has largely been in services, controllers, schema decisions, and system design — not yet in complete polished modules or broad page coverage.</p>
+            </section>
+
+            <section id="why-sequence">
+                <h2>3. Why This Sequence Is Correct</h2>
+                <p>Patronr is not a simple CRUD application. It combines branch operations, payment flows, customer capture, loyalty, CRM, communications, intelligence, and SaaS platform controls.</p>
+                <p>If higher-level modules are built before foundational rules are stable, the likely outcome is:</p>
+                <ol>
+                    <li>Modules get built quickly</li>
+                    <li>Core assumptions later prove wrong</li>
+                    <li>Permissions, branch scope, or identity rules break those modules</li>
+                    <li>Major rewrites become necessary</li>
+                </ol>
+                <div class="callout">The current approach is slower visually, safer structurally, and better for long-term system integrity.</div>
+            </section>
+
+            <section id="groundwork">
+                <h2>4. What Groundwork Is Already In Place</h2>
+                <h3>System direction</h3>
+                <p>Product identity has been clarified. Patronr is framed as a CRM and Revenue Operating System. System design direction has been documented. Architectural rules are being made explicit rather than left implicit.</p>
+                <h3>Authority and access model</h3>
+                <p>Platform and tenant authority are treated as different layers. Role hierarchy rules have been designed and enforced. Feature gating and platform permissions are formalized.</p>
+                <h3>Branch-first operations</h3>
+                <p>Branch context has been treated as the primary operational unit. Branch access logic has been tightened. Branch-first thinking is shaping terminals, logs, permissions, and settings.</p>
+                <h3>Terminal and payment foundation</h3>
+                <p>Terminal architecture is actively being shaped. STK push and callback patterns are designed as native operational flows. Split payment and callback reconciliation groundwork exists.</p>
+                <h3>Loyalty foundation</h3>
+                <p>Loyalty is tied directly to payment and customer identity. Manual and automatic award logic has been designed. Settings and reward logic account for real-world operational conditions.</p>
+                <h3>Observability and traceability</h3>
+                <p>Activity logging is treated as a first-class system concern. System actions, not only user actions, are considered in audit design.</p>
+            </section>
+
+            <section id="not-yet-built">
+                <h2>5. What Is Not Yet Built</h2>
+                <p>A lot of Patronr is still ahead. That is expected. Examples of work that is still early, partial, or not yet built:</p>
+                <ul>
+                    <li>Broad polished admin and page coverage</li>
+                    <li>Complete CRM workflows</li>
+                    <li>Mature intelligence and action surfaces</li>
+                    <li>Campaign execution flows</li>
+                    <li>Messaging management surfaces</li>
+                    <li>Report orchestration</li>
+                    <li>Deeper customer intelligence views</li>
+                    <li>Fully developed communications modules</li>
+                    <li>Many end-user operating pages</li>
+                </ul>
+                <div class="note">The system should be described as <strong>foundationally progressing, but still early in module expansion</strong> — not "mostly built."</div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- SEQUENCING RATIONALE -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="build-order">
+                <h2>6. Current Intentional Build Order</h2>
+                <ol>
+                    <li>Design the terminal and make it fully designed</li>
+                    <li>Revenue classification layer (catalog items, areas, events, covers)</li>
+                    <li>Promotions and discounts</li>
+                    <li>SMS and WhatsApp foundational infrastructure</li>
+                    <li>Reassess the next module direction using the ROS pillar framework</li>
+                </ol>
+                <p>This reflects the current belief that the most important next steps are strengthening the core operating loop, not building more random modules.</p>
+            </section>
+
+            <section id="terminal-first">
+                <h2>7. Why Terminal First Makes Sense</h2>
+                <p>The terminal is the most important operational surface in Patronr. It is where the product wedge becomes real: payment happens, customer identity can be captured, loyalty executes, customer behavior becomes data.</p>
+                <p>If the terminal is weak, slow, confusing, or visually unfinished: staff adoption drops, payment-linked capture drops, loyalty adoption drops, CRM quality drops, and the rest of the system loses value.</p>
+                <div class="callout">Making the terminal fully designed is not cosmetic work. It is core product work.</div>
+                <p>The terminal should become: fast · obvious · confidence-building · low-friction · operationally elegant.</p>
+            </section>
+
+            <section id="sms-email-next">
+                <h2>8. Why SMS and WhatsApp Foundation Next Makes Sense</h2>
+                <p>Patronr is not only about capturing data. It must also act on that data. SMS and WhatsApp are the first practical action channels — and the primary channels for Kenya.</p>
+                <p>They enable: payment confirmations · loyalty notifications · retention messages · campaigns · reports · alerts · future recommended actions.</p>
+                <p>Without a real communications foundation, Patronr risks becoming a system that understands what should happen but cannot make it happen — which would weaken the Revenue Operating System direction.</p>
+                <div class="note">WhatsApp is not a future-phase addition. It belongs in the communications foundation alongside SMS from the start.</div>
+            </section>
+
+            <section id="messaging-scope">
+                <h2>9. Recommended Scope For Communications Foundation</h2>
+                <h3>Core messaging model</h3>
+                <ul>
+                    <li>Provider abstraction (SMS and WhatsApp, provider-agnostic)</li>
+                    <li>Outbound message records with delivery state tracking</li>
+                    <li>Template or content structure</li>
+                    <li>Branch/company context rules</li>
+                    <li>Actor and audit tracing</li>
+                </ul>
+                <h3>Operational use cases</h3>
+                <ul>
+                    <li>Payment confirmation</li>
+                    <li>Loyalty events (earn, redeem, enrollment)</li>
+                    <li>Scheduled report delivery to owner/manager</li>
+                    <li>Admin test sends</li>
+                </ul>
+                <h3>Architectural goals</h3>
+                <ul>
+                    <li>Provider-agnostic by design</li>
+                    <li>Auditable with full delivery state history</li>
+                    <li>Branch-aware where operationally necessary</li>
+                    <li>Safe to expand into campaigns and automation later</li>
+                </ul>
+                <p>The goal at this stage is reliable message infrastructure — not full marketing automation.</p>
+            </section>
+
+            <section id="next-decision">
+                <h2>10. Decision Guidance For What Comes After</h2>
+                <p>After terminal design and communications foundation, the next step should not be chosen randomly. Ask:</p>
+                <ol>
+                    <li>What strengthens the payment-to-customer loop most?</li>
+                    <li>What makes Patronr more actionable, not just more descriptive?</li>
+                    <li>What builds on the new communications foundation naturally?</li>
+                    <li>What benefits most from the groundwork already laid?</li>
+                </ol>
+                <p>See the full ROS build roadmap in section 14 for the recommended sequence.</p>
+            </section>
+
+            <section id="maturity-read">
+                <h2>11. Current Product Maturity Read</h2>
+                <p>Right now Patronr should be understood as:</p>
+                <ul>
+                    <li>Strong in foundational architecture relative to its stage</li>
+                    <li>Still early in visible module buildout</li>
+                    <li>Intentionally focused on the parts that prevent future breakage</li>
+                </ul>
+                <p>This is not shallow work. It is platform hardening and direction-setting work.</p>
+            </section>
+
+            <section id="strategic-summary">
+                <h2>12. Current Strategic Summary</h2>
+                <p>Patronr is still in groundwork mode. The current mission is not to rush module count.</p>
+                <div class="callout">Make the terminal strong · make payment-linked capture strong · make authority and branch rules stable · make communications foundationally correct · then build outward on stable ground.</div>
+            </section>
+
+            <!-- ═══════════════════════════════════════════════════════ -->
+            <!-- FULL ROADMAP -->
+            <!-- ═══════════════════════════════════════════════════════ -->
+
+            <section id="immediate-next-steps">
+                <h2>13. Immediate Next Steps</h2>
+                <p>The current working sequence:</p>
+                <ol>
+                    <li>Terminal design completion</li>
+                    <li>Revenue classification layer — catalog items, areas, events, covers (schema + checkout UI + admin pages)</li>
+                    <li>Promotions and discounts</li>
+                    <li>SMS and WhatsApp foundation (co-primary channels for Kenya)</li>
+                    <li>Email foundation alongside only if it does not dilute focus</li>
+                    <li>Patronr API and Angavu integration for messaging</li>
+                    <li>Re-evaluate next strategic module using the ROS pillar framework</li>
+                </ol>
+                <div class="note">Channel priority: SMS and WhatsApp together first. Email is useful for reports and formal communications but should not hold up the core channels.</div>
+            </section>
+
+            <section id="ros-roadmap">
+                <h2>14. Full ROS Build Roadmap</h2>
+                <p>This section captures the complete picture of what Patronr needs to become a genuine Revenue Operating System. It is a sequencing guide, not a delivery commitment. Each item is mapped to the four ROS pillars: <span class="tag tag-capture">Capture</span> <span class="tag tag-understand">Understand</span> <span class="tag tag-act">Act</span> <span class="tag tag-measure">Measure</span></p>
+
+                <h3>Phase 1 — Terminal completion <span class="badge badge-active">Active</span></h3>
+                <table>
+                    <tr><th>Item</th><th>Pillar</th><th>Status</th></tr>
+                    <tr><td>Terminal checkout flow</td><td><span class="tag tag-capture">Capture</span></td><td><span class="badge badge-active">In progress</span></td></tr>
+                    <tr><td>M-Pesa STK push + callback</td><td><span class="tag tag-capture">Capture</span></td><td><span class="badge badge-active">In progress</span></td></tr>
+                    <tr><td>Loyalty at checkout</td><td><span class="tag tag-capture">Capture</span></td><td><span class="badge badge-active">In progress</span></td></tr>
+                    <tr><td>Permission enforcement across terminal</td><td><span class="tag tag-capture">Capture</span></td><td><span class="badge badge-active">In progress</span></td></tr>
+                    <tr><td>Activity logging across terminal</td><td><span class="tag tag-measure">Measure</span></td><td><span class="badge badge-active">In progress</span></td></tr>
+                    <tr><td>Branch-scoped terminal settings</td><td><span class="tag tag-capture">Capture</span></td><td><span class="badge badge-done">Done</span></td></tr>
+                    <tr><td>VIEW_TRANSACTIONS / SEND_STK_PUSH / VIEW_FULL_CUSTOMER_PHONE permission gates</td><td><span class="tag tag-capture">Capture</span></td><td><span class="badge badge-done">Done</span></td></tr>
+                </table>
+
+                <h3>Phase 2 — Revenue classification layer <span class="badge badge-pending">Next</span></h3>
+                <table>
+                    <tr><th>Item</th><th>Pillar</th><th>Notes</th></tr>
+                    <tr><td>Catalog items (services + products)</td><td><span class="tag tag-capture">Capture</span></td><td>Lightweight — name, category, price, branch-scoped</td></tr>
+                    <tr><td>Events table + branch management</td><td><span class="tag tag-capture">Capture</span></td><td>Start/end time, status, auto-suggest at checkout</td></tr>
+                    <tr><td><code>revenue_source_type</code> + <code>revenue_source_id</code> on transactions</td><td><span class="tag tag-capture">Capture</span></td><td>Links to catalog_items</td></tr>
+                    <tr><td><code>event_id</code> on transactions</td><td><span class="tag tag-capture">Capture</span></td><td>Separate from revenue source — event is context, not a sale type</td></tr>
+                    <tr><td><code>covers</code> on transactions</td><td><span class="tag tag-capture">Capture</span></td><td>Headcount — one field, unlocks per-cover metrics</td></tr>
+                    <tr><td>Areas surfaced in revenue intelligence</td><td><span class="tag tag-understand">Understand</span></td><td>Already captured on transactions — needs reporting layer</td></tr>
+                    <tr><td>Catalog quick-pick at checkout</td><td><span class="tag tag-capture">Capture</span></td><td>Optional, recent/frequent first, skippable</td></tr>
+                    <tr><td>Event context suggestion at checkout</td><td><span class="tag tag-capture">Capture</span></td><td>Auto-suggest if active event exists, cashier confirms or skips</td></tr>
+                    <tr><td>Events admin page</td><td><span class="tag tag-capture">Capture</span></td><td>Create, edit, activate, end events per branch</td></tr>
+                    <tr><td>Catalog admin page</td><td><span class="tag tag-capture">Capture</span></td><td>Manage services, products, categories per branch</td></tr>
+                </table>
+                <p class="small">Tickets are deferred until events are stable.</p>
+
+                <h3>Phase 3 — Operational accountability <span class="badge badge-pending">Upcoming</span></h3>
+                <table>
+                    <tr><th>Item</th><th>Pillar</th><th>Notes</th></tr>
+                    <tr><td>Promotions and discounts at checkout</td><td><span class="tag tag-capture">Capture</span></td><td>Permission-gated, gross + net amounts stored, reason required</td></tr>
+                    <tr><td>Vouchers and gift cards</td><td><span class="tag tag-capture">Capture</span></td><td>Purchasable and redeemable at checkout, partial redemption</td></tr>
+                    <tr><td>Discount permission and reporting</td><td><span class="tag tag-measure">Measure</span></td><td>Who applied what discount and when</td></tr>
+                </table>
+
+                <h3>Phase 4 — Intelligence layer <span class="badge badge-pending">Upcoming</span></h3>
+                <table>
+                    <tr><th>Item</th><th>Pillar</th><th>Notes</th></tr>
+                    <tr><td>Automatic customer segmentation</td><td><span class="tag tag-understand">Understand</span></td><td>New, Returning, High Value, At Risk, Lost</td></tr>
+                    <tr><td>Retention rate metric</td><td><span class="tag tag-understand">Understand</span></td><td>Period-over-period repeat visit rate</td></tr>
+                    <tr><td>Churn signals</td><td><span class="tag tag-understand">Understand</span></td><td>Customers overdue for return based on their pattern</td></tr>
+                    <tr><td>Staff performance reporting</td><td><span class="tag tag-understand">Understand</span></td><td>Revenue, loyalty capture rate, discount usage per cashier</td></tr>
+                    <tr><td>Event ROI reporting</td><td><span class="tag tag-understand">Understand</span></td><td>Revenue during event vs comparable period</td></tr>
+                    <tr><td>Revenue by classification</td><td><span class="tag tag-understand">Understand</span></td><td>Slice by service/product/event/area/cashier/shift</td></tr>
+                </table>
+
+                <h3>Phase 5 — Communications foundation <span class="badge badge-pending">Upcoming</span></h3>
+                <table>
+                    <tr><th>Item</th><th>Pillar</th><th>Notes</th></tr>
+                    <tr><td>SMS provider abstraction</td><td><span class="tag tag-act">Act</span></td><td>Provider-agnostic, outbound message records</td></tr>
+                    <tr><td>WhatsApp provider abstraction</td><td><span class="tag tag-act">Act</span></td><td>Primary channel alongside SMS</td></tr>
+                    <tr><td>Delivery state tracking</td><td><span class="tag tag-act">Act</span></td><td>Sent, delivered, failed</td></tr>
+                    <tr><td>Payment confirmation message</td><td><span class="tag tag-act">Act</span></td><td>Triggered on transaction complete</td></tr>
+                    <tr><td>Loyalty event notifications</td><td><span class="tag tag-act">Act</span></td><td>Earn, redeem, enrollment welcome</td></tr>
+                    <tr><td>Template management</td><td><span class="tag tag-act">Act</span></td><td>Tenant-configurable message content</td></tr>
+                    <tr><td>Scheduled report delivery</td><td><span class="tag tag-act">Act</span></td><td>Daily/weekly briefing to owner via SMS or WhatsApp</td></tr>
+                </table>
+                <p class="small">Email follows after SMS and WhatsApp are solid.</p>
+
+                <h3>Phase 6 — Action surfaces <span class="badge badge-pending">Later</span></h3>
+                <table>
+                    <tr><th>Item</th><th>Pillar</th><th>Notes</th></tr>
+                    <tr><td>Automated trigger rules</td><td><span class="tag tag-act">Act</span></td><td>Visit lapse, birthday, loyalty milestone, event proximity</td></tr>
+                    <tr><td>Campaign builder</td><td><span class="tag tag-act">Act</span></td><td>Segment → message → send</td></tr>
+                    <tr><td>Manager action surface</td><td><span class="tag tag-act">Act</span></td><td>Daily answer to "what should I do today?"</td></tr>
+                    <tr><td>Win-back campaigns</td><td><span class="tag tag-act">Act</span></td><td>Target at-risk and lost segments</td></tr>
+                    <tr><td>Event-linked campaigns</td><td><span class="tag tag-act">Act</span></td><td>Notify past event attendees about upcoming events</td></tr>
+                </table>
+
+                <h3>Phase 7 — Measurement and loop closure <span class="badge badge-pending">Later</span></h3>
+                <table>
+                    <tr><th>Item</th><th>Pillar</th><th>Notes</th></tr>
+                    <tr><td>Campaign outcome tracking</td><td><span class="tag tag-measure">Measure</span></td><td>Return rate and revenue attributed to campaigns</td></tr>
+                    <tr><td>Retention trend over time</td><td><span class="tag tag-measure">Measure</span></td><td>Month-over-month retention by branch and company</td></tr>
+                    <tr><td>Event comparison reporting</td><td><span class="tag tag-measure">Measure</span></td><td>Event ROI compared across events and time</td></tr>
+                    <tr><td>Discount impact reporting</td><td><span class="tag tag-measure">Measure</span></td><td>Revenue effect of discounting patterns</td></tr>
+                </table>
+
+                <h3>Deliberately deferred</h3>
+                <ul>
+                    <li><strong>Full inventory and stock management</strong> — different product category</li>
+                    <li><strong>Table management and floor plan</strong> — heavy, build after shift management is solid</li>
+                    <li><strong>Reservations and bookings system</strong> — tickets (tied to events) come first</li>
+                    <li><strong>Accounting export and financial reporting</strong> — export clean data, do not become accounting software</li>
+                    <li><strong>AI-driven predictions</strong> — data foundation must be solid first</li>
+                </ul>
+            </section>
+
+            <section id="priority-sequence">
+                <h2>15. Priority Sequence For What Comes After Terminal</h2>
+                <p>When terminal design is complete, the recommended build order:</p>
+                <ol class="priority-list">
+                    <li>
+                        <div class="priority-num">1</div>
+                        <div class="priority-text">
+                            <strong>Revenue classification layer</strong>
+                            <span>Enriches every transaction going forward and the build cost is low. Schema changes are easier to make now than after thousands of transactions have accumulated without this context.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="priority-num">2</div>
+                        <div class="priority-text">
+                            <strong>Promotions and discounts</strong>
+                            <span>Revenue data is unreliable without it. Discounting outside the system creates dirty numbers that corrupt every downstream report.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="priority-num">3</div>
+                        <div class="priority-text">
+                            <strong>SMS and WhatsApp foundation</strong>
+                            <span>The first action channel. Everything in phases 6 and 7 depends on this being right. WhatsApp is co-primary with SMS for Kenya.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="priority-num">4</div>
+                        <div class="priority-text">
+                            <strong>Customer segmentation and churn signals</strong>
+                            <span>Makes all the data already being captured actually useful. Feeds directly into messaging and the manager action surface.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="priority-num">5</div>
+                        <div class="priority-text">
+                            <strong>Scheduled reports</strong>
+                            <span>Low build cost, high daily value. Owners get a morning briefing without logging in.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="priority-num">6</div>
+                        <div class="priority-text">
+                            <strong>Automated triggers</strong>
+                            <span>Builds on the communications foundation. Works silently and compounds over time.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="priority-num">7</div>
+                        <div class="priority-text">
+                            <strong>Manager action surface</strong>
+                            <span>The interface that ties intelligence to action. Requires segmentation and communications to be in place. This is where Patronr feels like a Revenue Operating System.</span>
+                        </div>
+                    </li>
+                    <li>
+                        <div class="priority-num">8</div>
+                        <div class="priority-text">
+                            <strong>Campaign builder and outcome tracking</strong>
+                            <span>Closes the ROS loop. Turns the intelligence and messaging layers into a measurable retention and revenue action tool.</span>
+                        </div>
+                    </li>
+                </ol>
+                <div class="note">This is not a rigid delivery schedule. It is the correct conceptual order. If something in a later phase becomes urgently needed, it can be pulled forward — but the dependency chain should be understood before doing so.</div>
+            </section>
+
+            <section id="pillar-test">
+                <h2>16. The Four ROS Pillars as a Build Test</h2>
+                <p>Every feature built from here should be tested against the four pillars:</p>
+                <ul>
+                    <li><span class="tag tag-capture">Capture</span> &nbsp; Does this bring more revenue context or customer identity into the system?</li>
+                    <li><span class="tag tag-understand">Understand</span> &nbsp; Does this turn existing data into useful intelligence?</li>
+                    <li><span class="tag tag-act">Act</span> &nbsp; Does this enable a direct, fast, measurable action?</li>
+                    <li><span class="tag tag-measure">Measure</span> &nbsp; Does this close a loop and show whether something worked?</li>
+                </ul>
+                <div class="warn">A feature that serves none of these four pillars should be questioned before being built.</div>
+            </section>
+
+            <section id="progress-rule">
+                <h2>17. Progress Rule</h2>
+                <p>The system should not be judged only by how many pages exist, how many modules are visible, or how much UI has been completed.</p>
+                <p>It should also be judged by:</p>
+                <ul>
+                    <li>How much future breakage has been prevented</li>
+                    <li>How much architectural confusion has been removed</li>
+                    <li>How much operational correctness has been locked in</li>
+                    <li>How much of the four-pillar ROS loop is functioning end to end</li>
+                </ul>
+                <div class="callout">That is the stage Patronr is in now.</div>
+            </section>
+
+        </div>
+    </div>
+</body>
+</html>

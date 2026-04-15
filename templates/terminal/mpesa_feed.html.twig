@@ -1,0 +1,297 @@
+{% extends 'layouts/terminal_app.html.twig' %}
+{% set _p = {subdomain: app.request.attributes.get('subdomain'), domain: app.request.attributes.get('domain'), branch: app.request.attributes.get('branch')} %}
+
+{% block title %}M-Pesa Payments{% endblock %}
+
+{% block body %}
+<div style="display:flex;flex-direction:column;height:100%;">
+
+    {# ── Header ──────────────────────────────────────────────────────────── #}
+    <div style="display:flex;align-items:center;gap:12px;padding:16px 20px;border-bottom:1px solid #1f2937;flex-shrink:0;">
+        <a href="{{ path('terminal_dashboard', _p) }}" class="action-btn"
+           style="width:40px;height:40px;background:#1f2937;border-radius:12px;display:flex;align-items:center;justify-content:center;text-decoration:none;flex-shrink:0;">
+            <svg width="20" height="20" fill="none" stroke="#9ca3af" stroke-width="2.5" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M15.75 19.5L8.25 12l7.5-7.5"/>
+            </svg>
+        </a>
+        <div style="flex:1;min-width:0;">
+            <div style="color:#fff;font-weight:700;font-size:15px;">M-Pesa Payments</div>
+            <div style="color:#6b7280;font-size:12px;">
+                <span id="mp-last-updated"></span>
+            </div>
+        </div>
+        {# Live dot + refresh button #}
+        <div style="display:flex;align-items:center;gap:8px;">
+            <div id="mp-live-dot"
+                 style="width:8px;height:8px;border-radius:50%;background:#10b981;flex-shrink:0;transition:opacity .3s;"></div>
+            <button id="mp-refresh-btn" class="action-btn"
+                    style="width:40px;height:40px;background:#1f2937;border-radius:12px;display:flex;align-items:center;justify-content:center;border:none;cursor:pointer;flex-shrink:0;">
+                <svg id="mp-refresh-icon" width="18" height="18" fill="none" stroke="#9ca3af" stroke-width="2.2" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                </svg>
+            </button>
+        </div>
+    </div>
+
+    {# ── Payments list ────────────────────────────────────────────────────── #}
+    <div style="flex:1;overflow-y:auto;padding:12px 16px;" id="mp-feed-scroll">
+        <div id="mp-feed-list" style="display:flex;flex-direction:column;gap:8px;">
+            {% if payments|length == 0 %}
+            <div id="mp-empty"
+                 style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 0;gap:12px;color:#6b7280;text-align:center;">
+                <svg width="48" height="48" fill="none" stroke="#374151" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round"
+                          d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/>
+                </svg>
+                <div style="font-size:14px;">No M-Pesa payments in this window.</div>
+            </div>
+            {% else %}
+            {% for p in payments %}
+            {% set phone_display = p.msisdn
+                ? (can_see_full_phone ? p.msisdn : ('···' ~ p.msisdn|slice(-3)))
+                : '' %}
+            {% set is_today = p.created_at|date('Y-m-d') == 'now'|date('Y-m-d') %}
+            {% set time_str = is_today ? p.created_at|date('H:i') : p.created_at|date('d M, H:i') %}
+            {% set pts = p.loyalty_points_awarded|default(0)|abs %}
+            {% set pts_fmt = (pts|round(0) == pts) ? pts|number_format(0) : pts|number_format(2) %}
+
+            <div class="mp-card {% if not p.is_claimed %}mp-card--new{% endif %}"
+                 data-id="{{ p.id }}"
+                 style="border-radius:16px;padding:12px 14px;
+                        {% if not p.is_claimed %}
+                        background:#0a2a1a;border:1px solid rgba(16,185,129,0.35);
+                        {% else %}
+                        background:#111827;border:1px solid #1f2937;
+                        {% endif %}">
+
+                {# Amount + time + status #}
+                <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                    <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:1px;
+                                background:{% if not p.is_claimed %}#10b981{% else %}#374151{% endif %};"></div>
+                    <span style="flex:1;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;
+                                 color:{% if not p.is_claimed %}#fff{% else %}#6b7280{% endif %};">
+                        KES {{ p.amount|number_format(0, '.', ',') }}
+                    </span>
+                    <span style="color:#6b7280;font-size:11px;">{{ time_str }}</span>
+                    {% if not p.is_claimed %}
+                    <span style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);
+                                 border-radius:6px;padding:2px 7px;font-size:10px;color:#34d399;font-weight:700;
+                                 letter-spacing:.04em;">NEW</span>
+                    {% else %}
+                    <span style="color:#4b5563;font-size:11px;">Claimed</span>
+                    {% endif %}
+                </div>
+
+                {# Code + phone/name + shortcode row #}
+                <div style="padding-left:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+                    {% if p.transaction_id %}
+                    <span style="font-family:ui-monospace,monospace;font-size:11px;font-weight:600;letter-spacing:.04em;
+                                 color:{% if not p.is_claimed %}#34d399{% else %}#4b5563{% endif %};">
+                        {{ p.transaction_id }}
+                    </span>
+                    {% endif %}
+                    {% if p.first_name or phone_display %}
+                    <span style="background:#1f2937;border-radius:6px;padding:2px 8px;font-size:11px;color:#9ca3af;">
+                        {% if p.first_name %}{{ p.first_name }} {% endif %}{{ phone_display }}
+                    </span>
+                    {% endif %}
+                    {% if p.method %}
+                    <span style="background:#1f2937;border-radius:6px;padding:2px 8px;font-size:11px;color:#6b7280;">
+                        {{ p.method }}
+                    </span>
+                    {% endif %}
+                    {% if pts > 0 %}
+                    <span style="background:rgba(234,179,8,0.12);border-radius:6px;padding:2px 8px;font-size:11px;color:#eab308;font-weight:600;">
+                        +{{ pts_fmt }} pts
+                    </span>
+                    {% endif %}
+                </div>
+
+            </div>
+            {% endfor %}
+            {% endif %}
+        </div>
+    </div>
+
+</div>
+
+<script>
+(function () {
+    // ── Kill any previous instance ────────────────────────────────────────
+    // Handles Turbo cache-restore: when the user navigates back, this script
+    // runs again. The old loop is still alive — kill it before starting fresh.
+    if (typeof window.__mpFeedCleanup === 'function') {
+        window.__mpFeedCleanup();
+    }
+
+    let   REFRESH_MS  = {{ refresh_seconds }} * 1000;   // updated from server on every poll
+    const pollUrl     = '{{ path('terminal_mpesa_feed_poll', _p) }}';
+    const liveDot     = document.getElementById('mp-live-dot');
+    const lastUpdEl   = document.getElementById('mp-last-updated');
+    const refreshBtn  = document.getElementById('mp-refresh-btn');
+    const refreshIcon = document.getElementById('mp-refresh-icon');
+    const listEl      = document.getElementById('mp-feed-list');
+
+    let timer    = null;
+    let spinning = false;
+
+    // ── Format helpers ────────────────────────────────────────────────────
+    function fmtAmt(n) {
+        return 'KES ' + Math.round(n).toLocaleString('en-KE');
+    }
+    function fmtPts(n) {
+        return Number.isInteger(n) ? n.toLocaleString() : n.toFixed(2);
+    }
+    function fmtTime(iso) {
+        const d   = new Date(iso.replace(' ', 'T'));
+        const now = new Date();
+        const sameDay = d.toDateString() === now.toDateString();
+        if (sameDay) {
+            return d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+        }
+        return d.toLocaleDateString('en-KE', { day: '2-digit', month: 'short' })
+             + ', '
+             + d.toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit' });
+    }
+    function fmtLastUpdate() {
+        return 'Updated ' + new Date().toLocaleTimeString('en-KE', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ── Render a single card HTML string ─────────────────────────────────
+    function renderCard(p) {
+        const isNew   = !p.is_claimed;
+        const dotClr  = isNew ? '#10b981' : '#374151';
+        const amtClr  = isNew ? '#fff'    : '#6b7280';
+        const codeClr = isNew ? '#34d399' : '#4b5563';
+        const bg      = isNew ? 'background:#0a2a1a;border:1px solid rgba(16,185,129,0.35);'
+                              : 'background:#111827;border:1px solid #1f2937;';
+        const badge   = isNew
+            ? '<span style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);border-radius:6px;padding:2px 7px;font-size:10px;color:#34d399;font-weight:700;letter-spacing:.04em;">NEW</span>'
+            : '<span style="color:#4b5563;font-size:11px;">Claimed</span>';
+
+        const code = p.transaction_id
+            ? `<span style="font-family:ui-monospace,monospace;font-size:11px;font-weight:600;letter-spacing:.04em;color:${codeClr};">${p.transaction_id}</span>`
+            : '';
+        const who = (p.first_name || p.masked_phone)
+            ? `<span style="background:#1f2937;border-radius:6px;padding:2px 8px;font-size:11px;color:#9ca3af;">${p.first_name ? p.first_name + ' ' : ''}${p.masked_phone}</span>`
+            : '';
+        const sc = p.method
+            ? `<span style="background:#1f2937;border-radius:6px;padding:2px 8px;font-size:11px;color:#6b7280;">${p.method}</span>`
+            : '';
+        const pts = p.loyalty_points > 0
+            ? `<span style="background:rgba(234,179,8,0.12);border-radius:6px;padding:2px 8px;font-size:11px;color:#eab308;font-weight:600;">+${fmtPts(p.loyalty_points)} pts</span>`
+            : '';
+
+        return `
+        <div class="mp-card${isNew ? ' mp-card--new' : ''}" data-id="${p.id}"
+             style="border-radius:16px;padding:12px 14px;${bg}">
+            <div style="display:flex;align-items:center;gap:8px;margin-bottom:6px;">
+                <div style="width:8px;height:8px;border-radius:50%;flex-shrink:0;margin-top:1px;background:${dotClr};"></div>
+                <span style="flex:1;font-size:17px;font-weight:800;font-variant-numeric:tabular-nums;color:${amtClr};">${fmtAmt(p.amount)}</span>
+                <span style="color:#6b7280;font-size:11px;">${fmtTime(p.created_at)}</span>
+                ${badge}
+            </div>
+            <div style="padding-left:16px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;">
+                ${code}${who}${sc}${pts}
+            </div>
+        </div>`;
+    }
+
+    // ── Fetch and update list ─────────────────────────────────────────────
+    async function doRefresh() {
+        if (spinning) return;
+        spinning = true;
+        liveDot.style.opacity = '0.3';
+        refreshIcon.style.transition = 'transform .6s ease';
+        refreshIcon.style.transform  = 'rotate(360deg)';
+
+        try {
+            const res  = await fetch(pollUrl, { credentials: 'same-origin' });
+            if (!res.ok) return;
+            const data = await res.json();
+            if (!Array.isArray(data.payments)) return;
+
+            // Pick up any interval change saved in settings without a page reload
+            if (data.refresh_seconds && data.refresh_seconds >= 5) {
+                REFRESH_MS = data.refresh_seconds * 1000;
+            }
+
+            if (data.payments.length === 0) {
+                listEl.innerHTML = `
+                    <div style="display:flex;flex-direction:column;align-items:center;justify-content:center;padding:60px 0;gap:12px;color:#6b7280;text-align:center;">
+                        <svg width="48" height="48" fill="none" stroke="#374151" stroke-width="1.5" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round"
+                                  d="M2.25 8.25h19.5M2.25 9h19.5m-16.5 5.25h6m-6 2.25h3m-3.75 3h15a2.25 2.25 0 002.25-2.25V6.75A2.25 2.25 0 0019.5 4.5h-15a2.25 2.25 0 00-2.25 2.25v10.5A2.25 2.25 0 004.5 19.5z"/>
+                        </svg>
+                        <div style="font-size:14px;">No M-Pesa payments in this window.</div>
+                    </div>`;
+            } else {
+                listEl.innerHTML = data.payments.map(renderCard).join('');
+            }
+
+            lastUpdEl.textContent = '· ' + fmtLastUpdate();
+            liveDot.style.opacity = '1';
+        } catch (e) {
+            liveDot.style.opacity = '0.4';
+        } finally {
+            spinning = false;
+            // Reset spinner icon smoothly
+            setTimeout(() => {
+                refreshIcon.style.transition = 'none';
+                refreshIcon.style.transform  = 'none';
+            }, 650);
+        }
+    }
+
+    // ── Auto-refresh timer ────────────────────────────────────────────────
+    function scheduleNext() {
+        clearTimeout(timer);
+        timer = setTimeout(async () => {
+            await doRefresh();
+            scheduleNext();
+        }, REFRESH_MS);
+    }
+
+    // ── Cleanup — stops the loop and removes all listeners ───────────────
+    function stop() {
+        clearTimeout(timer);
+        timer    = null;
+        spinning = false;
+        document.removeEventListener('turbo:before-cache', onBeforeCache);
+        document.removeEventListener('visibilitychange',   onVisibilityChange);
+        window.removeEventListener('pagehide',             onPageHide);
+        window.__mpFeedCleanup = null;
+    }
+
+    function onBeforeCache()      { stop(); }  // Turbo is about to cache this page — stop before leaving
+    function onPageHide()         { stop(); }  // Real navigation / tab close
+
+    function onVisibilityChange() {
+        if (document.hidden) {
+            clearTimeout(timer);
+        } else {
+            doRefresh().then(scheduleNext);
+        }
+    }
+
+    // Manual refresh
+    refreshBtn.addEventListener('click', async () => {
+        clearTimeout(timer);
+        await doRefresh();
+        scheduleNext();
+    });
+
+    document.addEventListener('turbo:before-cache', onBeforeCache);
+    document.addEventListener('visibilitychange',   onVisibilityChange);
+    window.addEventListener('pagehide',             onPageHide);
+
+    // Register cleanup so the next run (on Turbo cache restore) can kill this one
+    window.__mpFeedCleanup = stop;
+
+    // Poll immediately on open so cashier sees fresh data right away,
+    // then start the recurring loop after that first fetch completes.
+    doRefresh().then(scheduleNext);
+})();
+</script>
+{% endblock %}
