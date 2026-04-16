@@ -70,11 +70,12 @@ class CatalogController extends AdminBaseController
         $session = $this->requireAdmin($request, 'create_catalog');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
 
-        $name     = trim((string) $request->request->get('name', ''));
-        $type     = $request->request->get('type', 'service');
-        $category = trim((string) $request->request->get('category', '')) ?: null;
-        $priceRaw = trim((string) $request->request->get('price', ''));
-        $price    = $priceRaw !== '' && is_numeric($priceRaw) ? (float) $priceRaw : null;
+        $name            = trim((string) $request->request->get('name', ''));
+        $type            = $request->request->get('type', 'service');
+        $category        = trim((string) $request->request->get('category', '')) ?: null;
+        $priceRaw        = trim((string) $request->request->get('price', ''));
+        $price           = $priceRaw !== '' && is_numeric($priceRaw) ? (float) $priceRaw : null;
+        $showInTerminal  = (bool) $request->request->get('show_in_terminal', true);
 
         if ($name === '') {
             return $this->error('Item name is required.');
@@ -110,6 +111,7 @@ class CatalogController extends AdminBaseController
             $type,
             $category,
             $price,
+            $showInTerminal,
         );
 
         $this->activityLog->record($session, 'catalog.created', [
@@ -119,11 +121,12 @@ class CatalogController extends AdminBaseController
         ]);
 
         return $this->success('Item created.', [
-            'id'       => $id,
-            'name'     => $name,
-            'type'     => $type,
-            'category' => $category,
-            'price'    => $price,
+            'id'              => $id,
+            'name'            => $name,
+            'type'            => $type,
+            'category'        => $category,
+            'price'           => $price,
+            'show_in_terminal' => $showInTerminal ? 1 : 0,
         ]);
     }
 
@@ -142,11 +145,12 @@ class CatalogController extends AdminBaseController
             return $this->error('Item not found.', 404);
         }
 
-        $name     = trim((string) $request->request->get('name', ''));
-        $type     = $request->request->get('type', 'service');
-        $category = trim((string) $request->request->get('category', '')) ?: null;
-        $priceRaw = trim((string) $request->request->get('price', ''));
-        $price    = $priceRaw !== '' && is_numeric($priceRaw) ? (float) $priceRaw : null;
+        $name           = trim((string) $request->request->get('name', ''));
+        $type           = $request->request->get('type', 'service');
+        $category       = trim((string) $request->request->get('category', '')) ?: null;
+        $priceRaw       = trim((string) $request->request->get('price', ''));
+        $price          = $priceRaw !== '' && is_numeric($priceRaw) ? (float) $priceRaw : null;
+        $showInTerminal = (bool) $request->request->get('show_in_terminal', true);
 
         if ($name === '') {
             return $this->error('Item name is required.');
@@ -183,6 +187,7 @@ class CatalogController extends AdminBaseController
             $type,
             $category,
             $price,
+            $showInTerminal,
         );
 
         $this->activityLog->record($session, 'catalog.updated', [
@@ -191,11 +196,12 @@ class CatalogController extends AdminBaseController
         ]);
 
         return $this->success('Item updated.', [
-            'id'       => $id,
-            'name'     => $name,
-            'type'     => $type,
-            'category' => $category,
-            'price'    => $price,
+            'id'               => $id,
+            'name'             => $name,
+            'type'             => $type,
+            'category'         => $category,
+            'price'            => $price,
+            'show_in_terminal' => $showInTerminal ? 1 : 0,
         ]);
     }
 

@@ -1,27 +1,575 @@
 {% extends 'layouts/app.html.twig' %}
 
-{% block title %}Dashboard{% endblock %}
+{% block title %}Dashboard — Patronr{% endblock %}
 
 {% block content %}
 
-<h1 class="text-2xl font-bold mb-6">
-Customer Intelligence Dashboard
-</h1>
-
-<div class="grid grid-cols-3 gap-6">
-
-<div class="bg-white p-6 rounded shadow">
-Total Customers
+{# ── Greeting ──────────────────────────────────────────────────────────────── #}
+<div class="mb-8">
+    <div class="flex flex-wrap items-start justify-between gap-4">
+        <div>
+            <h1 class="text-2xl font-bold text-gray-900 leading-tight">
+                Welcome back{% if session.user.name is defined and session.user.name %}, {{ session.user.name|split(' ')|first }}{% endif %} 👋
+            </h1>
+            <p class="text-sm text-gray-500 mt-1">
+                {% if session.branch is defined and session.branch %}
+                    {{ session.branch.name }}
+                    {% if session.company is defined %} · {{ session.company.name }}{% endif %}
+                {% elseif session.company is defined %}
+                    {{ session.company.name }}
+                {% endif %}
+                <span class="ml-2 text-gray-300">·</span>
+                <span class="ml-2 text-gray-400 text-xs font-mono">{{ 'now'|date('T — D d M Y, H:i') }}</span>
+            </p>
+        </div>
+        <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 text-xs font-semibold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+                <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse inline-block"></span>
+                Live
+            </span>
+        </div>
+    </div>
 </div>
 
-<div class="bg-white p-6 rounded shadow">
-Revenue Today
+{# ── KPI Cards ─────────────────────────────────────────────────────────────── #}
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-8">
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Customers</span>
+            <div class="w-8 h-8 rounded-lg bg-indigo-50 flex items-center justify-center">
+                <svg width="14" height="14" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15 19.128a9.38 9.38 0 002.625.372 9.337 9.337 0 004.121-.952 4.125 4.125 0 00-7.533-2.493M15 19.128v-.003c0-1.113-.285-2.16-.786-3.07M15 19.128v.106A12.318 12.318 0 018.624 21c-2.331 0-4.512-.645-6.374-1.766l-.001-.109a6.375 6.375 0 0111.964-3.07M12 6.375a3.375 3.375 0 11-6.75 0 3.375 3.375 0 016.75 0zm8.25 2.25a2.625 2.625 0 11-5.25 0 2.625 2.625 0 015.25 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="text-2xl font-bold text-gray-900">1,284</div>
+        <div class="flex items-center gap-1 mt-1">
+            <svg width="11" height="11" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <span class="text-xs text-emerald-600 font-semibold">+12%</span>
+            <span class="text-xs text-gray-400">this month</span>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Revenue (Month)</span>
+            <div class="w-8 h-8 rounded-lg bg-emerald-50 flex items-center justify-center">
+                <svg width="14" height="14" fill="none" stroke="#059669" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M12 6v12m-3-2.818l.879.659c1.171.879 3.07.879 4.242 0 1.172-.879 1.172-2.303 0-3.182C13.536 12.219 12.768 12 12 12c-.725 0-1.45-.22-2.003-.659-1.106-.879-1.106-2.303 0-3.182s2.9-.879 4.006 0l.415.33M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="text-2xl font-bold text-gray-900">847,500</div>
+        <div class="flex items-center gap-1 mt-1">
+            <svg width="11" height="11" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <span class="text-xs text-emerald-600 font-semibold">+8.4%</span>
+            <span class="text-xs text-gray-400">vs last month</span>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Transactions Today</span>
+            <div class="w-8 h-8 rounded-lg bg-sky-50 flex items-center justify-center">
+                <svg width="14" height="14" fill="none" stroke="#0284c7" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 12h16.5m-16.5 3.75h16.5M3.75 19.5h16.5M5.625 4.5h12.75a1.875 1.875 0 010 3.75H5.625a1.875 1.875 0 010-3.75z"/>
+                </svg>
+            </div>
+        </div>
+        <div class="text-2xl font-bold text-gray-900">34</div>
+        <div class="flex items-center gap-1 mt-1">
+            <span class="text-xs text-gray-400">KES</span>
+            <span class="text-xs font-semibold text-gray-700">62,800</span>
+            <span class="text-xs text-gray-400">total today</span>
+        </div>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-5" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="flex items-center justify-between mb-3">
+            <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Return Rate</span>
+            <div class="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center">
+                <svg width="14" height="14" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M16.023 9.348h4.992v-.001M2.985 19.644v-4.992m0 0h4.992m-4.993 0l3.181 3.183a8.25 8.25 0 0013.803-3.7M4.031 9.865a8.25 8.25 0 0113.803-3.7l3.181 3.182m0-4.991v4.99"/>
+                </svg>
+            </div>
+        </div>
+        <div class="text-2xl font-bold text-gray-900">68%</div>
+        <div class="flex items-center gap-1 mt-1">
+            <svg width="11" height="11" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24"><polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/><polyline points="17 6 23 6 23 12"/></svg>
+            <span class="text-xs text-emerald-600 font-semibold">+3pts</span>
+            <span class="text-xs text-gray-400">vs last month</span>
+        </div>
+    </div>
+
 </div>
 
-<div class="bg-white p-6 rounded shadow">
-Returning Customers
+{# ── Revenue Chart + Recent Transactions ──────────────────────────────────── #}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+    {# Revenue trend — fake SVG line chart #}
+    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-100">
+            <div>
+                <p class="text-sm font-semibold text-gray-900">Revenue Trend</p>
+                <p class="text-xs text-gray-400 mt-0.5">Last 30 days · KES</p>
+            </div>
+            <div class="flex gap-1">
+                <span class="text-xs font-semibold bg-indigo-600 text-white px-3 py-1 rounded-lg">30d</span>
+                <span class="text-xs font-semibold text-gray-500 bg-gray-100 px-3 py-1 rounded-lg">7d</span>
+            </div>
+        </div>
+        <div class="px-6 pt-4 pb-2">
+            <svg viewBox="0 0 600 160" width="100%" height="160" preserveAspectRatio="none">
+                <defs>
+                    <linearGradient id="revGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#6366f1" stop-opacity="0.18"/>
+                        <stop offset="100%" stop-color="#6366f1" stop-opacity="0"/>
+                    </linearGradient>
+                </defs>
+                {# Grid lines #}
+                <line x1="0" y1="130" x2="600" y2="130" stroke="#f3f4f6" stroke-width="1"/>
+                <line x1="0" y1="97"  x2="600" y2="97"  stroke="#f3f4f6" stroke-width="1"/>
+                <line x1="0" y1="64"  x2="600" y2="64"  stroke="#f3f4f6" stroke-width="1"/>
+                <line x1="0" y1="31"  x2="600" y2="31"  stroke="#f3f4f6" stroke-width="1"/>
+                {# Area fill #}
+                <path d="M0,110 C20,105 40,95 60,100 C80,105 100,115 120,108 C140,101 160,80 180,72 C200,64 220,68 240,62 C260,56 280,45 300,50 C320,55 340,70 360,65 C380,60 400,42 420,38 C440,34 460,40 480,35 C500,30 520,22 540,28 C560,34 580,38 600,30 L600,130 L0,130 Z" fill="url(#revGrad)"/>
+                {# Line #}
+                <path d="M0,110 C20,105 40,95 60,100 C80,105 100,115 120,108 C140,101 160,80 180,72 C200,64 220,68 240,62 C260,56 280,45 300,50 C320,55 340,70 360,65 C380,60 400,42 420,38 C440,34 460,40 480,35 C500,30 520,22 540,28 C560,34 580,38 600,30" fill="none" stroke="#6366f1" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"/>
+                {# Highlight dot #}
+                <circle cx="480" cy="35" r="4" fill="#6366f1"/>
+                <circle cx="480" cy="35" r="7" fill="#6366f1" opacity="0.15"/>
+            </svg>
+            <div class="flex justify-between text-xs text-gray-400 mt-1 px-1">
+                <span>Mar 17</span>
+                <span>Mar 24</span>
+                <span>Mar 31</span>
+                <span>Apr 7</span>
+                <span>Apr 16</span>
+            </div>
+        </div>
+        <div class="grid grid-cols-3 divide-x divide-gray-100 border-t border-gray-100">
+            <div class="px-6 py-3">
+                <p class="text-xs text-gray-400">Peak day</p>
+                <p class="text-sm font-bold text-gray-800 mt-0.5">Fri Apr 12 <span class="text-indigo-600">↑</span></p>
+            </div>
+            <div class="px-6 py-3">
+                <p class="text-xs text-gray-400">Avg / day</p>
+                <p class="text-sm font-bold text-gray-800 mt-0.5">KES 28,250</p>
+            </div>
+            <div class="px-6 py-3">
+                <p class="text-xs text-gray-400">Total (30d)</p>
+                <p class="text-sm font-bold text-gray-800 mt-0.5">KES 847,500</p>
+            </div>
+        </div>
+    </div>
+
+    {# Recent transactions #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-900">Recent Transactions</p>
+            <span class="text-xs text-indigo-600 font-semibold cursor-pointer hover:underline">View all</span>
+        </div>
+        <div class="divide-y divide-gray-50">
+            {% set sample_txns = [
+                {name: 'Aisha M.',    amount: '4,500', area: 'VIP Lounge',   time: '2m ago',  item: 'Full Body Massage'},
+                {name: 'Brian K.',    amount: '1,200', area: 'Main Floor',   time: '18m ago', item: 'Hair Treatment'},
+                {name: 'Cynthia O.', amount: '2,800', area: 'Spa Suite',    time: '31m ago', item: 'Facial Package'},
+                {name: 'David N.',   amount: '650',   area: 'Bar',          time: '45m ago', item: 'Beverages'},
+                {name: 'Esther W.', amount: '3,100',  area: 'VIP Lounge',  time: '1h ago',  item: 'Full Body Massage'},
+            ] %}
+            {% for txn in sample_txns %}
+            <div class="flex items-center gap-3 px-5 py-3 hover:bg-gray-50 transition-colors">
+                <div class="w-7 h-7 rounded-full bg-indigo-100 flex items-center justify-center flex-shrink-0">
+                    <span class="text-xs font-bold text-indigo-600">{{ txn.name|first }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold text-gray-800 truncate">{{ txn.name }}</p>
+                    <p class="text-xs text-gray-400 truncate">{{ txn.item }} · {{ txn.area }}</p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="text-xs font-bold text-gray-800">{{ txn.amount }}</p>
+                    <p class="text-xs text-gray-400">{{ txn.time }}</p>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
 </div>
 
+{# ── Revenue by Source ─────────────────────────────────────────────────────── #}
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-6 mb-8">
+
+    {# Revenue by Services & Items — bar chart #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-900">Revenue by Services &amp; Items</p>
+            <p class="text-xs text-gray-400 mt-0.5">Top earners this month</p>
+        </div>
+        <div class="px-6 py-4 space-y-3">
+            {% set bars = [
+                {label: 'Full Body Massage', value: 88, amount: '312,400', color: '#6366f1'},
+                {label: 'Facial Package',    value: 62, amount: '218,700', color: '#8b5cf6'},
+                {label: 'Hair Treatment',    value: 45, amount: '156,200', color: '#06b6d4'},
+                {label: 'Spa Package',       value: 31, amount: '109,800', color: '#10b981'},
+                {label: 'Beverages',         value: 14, amount: '50,400',  color: '#f59e0b'},
+            ] %}
+            {% for bar in bars %}
+            <div>
+                <div class="flex items-center justify-between mb-1">
+                    <span class="text-xs font-medium text-gray-700">{{ bar.label }}</span>
+                    <span class="text-xs font-bold text-gray-800">KES {{ bar.amount }}</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full transition-all" style="width:{{ bar.value }}%;background:{{ bar.color }};"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Revenue by Area #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="px-6 py-4 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-900">Revenue by Area</p>
+            <p class="text-xs text-gray-400 mt-0.5">Where transactions are captured</p>
+        </div>
+        <div class="px-6 py-5">
+            {# Donut chart — pure SVG #}
+            <div class="flex items-center gap-6">
+                <svg viewBox="0 0 100 100" width="120" height="120" style="flex-shrink:0;">
+                    {# Donut segments: VIP 40%, Spa 28%, Main 20%, Bar 12% #}
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#e5e7eb" stroke-width="18"/>
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#6366f1" stroke-width="18"
+                            stroke-dasharray="100.5 150.8" stroke-dashoffset="0" transform="rotate(-90 50 50)"/>
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#8b5cf6" stroke-width="18"
+                            stroke-dasharray="70.4 180.9" stroke-dashoffset="-100.5" transform="rotate(-90 50 50)"/>
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#06b6d4" stroke-width="18"
+                            stroke-dasharray="50.3 201" stroke-dashoffset="-170.9" transform="rotate(-90 50 50)"/>
+                    <circle cx="50" cy="50" r="40" fill="none" stroke="#f59e0b" stroke-width="18"
+                            stroke-dasharray="30.2 221.1" stroke-dashoffset="-221.2" transform="rotate(-90 50 50)"/>
+                    <text x="50" y="47" text-anchor="middle" font-size="9" font-weight="700" fill="#111827">847K</text>
+                    <text x="50" y="57" text-anchor="middle" font-size="6" fill="#9ca3af">Total KES</text>
+                </svg>
+                <div class="space-y-2 flex-1 min-w-0">
+                    {% set areas = [
+                        {label: 'VIP Lounge',  pct: '40%', color: '#6366f1'},
+                        {label: 'Spa Suite',   pct: '28%', color: '#8b5cf6'},
+                        {label: 'Main Floor',  pct: '20%', color: '#06b6d4'},
+                        {label: 'Bar',         pct: '12%', color: '#f59e0b'},
+                    ] %}
+                    {% for a in areas %}
+                    <div class="flex items-center gap-2">
+                        <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{{ a.color }};"></span>
+                        <span class="text-xs text-gray-600 flex-1 truncate">{{ a.label }}</span>
+                        <span class="text-xs font-bold text-gray-800">{{ a.pct }}</span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </div>
+
+</div>
+
+{# ── The Four Pillars ──────────────────────────────────────────────────────── #}
+<div class="mb-8">
+    <div class="mb-4">
+        <h2 class="text-base font-bold text-gray-900">How Patronr Works</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Everything in Patronr is designed around four pillars that form one continuous loop.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5 relative overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-indigo-500 rounded-t-xl"></div>
+            <div class="w-9 h-9 rounded-lg bg-indigo-50 flex items-center justify-center mb-3">
+                <svg width="16" height="16" fill="none" stroke="#4f46e5" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3.75 9.776c.112-.017.227-.026.344-.026h15.812c.117 0 .232.009.344.026m-16.5 0a2.25 2.25 0 00-1.883 2.542l.857 6a2.25 2.25 0 002.227 1.932H19.05a2.25 2.25 0 002.227-1.932l.857-6a2.25 2.25 0 00-1.883-2.542m-16.5 0V6A2.25 2.25 0 016 3.75h3.879a1.5 1.5 0 011.06.44l2.122 2.12a1.5 1.5 0 001.06.44H18A2.25 2.25 0 0120.25 9v.776"/>
+                </svg>
+            </div>
+            <div class="text-xs font-bold text-indigo-600 uppercase tracking-wide mb-1">1 · Capture</div>
+            <p class="text-sm font-semibold text-gray-900 mb-1.5">Get context at payment</p>
+            <p class="text-xs text-gray-500 leading-relaxed">Every transaction carries who paid, how much, where, what service or product was sold, and what event was running. All captured in the terminal — zero extra effort.</p>
+            <div class="mt-3 flex flex-wrap gap-1">
+                <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold">Terminal</span>
+                <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold">Areas</span>
+                <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold">Catalog</span>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5 relative overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-violet-500 rounded-t-xl"></div>
+            <div class="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center mb-3">
+                <svg width="16" height="16" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M3 13.125C3 12.504 3.504 12 4.125 12h2.25c.621 0 1.125.504 1.125 1.125v6.75C7.5 20.496 6.996 21 6.375 21h-2.25A1.125 1.125 0 013 19.875v-6.75zM9.75 8.625c0-.621.504-1.125 1.125-1.125h2.25c.621 0 1.125.504 1.125 1.125v11.25c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V8.625zM16.5 4.125c0-.621.504-1.125 1.125-1.125h2.25C20.496 3 21 3.504 21 4.125v15.75c0 .621-.504 1.125-1.125 1.125h-2.25a1.125 1.125 0 01-1.125-1.125V4.125z"/>
+                </svg>
+            </div>
+            <div class="text-xs font-bold text-violet-600 uppercase tracking-wide mb-1">2 · Understand</div>
+            <p class="text-sm font-semibold text-gray-900 mb-1.5">Turn data into intelligence</p>
+            <p class="text-xs text-gray-500 leading-relaxed">Patronr builds customer profiles from payment behavior — visit frequency, spending patterns, preferred services, churn signals. Segments emerge automatically from real data.</p>
+            <div class="mt-3 flex flex-wrap gap-1">
+                <span class="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded font-semibold">Segments</span>
+                <span class="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded font-semibold">Analytics</span>
+                <span class="text-xs bg-violet-50 text-violet-600 px-2 py-0.5 rounded font-semibold">Retention</span>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5 relative overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-emerald-500 rounded-t-xl"></div>
+            <div class="w-9 h-9 rounded-lg bg-emerald-50 flex items-center justify-center mb-3">
+                <svg width="16" height="16" fill="none" stroke="#059669" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M15.59 14.37a6 6 0 01-5.84 7.38v-4.8m5.84-2.58a14.98 14.98 0 006.16-12.12A14.98 14.98 0 009.631 8.41m5.96 5.96a14.926 14.926 0 01-5.841 2.58m-.119-8.54a6 6 0 00-7.381 5.84h4.8m2.581-5.84a14.927 14.927 0 00-2.58 5.84m2.699 2.7c-.103.021-.207.041-.311.06a15.09 15.09 0 01-2.448-2.448 14.9 14.9 0 01.06-.312m-2.24 2.39a4.493 4.493 0 00-1.757 4.306 4.493 4.493 0 004.306-1.758M16.5 9a1.5 1.5 0 11-3 0 1.5 1.5 0 013 0z"/>
+                </svg>
+            </div>
+            <div class="text-xs font-bold text-emerald-600 uppercase tracking-wide mb-1">3 · Act</div>
+            <p class="text-sm font-semibold text-gray-900 mb-1.5">Convert insight to action</p>
+            <p class="text-xs text-gray-500 leading-relaxed">Send targeted campaigns to the right customers at the right moment. Win back churning customers. Reward your most loyal. Every action is based on what the data actually says.</p>
+            <div class="mt-3 flex flex-wrap gap-1">
+                <span class="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-semibold">Campaigns</span>
+                <span class="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-semibold">SMS</span>
+                <span class="text-xs bg-emerald-50 text-emerald-600 px-2 py-0.5 rounded font-semibold">WhatsApp</span>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5 relative overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+            <div class="absolute top-0 left-0 right-0 h-1 bg-amber-500 rounded-t-xl"></div>
+            <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center mb-3">
+                <svg width="16" height="16" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" d="M9 12.75L11.25 15 15 9.75M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                </svg>
+            </div>
+            <div class="text-xs font-bold text-amber-600 uppercase tracking-wide mb-1">4 · Measure</div>
+            <p class="text-sm font-semibold text-gray-900 mb-1.5">Close the loop</p>
+            <p class="text-xs text-gray-500 leading-relaxed">Track whether campaigns drove return visits. Compare event performance. See which services drive the most loyal customers. Every action has a measurable outcome.</p>
+            <div class="mt-3 flex flex-wrap gap-1">
+                <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded font-semibold">Outcomes</span>
+                <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded font-semibold">Reports</span>
+                <span class="text-xs bg-amber-50 text-amber-600 px-2 py-0.5 rounded font-semibold">Trends</span>
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{# ── Revenue Classification explainer ─────────────────────────────────────── #}
+<div class="mb-8">
+    <div class="mb-4">
+        <h2 class="text-base font-bold text-gray-900">Revenue Classification</h2>
+        <p class="text-xs text-gray-500 mt-0.5">Three independent dimensions that attach to every transaction — so you can answer the questions that matter.</p>
+    </div>
+    <div class="grid grid-cols-1 sm:grid-cols-3 gap-4">
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-9 h-9 rounded-lg bg-teal-50 flex items-center justify-center flex-shrink-0">
+                    <svg width="16" height="16" fill="none" stroke="#0d9488" stroke-width="1.5" viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-gray-900">Areas</p>
+                    <p class="text-xs text-gray-400">Where it happened</p>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed mb-3">Physical spaces where transactions take place — VIP Lounge, Spa Suite, Main Floor. Areas answer <em>"where does revenue come from?"</em> and help classify customer behaviour by location.</p>
+            <div class="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                {% for a in ['VIP Lounge', 'Spa Suite', 'Main Floor', 'Bar'] %}
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-600">{{ a }}</span>
+                    <span class="text-xs font-semibold text-teal-700 bg-teal-50 px-1.5 py-0.5 rounded">Active</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-9 h-9 rounded-lg bg-violet-50 flex items-center justify-center flex-shrink-0">
+                    <svg width="16" height="16" fill="none" stroke="#7c3aed" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M11.42 15.17L17.25 21A2.652 2.652 0 0021 17.25l-5.877-5.877M11.42 15.17l2.496-3.03c.317-.384.74-.626 1.208-.766M11.42 15.17l-4.655 5.653a2.548 2.548 0 11-3.586-3.586l6.837-5.63m5.108-.233c.55-.164 1.163-.188 1.743-.14a4.5 4.5 0 004.486-6.336l-3.276 3.277a3.004 3.004 0 01-2.25-2.25l3.276-3.276a4.5 4.5 0 00-6.336 4.486c.091 1.076-.071 2.264-.904 2.95l-.102.085m-1.745 1.437L5.909 7.5H4.5L2.25 3.75l1.5-1.5L7.5 4.5v1.409l4.26 4.26m-1.745 1.437l1.745-1.437m6.615 8.206L15.75 15.75M4.867 19.125h.008v.008h-.008v-.008z"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-gray-900">Services &amp; Items</p>
+                    <p class="text-xs text-gray-400">What was sold</p>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed mb-3">Not an inventory system — a revenue tagging tool. Cashiers select what service or product drove the transaction. Answers <em>"which offerings generate the most revenue?"</em></p>
+            <div class="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                {% for s in [
+                    {n: 'Full Body Massage', t: 'Service'},
+                    {n: 'Facial Package', t: 'Service'},
+                    {n: 'Hair Treatment', t: 'Service'},
+                    {n: 'Beverages', t: 'Product'},
+                ] %}
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-600 truncate">{{ s.n }}</span>
+                    <span class="text-xs font-semibold px-1.5 py-0.5 rounded {{ s.t == 'Service' ? 'bg-violet-50 text-violet-700' : 'bg-sky-50 text-sky-700' }}">{{ s.t }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+        <div class="bg-white rounded-xl border border-gray-200 p-5" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+            <div class="flex items-center gap-3 mb-3">
+                <div class="w-9 h-9 rounded-lg bg-amber-50 flex items-center justify-center flex-shrink-0">
+                    <svg width="16" height="16" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 3v2.25M17.25 3v2.25M3 18.75V7.5a2.25 2.25 0 012.25-2.25h13.5A2.25 2.25 0 0121 7.5v11.25m-18 0A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75m-18 0v-7.5A2.25 2.25 0 015.25 9h13.5A2.25 2.25 0 0121 11.25v7.5"/>
+                    </svg>
+                </div>
+                <div>
+                    <p class="text-sm font-bold text-gray-900">Events &amp; Offers</p>
+                    <p class="text-xs text-gray-400">Under what conditions</p>
+                </div>
+            </div>
+            <p class="text-xs text-gray-500 leading-relaxed mb-3">The context around a sale — Ladies Night, Weekend Brunch, Valentine's Dinner. Answers <em>"does revenue spike during certain events?"</em> and quantifies which events drive repeat visits.</p>
+            <div class="bg-gray-50 rounded-lg p-3 space-y-1.5">
+                {% set evs = [
+                    {n: 'Ladies Night', s: 'Running', c: 'bg-emerald-50 text-emerald-700'},
+                    {n: 'Weekend Brunch', s: 'Recurring', c: 'bg-indigo-50 text-indigo-600'},
+                    {n: 'Live Jazz Fridays', s: 'Recurring', c: 'bg-indigo-50 text-indigo-600'},
+                    {n: 'Easter Special', s: 'Scheduled', c: 'bg-gray-100 text-gray-500'},
+                ] %}
+                {% for ev in evs %}
+                <div class="flex items-center justify-between">
+                    <span class="text-xs text-gray-600 truncate">{{ ev.n }}</span>
+                    <span class="text-xs font-semibold px-1.5 py-0.5 rounded {{ ev.c }}">{{ ev.s }}</span>
+                </div>
+                {% endfor %}
+            </div>
+        </div>
+
+    </div>
+</div>
+
+{# ── Customer Intelligence preview ─────────────────────────────────────────── #}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+
+    {# Top customers #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-900">Top Customers</p>
+            <span class="text-xs text-indigo-600 font-semibold">By spend</span>
+        </div>
+        <div class="divide-y divide-gray-50">
+            {% set top_customers = [
+                {name: 'Aisha Mohammed',   visits: 14, spend: '68,400', badge: 'Loyal',    bc: 'bg-indigo-50 text-indigo-700'},
+                {name: 'Cynthia Odhiambo', visits: 11, spend: '52,100', badge: 'Regular',  bc: 'bg-emerald-50 text-emerald-700'},
+                {name: 'Brian Kamau',       visits: 9,  spend: '44,700', badge: 'Regular',  bc: 'bg-emerald-50 text-emerald-700'},
+                {name: 'Esther Wanjiku',    visits: 7,  spend: '38,900', badge: 'At Risk',  bc: 'bg-amber-50 text-amber-700'},
+                {name: 'David Njoroge',     visits: 5,  spend: '29,500', badge: 'New',      bc: 'bg-sky-50 text-sky-700'},
+            ] %}
+            {% for c in top_customers %}
+            <div class="flex items-center gap-3 px-5 py-3">
+                <div class="w-7 h-7 rounded-full bg-gradient-to-br from-indigo-400 to-purple-500 flex items-center justify-center flex-shrink-0">
+                    <span class="text-xs font-bold text-white">{{ c.name|first }}</span>
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold text-gray-800 truncate">{{ c.name }}</p>
+                    <p class="text-xs text-gray-400">{{ c.visits }} visits</p>
+                </div>
+                <div class="text-right flex-shrink-0">
+                    <p class="text-xs font-bold text-gray-800">{{ c.spend }}</p>
+                    <span class="text-xs font-semibold px-1.5 py-0.5 rounded {{ c.bc }}">{{ c.badge }}</span>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# Loyalty snapshot #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-900">Loyalty Snapshot</p>
+            <p class="text-xs text-gray-400 mt-0.5">Points economy this month</p>
+        </div>
+        <div class="px-5 py-4 space-y-4">
+            <div class="grid grid-cols-2 gap-3">
+                <div class="bg-indigo-50 rounded-lg p-3 text-center">
+                    <p class="text-xl font-bold text-indigo-700">847</p>
+                    <p class="text-xs text-indigo-500 mt-0.5">Enrolled</p>
+                </div>
+                <div class="bg-emerald-50 rounded-lg p-3 text-center">
+                    <p class="text-xl font-bold text-emerald-700">312</p>
+                    <p class="text-xs text-emerald-500 mt-0.5">Redeemed</p>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs text-gray-500">Points awarded this month</span>
+                    <span class="text-xs font-bold text-gray-800">124,350 pts</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full bg-indigo-500" style="width:73%;"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs text-gray-500">Points redeemed</span>
+                    <span class="text-xs font-bold text-gray-800">42,100 pts</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full bg-emerald-500" style="width:34%;"></div>
+                </div>
+            </div>
+            <div>
+                <div class="flex items-center justify-between mb-1.5">
+                    <span class="text-xs text-gray-500">Loyalty capture rate</span>
+                    <span class="text-xs font-bold text-gray-800">66%</span>
+                </div>
+                <div class="h-2 bg-gray-100 rounded-full overflow-hidden">
+                    <div class="h-full rounded-full bg-amber-400" style="width:66%;"></div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    {# What's coming — platform roadmap teaser #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden" style="box-shadow:0 1px 4px rgba(0,0,0,.05);">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <p class="text-sm font-semibold text-gray-900">What's Coming</p>
+            <p class="text-xs text-gray-400 mt-0.5">Patronr is actively expanding</p>
+        </div>
+        <div class="px-5 py-4 space-y-3">
+            {% set roadmap = [
+                {label: 'Customer Segments',    desc: 'Auto-groups by behaviour',           done: true,  color: 'bg-emerald-500'},
+                {label: 'SMS Campaigns',         desc: 'Targeted win-back & rewards',        done: false, color: 'bg-gray-300'},
+                {label: 'WhatsApp Messaging',    desc: 'Two-way customer comms',             done: false, color: 'bg-gray-300'},
+                {label: 'Campaign Outcomes',     desc: 'Did the action work?',               done: false, color: 'bg-gray-300'},
+                {label: 'Revenue Reports',       desc: 'Deep analytics across all pillars',  done: false, color: 'bg-gray-300'},
+                {label: 'Event ROI',             desc: 'Which events drive repeat visits?',  done: false, color: 'bg-gray-300'},
+            ] %}
+            {% for item in roadmap %}
+            <div class="flex items-center gap-3">
+                <div class="w-2 h-2 rounded-full flex-shrink-0 {{ item.color }}"></div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-xs font-semibold text-gray-800">{{ item.label }}</p>
+                    <p class="text-xs text-gray-400">{{ item.desc }}</p>
+                </div>
+                {% if item.done %}
+                <svg width="13" height="13" fill="none" stroke="#10b981" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                {% else %}
+                <span class="text-xs text-gray-300 font-semibold">Soon</span>
+                {% endif %}
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>
+
+{# ── Patronr tagline footer ─────────────────────────────────────────────────── #}
+<div class="rounded-xl border border-indigo-100 bg-gradient-to-r from-indigo-50 to-purple-50 px-8 py-6 flex flex-wrap items-center justify-between gap-4">
+    <div>
+        <p class="text-sm font-bold text-indigo-900">Patronr — CRM &amp; Revenue Operating System</p>
+        <p class="text-xs text-indigo-600 mt-0.5 max-w-xl leading-relaxed">
+            Every transaction is an opportunity to know your customer, classify your revenue, and act on what the data reveals.
+            Capture at payment → Understand through data → Act on intelligence → Measure what changed.
+        </p>
+    </div>
+    <div class="flex items-center gap-2 text-xs text-indigo-400 font-semibold">
+        <span class="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse inline-block"></span>
+        EAT {{ 'now'|date('H:i') }}
+    </div>
 </div>
 
 {% endblock %}

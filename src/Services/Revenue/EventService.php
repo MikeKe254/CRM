@@ -54,7 +54,6 @@ final class EventService
                     e.recurrence_type, e.recurrence_days, e.recurrence_time_start,
                     e.recurrence_time_end, e.recurrence_valid_from, e.recurrence_valid_until,
                     e.recurrence_monthly_day,
-                    e.offer_discount_type, e.offer_discount_value, e.offer_applies_to,
                     e.created_at
                FROM events e
               WHERE e.company_id = :company_id
@@ -83,7 +82,6 @@ final class EventService
                     recurrence_type, recurrence_days, recurrence_time_start,
                     recurrence_time_end, recurrence_valid_from, recurrence_valid_until,
                     recurrence_monthly_day,
-                    offer_discount_type, offer_discount_value, offer_applies_to,
                     created_at
                FROM events
               WHERE branch_id  = :branch_id
@@ -332,9 +330,6 @@ final class EventService
         ?string $recurrenceValidUntil = null,
         ?int    $recurrenceMonthlyDay = null,
         string  $entryType = 'event',
-        ?string $offerDiscountType = null,
-        ?float  $offerDiscountValue = null,
-        string  $offerAppliesTo = 'all',
     ): int {
         $this->db->insert('events', [
             'company_id'               => $companyId,
@@ -352,9 +347,6 @@ final class EventService
             'recurrence_valid_from'    => $recurrenceValidFrom,
             'recurrence_valid_until'   => $recurrenceValidUntil,
             'recurrence_monthly_day'   => $recurrenceMonthlyDay,
-            'offer_discount_type'      => $entryType === 'offer' ? $offerDiscountType  : null,
-            'offer_discount_value'     => $entryType === 'offer' ? $offerDiscountValue : null,
-            'offer_applies_to'         => $entryType === 'offer' ? $offerAppliesTo     : null,
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -376,9 +368,6 @@ final class EventService
         ?string $recurrenceValidUntil = null,
         ?int    $recurrenceMonthlyDay = null,
         string  $entryType = 'event',
-        ?string $offerDiscountType = null,
-        ?float  $offerDiscountValue = null,
-        string  $offerAppliesTo = 'all',
     ): void {
         $this->db->executeStatement(
             'UPDATE events
@@ -393,10 +382,7 @@ final class EventService
                     recurrence_time_end    = :recurrence_time_end,
                     recurrence_valid_from  = :recurrence_valid_from,
                     recurrence_valid_until = :recurrence_valid_until,
-                    recurrence_monthly_day = :recurrence_monthly_day,
-                    offer_discount_type    = :offer_discount_type,
-                    offer_discount_value   = :offer_discount_value,
-                    offer_applies_to       = :offer_applies_to
+                    recurrence_monthly_day = :recurrence_monthly_day
               WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id',
             [
                 'name'                   => $name,
@@ -411,9 +397,6 @@ final class EventService
                 'recurrence_valid_from'  => $recurrenceValidFrom,
                 'recurrence_valid_until' => $recurrenceValidUntil,
                 'recurrence_monthly_day' => $recurrenceMonthlyDay,
-                'offer_discount_type'    => $entryType === 'offer' ? $offerDiscountType  : null,
-                'offer_discount_value'   => $entryType === 'offer' ? $offerDiscountValue : null,
-                'offer_applies_to'       => $entryType === 'offer' ? $offerAppliesTo     : null,
                 'id'                     => $id,
                 'company_id'             => $companyId,
                 'branch_id'              => $branchId,

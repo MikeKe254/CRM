@@ -1164,7 +1164,7 @@ class SettingsController extends AdminBaseController
 
         $settings = $this->db->fetchAssociative(
             'SELECT show_mpesa_feed, mpesa_feed_refresh_seconds, mpesa_feed_max_hours,
-                    mpesa_feed_max_visible, show_quick_stk
+                    mpesa_feed_max_visible, show_quick_stk, enable_pos_pricing, show_events_at_terminal
                FROM pos_terminal_settings
               WHERE company_id = :company_id
                 AND branch_id  = :branch_id
@@ -1176,6 +1176,8 @@ class SettingsController extends AdminBaseController
             'mpesa_feed_max_hours'       => 24,
             'mpesa_feed_max_visible'     => 50,
             'show_quick_stk'             => 0,
+            'enable_pos_pricing'         => 0,
+            'show_events_at_terminal'    => 1,
         ];
 
         return $this->render('admin/settings/terminal.html.twig', [
@@ -1192,13 +1194,15 @@ class SettingsController extends AdminBaseController
 
         $branchId = $this->activeBranchId($session);
 
-        $showMpesaFeed   = (int) (bool) $request->request->get('show_mpesa_feed');
-        $refreshSeconds  = in_array((int) $request->request->get('mpesa_feed_refresh_seconds'), [5, 10], true)
+        $showMpesaFeed         = (int) (bool) $request->request->get('show_mpesa_feed');
+        $refreshSeconds        = in_array((int) $request->request->get('mpesa_feed_refresh_seconds'), [5, 10], true)
             ? (int) $request->request->get('mpesa_feed_refresh_seconds')
             : 5;
-        $maxHours        = max(1, min(168, (int) $request->request->get('mpesa_feed_max_hours', 24)));
-        $maxVisible      = max(1, min(200, (int) $request->request->get('mpesa_feed_max_visible', 50)));
-        $showQuickStk    = (int) (bool) $request->request->get('show_quick_stk');
+        $maxHours              = max(1, min(168, (int) $request->request->get('mpesa_feed_max_hours', 24)));
+        $maxVisible            = max(1, min(200, (int) $request->request->get('mpesa_feed_max_visible', 50)));
+        $showQuickStk          = (int) (bool) $request->request->get('show_quick_stk');
+        $enablePosPricing      = (int) (bool) $request->request->get('enable_pos_pricing');
+        $showEventsAtTerminal  = (int) (bool) $request->request->get('show_events_at_terminal');
 
         $existing = $this->db->fetchOne(
             'SELECT id FROM pos_terminal_settings WHERE company_id = :company_id AND branch_id = :branch_id LIMIT 1',
@@ -1212,19 +1216,22 @@ class SettingsController extends AdminBaseController
                         mpesa_feed_refresh_seconds = ?,
                         mpesa_feed_max_hours       = ?,
                         mpesa_feed_max_visible     = ?,
-                        show_quick_stk             = ?
+                        show_quick_stk             = ?,
+                        enable_pos_pricing         = ?,
+                        show_events_at_terminal    = ?
                   WHERE company_id = ? AND branch_id = ?',
                 [$showMpesaFeed, $refreshSeconds, $maxHours, $maxVisible, $showQuickStk,
-                 $session->company->id, $branchId],
+                 $enablePosPricing, $showEventsAtTerminal, $session->company->id, $branchId],
             );
         } else {
             $this->db->executeStatement(
                 'INSERT INTO pos_terminal_settings
                     (company_id, branch_id, show_mpesa_feed, mpesa_feed_refresh_seconds,
-                     mpesa_feed_max_hours, mpesa_feed_max_visible, show_quick_stk)
-                 VALUES (?, ?, ?, ?, ?, ?, ?)',
+                     mpesa_feed_max_hours, mpesa_feed_max_visible, show_quick_stk,
+                     enable_pos_pricing, show_events_at_terminal)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [$session->company->id, $branchId, $showMpesaFeed, $refreshSeconds,
-                 $maxHours, $maxVisible, $showQuickStk],
+                 $maxHours, $maxVisible, $showQuickStk, $enablePosPricing, $showEventsAtTerminal],
             );
         }
 

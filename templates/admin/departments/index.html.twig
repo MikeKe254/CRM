@@ -11,7 +11,7 @@
     {{ showInactive ? 'Hide inactive' : 'Show inactive' }}
 </a>
 {% if can.create %}
-<button onclick="openCreate()"
+<button onclick="openCreateDept()"
         class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
     + Add Department
 </button>
@@ -80,9 +80,9 @@
                 <td class="px-4 py-3 text-right">
                     <div class="flex items-center justify-end gap-1">
                         {% if can.edit %}
-                        <button onclick="openEdit({{ dept|json_encode|e('html_attr') }})"
+                        <button onclick="openEditDept({{ dept|json_encode|e('html_attr') }})"
                                 class="text-xs text-indigo-600 border border-indigo-200 bg-white hover:bg-indigo-50 px-2.5 py-1 rounded transition-colors">Edit</button>
-                        <button onclick="toggleStatus({{ dept.id }}, '{{ dept.status }}', '{{ dept.name|e('js') }}')"
+                        <button onclick="toggleDeptStatus({{ dept.id }}, '{{ dept.status }}', '{{ dept.name|e('js') }}')"
                                 class="hidden sm:inline-flex text-xs {{ dept.status == 'active' ? 'text-amber-600 border-amber-200 hover:bg-amber-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50' }} border bg-white px-2.5 py-1 rounded transition-colors">
                             {{ dept.status == 'active' ? 'Deactivate' : 'Activate' }}
                         </button>

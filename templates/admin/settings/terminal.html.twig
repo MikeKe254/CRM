@@ -96,6 +96,61 @@
         </div>
     </div>
 
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    {# ── Events & Offers at checkout ──────────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Events &amp; Offers at Checkout</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Show running events and offers as selectable chips on the terminal checkout screen so cashiers can tag transactions with the revenue context.</p>
+        </div>
+        <div class="settings-section-fields">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Show events &amp; offers at terminal</p>
+                    <p class="text-xs text-gray-500 mt-0.5">When enabled, any event or offer that is currently running appears as a chip the cashier can select during checkout.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="show_events_at_terminal" value="1" {{ s.show_events_at_terminal ?? 1 ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
+    {# ── Revenue Classification pricing ──────────────────────────────────── #}
+    <div class="settings-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Revenue Classification Pricing</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Allow prices defined on Services &amp; Items to pre-fill the amount at checkout.</p>
+        </div>
+        <div class="settings-section-fields space-y-3">
+
+            {# Warning notice #}
+            <div style="display:flex;gap:.75rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #fcd34d;background:#fffbeb;">
+                <svg style="flex-shrink:0;margin-top:.1rem;" width="16" height="16" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z"/></svg>
+                <div>
+                    <p class="text-xs font-semibold text-amber-800">Patronr is not a point-of-sale system</p>
+                    <p class="text-xs text-amber-700 mt-0.5 leading-relaxed">Services &amp; Items prices exist for revenue classification only — to tag what generated a sale. The amount entered at the terminal is always treated as final. Only enable this if your branch has no dedicated POS available.</p>
+                </div>
+            </div>
+
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Pre-fill amounts from item prices</p>
+                    <p class="text-xs text-gray-500 mt-0.5">When a cashier selects a Services &amp; Items entry, its price populates the amount field. The cashier can still override it.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="enable_pos_pricing" value="1" {{ s.enable_pos_pricing ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+
+        </div>
+    </div>
+
     <div class="settings-card-footer flex items-center justify-between px-8 py-4 border-t border-gray-100 bg-gray-50">
         <p class="text-xs text-gray-400">Changes apply immediately across all terminals in this branch.</p>
         <button type="submit"

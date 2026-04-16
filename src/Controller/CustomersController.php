@@ -1,18 +1,55 @@
 <?php
 
+declare(strict_types=1);
+
 namespace App\Controller;
 
-use Symfony\Bundle\FrameworkBundle\Controller\AbstractController;
+use App\Controller\Admin\AdminBaseController;
+use App\Services\Auth\AuthService;
+use App\Services\Branch\BranchResolverService;
+use App\Services\Permission\CheckPermissionService;
+use App\Services\Permission\PlatformCheckPermissionService;
+use Doctrine\DBAL\Connection;
+use Symfony\Component\HttpFoundation\Request;
 use Symfony\Component\HttpFoundation\Response;
 use Symfony\Component\Routing\Attribute\Route;
 
-final class CustomersController extends AbstractController
+#[Route(
+    '/{branch}/dashboard/customers',
+    host: '{subdomain}.{domain}',
+    requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+', 'branch' => '[A-Za-z0-9-]+'],
+)]
+final class CustomersController extends AdminBaseController
 {
-    #[Route('/customers', name: 'app_customers', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+'])]
-    public function index(): Response
+    public function __construct(
+        AuthService                    $auth,
+        CheckPermissionService         $can,
+        PlatformCheckPermissionService $platformCan,
+        BranchResolverService          $branchResolver,
+        Connection                     $db,
+    ) {
+        parent::__construct($auth, $can, $platformCan, $branchResolver, $db);
+    }
+
+    #[Route('', name: 'app_customers', methods: ['GET'])]
+    public function index(Request $request): Response
     {
+        $session = $this->requireAdmin($request);
+        if ($session instanceof Response) return $session;
+
         return $this->render('customers/index.html.twig', [
-            'controller_name' => 'CustomersController',
+            'session' => $session,
+        ]);
+    }
+
+    #[Route('/{id}', name: 'app_customer_profile', requirements: ['id' => '\d+'], methods: ['GET'])]
+    public function profile(Request $request, int $id): Response
+    {
+        $session = $this->requireAdmin($request);
+        if ($session instanceof Response) return $session;
+
+        return $this->render('customers/profile.html.twig', [
+            'session' => $session,
         ]);
     }
 }

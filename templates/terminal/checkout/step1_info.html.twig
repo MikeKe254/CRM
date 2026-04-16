@@ -43,28 +43,23 @@
                    value="{{ draft.get('amount', '') }}">
         </div>
 
-        {# ── Catalog quick-pick — horizontal scroll, optional ───────────── #}
+        {# ── Catalog quick-pick — multi-select horizontal scroll ────────── #}
         {% if catalog_items|length > 0 %}
+        {% set _selected_ids = draft.get('catalog_item_ids', []) %}
         <div style="flex-shrink:0;border-top:1px solid #1f2937;">
             <div style="display:flex;align-items:center;overflow-x:auto;padding:7px 16px;scrollbar-width:none;-webkit-overflow-scrolling:touch;touch-action:pan-x;"
                  class="catalog-scroll-row" id="catalog-scroll">
-                <input type="hidden" name="catalog_item_id" id="catalog-item-id-input" value="{{ draft.get('catalog_item_id', '') }}">
-                <button type="button" class="keypad-btn catalog-chip"
-                        data-catalog-id=""
-                        data-price=""
-                        style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid #374151;font-size:11px;font-weight:500;margin-right:6px;white-space:nowrap;
-                               {{ not draft.get('catalog_item_id') ? 'background:#374151;color:#fff;border-color:#4b5563;' : 'background:#1f2937;color:#9ca3af;' }}">
-                    No Item
-                </button>
+                {# Single hidden input stores comma-separated selected IDs #}
+                <input type="hidden" name="catalog_item_ids" id="catalog-item-ids-input"
+                       value="{{ _selected_ids|join(',') }}">
                 {% for item in catalog_items %}
+                {% set _active = item.id in _selected_ids %}
                 <button type="button" class="keypad-btn catalog-chip"
                         data-catalog-id="{{ item.id }}"
                         data-price="{{ item.price ?: '' }}"
                         style="flex-shrink:0;padding:4px 10px;border-radius:20px;border:1px solid;font-size:11px;font-weight:600;margin-right:6px;white-space:nowrap;
-                               {{ draft.get('catalog_item_id') == item.id
-                                  ? 'background:#7c3aed;border-color:#a78bfa;color:#fff;'
-                                  : 'background:#1f2937;border-color:#374151;color:#d1d5db;' }}">
-                    {{ item.name }}{% if item.price %} · {{ item.price|number_format(0) }}{% endif %}
+                               {{ _active ? 'background:#7c3aed;border-color:#a78bfa;color:#fff;' : 'background:#1f2937;border-color:#374151;color:#d1d5db;' }}">
+                    {{ item.name }}{% if item.price and terminal_settings.enable_pos_pricing %} · {{ item.price|number_format(0) }}{% endif %}
                 </button>
                 {% endfor %}
             </div>
@@ -303,27 +298,47 @@
     window.clearKey     = () => { raw = ''; render(); };
     render();
 
-    // ── Catalog chips ──
-    const catalogInput = document.getElementById('catalog-item-id-input');
+    // ── Catalog chips — multi-select ──
+    const catalogInput    = document.getElementById('catalog-item-ids-input');
+    const enablePricing   = {{ terminal_settings.enable_pos_pricing ? 'true' : 'false' }};
+    const selectedCatalog = new Set(
+        (catalogInput?.value || '').split(',').filter(Boolean).map(Number)
+    );
+
+    function syncCatalogChips() {
+        document.querySelectorAll('.catalog-chip').forEach(b => {
+            const id = parseInt(b.dataset.catalogId);
+            const on = selectedCatalog.has(id);
+            b.style.background  = on ? '#7c3aed' : '#1f2937';
+            b.style.borderColor = on ? '#a78bfa' : '#374151';
+            b.style.color       = on ? '#fff'    : '#d1d5db';
+        });
+        if (catalogInput) catalogInput.value = [...selectedCatalog].join(',');
+    }
+
     document.querySelectorAll('.catalog-chip').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.catalog-chip').forEach(b => {
-                b.style.background  = '#1f2937';
-                b.style.borderColor = '#374151';
-                b.style.color       = '#d1d5db';
-            });
-            btn.style.background  = '#7c3aed';
-            btn.style.borderColor = '#a78bfa';
-            btn.style.color       = '#fff';
-            if (catalogInput) catalogInput.value = btn.dataset.catalogId;
-            // Auto-fill amount if item has a price and amount is currently 0
-            const p = parseFloat(btn.dataset.price);
-            if (p > 0 && (parseInt(raw) || 0) === 0) {
-                raw = String(Math.round(p));
-                render();
+            const id = parseInt(btn.dataset.catalogId);
+            if (selectedCatalog.has(id)) {
+                selectedCatalog.delete(id);
+            } else {
+                selectedCatalog.add(id);
+            }
+            syncCatalogChips();
+            // Price pre-fill (only when pricing enabled and amount is still 0)
+            if (enablePricing && (parseInt(raw) || 0) === 0) {
+                let total = 0;
+                document.querySelectorAll('.catalog-chip').forEach(b => {
+                    const bid = parseInt(b.dataset.catalogId);
+                    if (selectedCatalog.has(bid)) {
+                        total += parseFloat(b.dataset.price) || 0;
+                    }
+                });
+                if (total > 0) { raw = String(Math.round(total)); render(); }
             }
         });
     });
+    syncCatalogChips();
 
     // Mouse-drag scroll on catalog row
     const catalogRow = document.getElementById('catalog-scroll');

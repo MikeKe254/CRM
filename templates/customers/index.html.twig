@@ -1,35 +1,333 @@
-{% extends 'base.html.twig' %}
+{% extends 'layouts/app.html.twig' %}
 
-{% block body %}
+{% block title %}All Customers · Patronr{% endblock %}
 
-<div class="min-h-screen bg-gray-100 p-10">
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = session.branch is defined and session.branch ? session.branch.slug : app.request.attributes.get('branch') %}
 
-    <h1 class="text-4xl font-bold mb-10">Customers</h1>
+{% block content %}
 
-    <p class="text-gray-600 mb-10">
-        If Turbo is working, this page loads instantly without a full browser refresh.
-    </p>
+{# ── Sample data notice ───────────────────────────────────────────────────── #}
+<div class="mb-5 flex items-center gap-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span><strong>Sample directory</strong> — all data on this page is illustrative. The real data layer is being built.</span>
+</div>
 
-    <div class="grid grid-cols-2 gap-6 mb-10">
+{# ── Page header ──────────────────────────────────────────────────────────── #}
+<div class="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+    <div>
+        <h1 class="text-xl font-bold text-gray-900">All Customers</h1>
+        <p class="text-sm text-gray-500 mt-0.5">Patronr CRM — Head Office Branch</p>
+    </div>
+    <div class="flex items-center gap-2 shrink-0">
+        <button class="h-9 px-3.5 text-sm font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 rounded-lg transition-colors inline-flex items-center gap-1.5">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+        </button>
+        <button class="h-9 px-3.5 text-sm font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 rounded-lg transition-colors inline-flex items-center gap-1.5">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="17 8 12 3 7 8"/><line x1="12" y1="3" x2="12" y2="15"/></svg>
+            Import
+        </button>
+        <button class="h-9 px-3.5 text-sm font-semibold text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors inline-flex items-center gap-1.5">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+            Add Customer
+        </button>
+    </div>
+</div>
 
-        <div class="bg-white p-6 rounded-xl shadow">
-            Customer A
-        </div>
+{# ── Summary KPI strip ─────────────────────────────────────────────────────── #}
+<div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-6">
 
-        <div class="bg-white p-6 rounded-xl shadow">
-            Customer B
-        </div>
-
-        <div class="bg-white p-6 rounded-xl shadow">
-            Customer C
-        </div>
-
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 mb-1">Total Customers</p>
+        <p class="text-2xl font-bold text-gray-900">1,284</p>
+        <p class="text-xs text-emerald-600 mt-1 font-medium">+38 this month</p>
     </div>
 
-    <a href="/dashboard" class="bg-blue-600 text-white px-6 py-3 rounded-lg hover:bg-blue-700 transition">
-        Back to Dashboard
-    </a>
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 mb-1">Active (30 days)</p>
+        <p class="text-2xl font-bold text-gray-900">642</p>
+        <p class="text-xs text-gray-400 mt-1">50.0% of total</p>
+    </div>
 
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 mb-1">Avg Lifetime Value</p>
+        <p class="text-2xl font-bold text-gray-900">KES 48.2K</p>
+        <p class="text-xs text-emerald-600 mt-1 font-medium">↑ 6.4% vs last quarter</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <p class="text-xs text-gray-500 mb-1">At-Risk Customers</p>
+        <p class="text-2xl font-bold text-amber-500">87</p>
+        <p class="text-xs text-gray-400 mt-1">No visit &gt; 45 days</p>
+    </div>
+
+</div>
+
+{# ── Main table card ───────────────────────────────────────────────────────── #}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+
+    {# Filter bar #}
+    <div class="flex flex-wrap items-center gap-3 px-4 py-3 border-b border-gray-100">
+
+        {# Search #}
+        <div class="relative">
+            <svg class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none" width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            <input type="text" id="cust-search" placeholder="Search name, phone, ID…"
+                   class="h-9 pl-8 pr-3 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 w-56">
+        </div>
+
+        {# Loyalty tier #}
+        <select class="h-9 pl-3 pr-8 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 appearance-none cursor-pointer">
+            <option value="">All Tiers</option>
+            <option value="platinum">Platinum</option>
+            <option value="gold">Gold</option>
+            <option value="silver">Silver</option>
+            <option value="bronze">Bronze</option>
+            <option value="member">Member</option>
+        </select>
+
+        {# Segment #}
+        <select class="h-9 pl-3 pr-8 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 appearance-none cursor-pointer">
+            <option value="">All Segments</option>
+            <option value="vip">VIP / Top 5%</option>
+            <option value="loyal">Loyal</option>
+            <option value="promising">Promising</option>
+            <option value="at_risk">At Risk</option>
+            <option value="churned">Churned</option>
+            <option value="new">New</option>
+        </select>
+
+        {# Status #}
+        <select class="h-9 pl-3 pr-8 border border-gray-300 rounded-lg text-sm text-gray-700 bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 appearance-none cursor-pointer">
+            <option value="">All Statuses</option>
+            <option value="active">Active</option>
+            <option value="at_risk">At Risk</option>
+            <option value="inactive">Inactive</option>
+            <option value="churned">Churned</option>
+        </select>
+
+        <span class="ml-auto text-xs text-gray-400 hidden sm:block">1,284 customers</span>
+    </div>
+
+    {# Table #}
+    <div class="overflow-x-auto">
+        <table class="w-full" id="cust-table">
+            <thead>
+                <tr class="border-b border-gray-100">
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 w-8">
+                        <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                    </th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Customer</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Loyalty</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Segment</th>
+                    <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Total Spend</th>
+                    <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Visits</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Last Visit</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Status</th>
+                    <th class="px-4 py-3 w-10"></th>
+                </tr>
+            </thead>
+            <tbody>
+
+            {# ── Row macro helpers ─────────────────────────────────────────── #}
+            {% set tier_class = {
+                'Platinum': 'bg-slate-100 text-slate-700',
+                'Gold':     'bg-amber-50 text-amber-700',
+                'Silver':   'bg-gray-100 text-gray-600',
+                'Bronze':   'bg-orange-50 text-orange-700',
+                'Member':   'bg-indigo-50 text-indigo-600',
+            } %}
+
+            {% set seg_class = {
+                'VIP':        'bg-purple-50 text-purple-700',
+                'Loyal':      'bg-emerald-50 text-emerald-700',
+                'Promising':  'bg-sky-50 text-sky-700',
+                'At Risk':    'bg-amber-50 text-amber-700',
+                'New':        'bg-indigo-50 text-indigo-700',
+                'Churned':    'bg-red-50 text-red-600',
+            } %}
+
+            {% set status_class = {
+                'Active':   'bg-emerald-50 text-emerald-700',
+                'At Risk':  'bg-amber-50 text-amber-700',
+                'Inactive': 'bg-gray-100 text-gray-500',
+                'Churned':  'bg-red-50 text-red-600',
+            } %}
+
+            {# ── Sample rows ───────────────────────────────────────────────── #}
+            {% set customers = [
+                { id: 1042, initials: 'JM', color: '#6366f1', name: 'James Mwangi',    phone: '+254 712 345 678', tier: 'Gold',     segment: 'VIP',       spend: 'KES 214,800', visits: 89,  last: '15 Apr 2026', status: 'Active'   },
+                { id: 1107, initials: 'AC', color: '#0ea5e9', name: 'Amina Charo',     phone: '+254 722 876 543', tier: 'Platinum', segment: 'VIP',       spend: 'KES 389,400', visits: 124, last: '16 Apr 2026', status: 'Active'   },
+                { id: 998,  initials: 'PO', color: '#10b981', name: 'Peter Otieno',    phone: '+254 733 210 987', tier: 'Silver',   segment: 'Loyal',     spend: 'KES 96,200',  visits: 41,  last: '12 Apr 2026', status: 'Active'   },
+                { id: 1213, initials: 'FK', color: '#f59e0b', name: 'Fatuma Kamau',    phone: '+254 700 654 321', tier: 'Gold',     segment: 'Loyal',     spend: 'KES 158,750', visits: 67,  last: '10 Apr 2026', status: 'Active'   },
+                { id: 874,  initials: 'DN', color: '#8b5cf6', name: 'David Njoroge',   phone: '+254 711 432 109', tier: 'Bronze',   segment: 'Promising', spend: 'KES 42,500',  visits: 18,  last: '8 Apr 2026',  status: 'Active'   },
+                { id: 1056, initials: 'GW', color: '#ec4899', name: 'Grace Wanjiku',   phone: '+254 728 765 432', tier: 'Silver',   segment: 'At Risk',   spend: 'KES 78,100',  visits: 29,  last: '24 Feb 2026', status: 'At Risk'  },
+                { id: 1188, initials: 'SO', color: '#14b8a6', name: 'Samuel Odhiambo', phone: '+254 742 098 765', tier: 'Member',   segment: 'New',       spend: 'KES 14,200',  visits: 6,   last: '13 Apr 2026', status: 'Active'   },
+                { id: 791,  initials: 'LK', color: '#f97316', name: 'Lydia Kariuki',   phone: '+254 756 321 654', tier: 'Platinum', segment: 'VIP',       spend: 'KES 472,600', visits: 188, last: '14 Apr 2026', status: 'Active'   },
+                { id: 1099, initials: 'BM', color: '#64748b', name: 'Brian Mutua',     phone: '+254 768 543 210', tier: 'Bronze',   segment: 'At Risk',   spend: 'KES 31,900',  visits: 14,  last: '15 Jan 2026', status: 'Inactive' },
+                { id: 1241, initials: 'NW', color: '#6366f1', name: 'Nancy Wairimu',   phone: '+254 719 876 098', tier: 'Gold',     segment: 'Promising', spend: 'KES 87,400',  visits: 33,  last: '11 Apr 2026', status: 'Active'   },
+                { id: 1003, initials: 'RM', color: '#a855f7', name: 'Robert Maina',    phone: '+254 734 567 890', tier: 'Silver',   segment: 'Loyal',     spend: 'KES 113,200', visits: 52,  last: '9 Apr 2026',  status: 'Active'   },
+                { id: 1162, initials: 'EA', color: '#ef4444', name: 'Esther Achieng',  phone: '+254 748 234 567', tier: 'Member',   segment: 'Churned',   spend: 'KES 8,500',   visits: 3,   last: '2 Oct 2025',  status: 'Churned'  },
+            ] %}
+
+            {% for c in customers %}
+            <tr class="border-b border-gray-50 hover:bg-gray-50 transition-colors group">
+
+                {# Checkbox #}
+                <td class="px-4 py-3">
+                    <input type="checkbox" class="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500">
+                </td>
+
+                {# Customer #}
+                <td class="px-4 py-3">
+                    <a href="{{ path('app_customer_profile', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: c.id}) }}" class="flex items-center gap-3 min-w-0">
+                        <div style="width:36px;height:36px;border-radius:50%;background:{{ c.color }};display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;color:#fff;flex-shrink:0;letter-spacing:0.02em;">
+                            {{ c.initials }}
+                        </div>
+                        <div class="min-w-0">
+                            <p class="text-sm font-semibold text-gray-900 group-hover:text-indigo-600 transition-colors truncate">{{ c.name }}</p>
+                            <p class="text-xs text-gray-400">{{ c.phone }} · #{{ c.id }}</p>
+                        </div>
+                    </a>
+                </td>
+
+                {# Loyalty tier #}
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded text-xs font-semibold {{ tier_class[c.tier]|default('bg-gray-100 text-gray-600') }}">
+                        {% if c.tier == 'Platinum' %}
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        {% elseif c.tier == 'Gold' %}
+                        <svg width="10" height="10" viewBox="0 0 24 24" fill="currentColor"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                        {% endif %}
+                        {{ c.tier }}
+                    </span>
+                </td>
+
+                {# Segment #}
+                <td class="px-4 py-3">
+                    <span class="inline-block px-2 py-0.5 rounded text-xs font-medium {{ seg_class[c.segment]|default('bg-gray-100 text-gray-600') }}">
+                        {{ c.segment }}
+                    </span>
+                </td>
+
+                {# Spend #}
+                <td class="px-4 py-3 text-right">
+                    <span class="text-sm font-semibold text-gray-800">{{ c.spend }}</span>
+                </td>
+
+                {# Visits #}
+                <td class="px-4 py-3 text-right">
+                    <span class="text-sm font-semibold text-gray-800">{{ c.visits }}</span>
+                </td>
+
+                {# Last visit #}
+                <td class="px-4 py-3">
+                    <span class="text-sm text-gray-600">{{ c.last }}</span>
+                </td>
+
+                {# Status #}
+                <td class="px-4 py-3">
+                    <span class="inline-block px-2 py-0.5 rounded-full text-xs font-semibold {{ status_class[c.status]|default('bg-gray-100 text-gray-500') }}">
+                        {{ c.status }}
+                    </span>
+                </td>
+
+                {# Actions #}
+                <td class="px-4 py-3">
+                    <a href="{{ path('app_customer_profile', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch, id: c.id}) }}"
+                       class="inline-flex items-center justify-center w-7 h-7 rounded-md text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 transition-colors opacity-0 group-hover:opacity-100">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>
+                    </a>
+                </td>
+
+            </tr>
+            {% endfor %}
+
+            </tbody>
+        </table>
+    </div>
+
+    {# Pagination footer #}
+    <div class="flex items-center justify-between px-4 py-3 border-t border-gray-100">
+        <p class="text-xs text-gray-400">Showing 1–12 of 1,284 customers</p>
+        <div class="flex items-center gap-1">
+            <button disabled class="h-7 w-7 flex items-center justify-center rounded-md border border-gray-200 text-gray-300 cursor-not-allowed">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="15 18 9 12 15 6"/></svg>
+            </button>
+            <button class="h-7 px-3 flex items-center justify-center rounded-md bg-indigo-600 text-white text-xs font-semibold">1</button>
+            <button class="h-7 px-3 flex items-center justify-center rounded-md text-gray-500 text-xs hover:bg-gray-100 transition-colors">2</button>
+            <button class="h-7 px-3 flex items-center justify-center rounded-md text-gray-500 text-xs hover:bg-gray-100 transition-colors">3</button>
+            <span class="text-xs text-gray-400 px-1">…</span>
+            <button class="h-7 px-3 flex items-center justify-center rounded-md text-gray-500 text-xs hover:bg-gray-100 transition-colors">107</button>
+            <button class="h-7 w-7 flex items-center justify-center rounded-md border border-gray-200 text-gray-500 hover:bg-gray-100 transition-colors">
+                <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="9 18 15 12 9 6"/></svg>
+            </button>
+        </div>
+    </div>
+
+</div>
+
+{# ── Segment breakdown cards ───────────────────────────────────────────────── #}
+<div class="mt-6 grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+
+    {% set segments = [
+        { label: 'VIP',        count: 64,  pct: '5.0',  color: 'bg-purple-100 text-purple-700',  bar: 'bg-purple-400' },
+        { label: 'Loyal',      count: 312, pct: '24.3', color: 'bg-emerald-100 text-emerald-700', bar: 'bg-emerald-400' },
+        { label: 'Promising',  count: 228, pct: '17.8', color: 'bg-sky-100 text-sky-700',         bar: 'bg-sky-400' },
+        { label: 'New',        count: 189, pct: '14.7', color: 'bg-indigo-100 text-indigo-700',   bar: 'bg-indigo-400' },
+        { label: 'At Risk',    count: 87,  pct: '6.8',  color: 'bg-amber-100 text-amber-700',     bar: 'bg-amber-400' },
+        { label: 'Churned',    count: 404, pct: '31.5', color: 'bg-red-100 text-red-600',         bar: 'bg-red-400' },
+    ] %}
+
+    {% for seg in segments %}
+    <div class="bg-white rounded-xl border border-gray-200 p-4">
+        <div class="flex items-center justify-between mb-2">
+            <span class="inline-block px-2 py-0.5 rounded text-xs font-semibold {{ seg.color }}">{{ seg.label }}</span>
+        </div>
+        <p class="text-2xl font-bold text-gray-900 mb-1">{{ seg.count }}</p>
+        <div class="w-full bg-gray-100 rounded-full h-1.5 mb-1">
+            <div class="{{ seg.bar }} h-1.5 rounded-full" style="width:{{ seg.pct }}%"></div>
+        </div>
+        <p class="text-xs text-gray-400">{{ seg.pct }}% of total</p>
+    </div>
+    {% endfor %}
+
+</div>
+
+{# ── Loyalty tier breakdown ────────────────────────────────────────────────── #}
+<div class="mt-4 bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-4 py-3 border-b border-gray-100 flex items-center justify-between">
+        <h2 class="text-sm font-semibold text-gray-800">Loyalty Tier Distribution</h2>
+        <span class="text-xs text-gray-400">All 1,284 customers</span>
+    </div>
+    <div class="px-4 py-4">
+        <div class="flex items-end gap-2 h-24 mb-3">
+            {% set tiers = [
+                { label: 'Platinum', count: 78,  pct: 78,  color: '#64748b' },
+                { label: 'Gold',     count: 196, pct: 100, color: '#f59e0b' },
+                { label: 'Silver',   count: 287, pct: 100, color: '#94a3b8' },
+                { label: 'Bronze',   count: 341, pct: 100, color: '#f97316' },
+                { label: 'Member',   count: 382, pct: 100, color: '#a5b4fc' },
+            ] %}
+            {# Normalize bars to the highest count = 382 #}
+            {% for t in tiers %}
+            <div class="flex flex-col items-center gap-1 flex-1">
+                <span class="text-xs font-semibold text-gray-700">{{ t.count }}</span>
+                <div style="width:100%;background:{{ t.color }};border-radius:4px 4px 0 0;height:{{ ((t.count / 382) * 72)|round }}px;"></div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="flex gap-2">
+            {% for t in tiers %}
+            <div class="flex-1 text-center">
+                <span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:{{ t.color }};margin-right:3px;vertical-align:middle;"></span>
+                <span class="text-xs text-gray-500">{{ t.label }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
 </div>
 
 {% endblock %}

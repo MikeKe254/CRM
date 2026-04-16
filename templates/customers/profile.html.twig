@@ -1,0 +1,558 @@
+{% extends 'layouts/app.html.twig' %}
+
+{% block title %}James Mwangi — Customer Profile · Patronr{% endblock %}
+
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = session.branch is defined and session.branch ? session.branch.slug : app.request.attributes.get('branch') %}
+
+{% block content %}
+
+{# ── Sample data notice ───────────────────────────────────────────────────── #}
+<div class="mb-5 flex items-center gap-2.5 px-4 py-2.5 bg-amber-50 border border-amber-200 rounded-xl text-xs text-amber-800">
+    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24" class="shrink-0"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span><strong>Sample profile</strong> — all data on this page is illustrative. The real data layer is being built.</span>
+</div>
+
+{# ── Back + Actions ───────────────────────────────────────────────────────── #}
+<div class="flex items-center justify-between mb-5">
+    <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+       class="inline-flex items-center gap-1.5 text-sm text-gray-500 hover:text-gray-900 transition-colors">
+        <svg width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/></svg>
+        All Customers
+    </a>
+    <div class="flex gap-2">
+        <button class="h-8 px-3 text-xs font-medium text-gray-600 border border-gray-200 bg-white hover:bg-gray-50 rounded-lg transition-colors inline-flex items-center gap-1.5">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+            Export
+        </button>
+        <button class="h-8 px-3 text-xs font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-lg transition-colors inline-flex items-center gap-1.5">
+            <svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+            Send Message
+        </button>
+    </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   HERO CARD — Identity + KPIs
+═══════════════════════════════════════════════════════════════════════════ #}
+<div class="bg-white rounded-2xl border border-gray-200 overflow-hidden mb-6">
+
+    {# Top gradient strip #}
+    <div style="height:6px;background:linear-gradient(90deg,#6366f1,#8b5cf6,#a78bfa);"></div>
+
+    <div class="p-6">
+        <div class="flex flex-col sm:flex-row sm:items-center gap-5">
+
+            {# Avatar #}
+            <div class="shrink-0 relative">
+                <div style="width:72px;height:72px;border-radius:50%;background:linear-gradient(135deg,#6366f1,#8b5cf6);display:flex;align-items:center;justify-content:center;font-size:26px;font-weight:700;color:#fff;letter-spacing:-0.02em;">
+                    JM
+                </div>
+                <div style="position:absolute;bottom:2px;right:2px;width:14px;height:14px;border-radius:50%;background:#10b981;border:2px solid #fff;"></div>
+            </div>
+
+            {# Name + badges #}
+            <div class="flex-1 min-w-0">
+                <div class="flex flex-wrap items-center gap-2 mb-1">
+                    <h1 class="text-xl font-bold text-gray-900">James Mwangi</h1>
+                    <span style="font-size:11px;font-weight:700;padding:2px 8px;background:rgba(245,158,11,0.15);color:#d97706;border-radius:20px;border:1px solid rgba(245,158,11,0.3);">
+                        ★ Gold Loyalty
+                    </span>
+                    <span style="font-size:11px;font-weight:600;padding:2px 8px;background:#f0fdf4;color:#16a34a;border-radius:20px;border:1px solid #bbf7d0;">
+                        ● Active
+                    </span>
+                </div>
+                <div class="flex flex-wrap gap-x-4 gap-y-1 text-sm text-gray-500">
+                    <span class="inline-flex items-center gap-1.5">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12a19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 3.6 1.18h3a2 2 0 0 1 2 1.72c.127.96.361 1.903.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6.29 6.29l.95-.95a2 2 0 0 1 2.11-.45c.907.339 1.85.573 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+                        +254 712 345 678
+                    </span>
+                    <span class="inline-flex items-center gap-1.5">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+                        james.mwangi@email.com
+                    </span>
+                    <span class="inline-flex items-center gap-1.5">
+                        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.5" viewBox="0 0 24 24"><rect x="3" y="4" width="18" height="18" rx="2"/><line x1="16" y1="2" x2="16" y2="6"/><line x1="8" y1="2" x2="8" y2="6"/><line x1="3" y1="10" x2="21" y2="10"/></svg>
+                        Member since Feb 2023
+                    </span>
+                    <span style="color:#9ca3af;font-size:12px;">ID #1042</span>
+                </div>
+            </div>
+
+            {# Ranking badge #}
+            <div class="shrink-0 text-center hidden sm:block">
+                <div style="width:64px;height:64px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(245,158,11,0.3);">
+                    <div style="font-size:11px;font-weight:700;color:#fff;line-height:1;">#12</div>
+                    <div style="font-size:9px;color:rgba(255,255,255,0.8);line-height:1.3;">of 1,284</div>
+                </div>
+                <div style="font-size:10px;color:#6b7280;margin-top:4px;">Top 1%</div>
+            </div>
+
+        </div>
+
+        {# KPI strip #}
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 pt-5 border-t border-gray-100">
+            <div class="text-center">
+                <div style="font-size:22px;font-weight:800;color:#1e1b4b;letter-spacing:-0.02em;">KES 94,200</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">Total Spend</div>
+                <div style="font-size:11px;color:#10b981;font-weight:600;margin-top:2px;">↑ +18% vs last year</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size:22px;font-weight:800;color:#1e1b4b;letter-spacing:-0.02em;">47</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">Total Visits</div>
+                <div style="font-size:11px;color:#10b981;font-weight:600;margin-top:2px;">↑ 3.9/month avg</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size:22px;font-weight:800;color:#1e1b4b;letter-spacing:-0.02em;">KES 2,004</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">Avg per Visit</div>
+                <div style="font-size:11px;color:#6366f1;font-weight:600;margin-top:2px;">↑ 2.3× branch avg</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size:22px;font-weight:800;color:#1e1b4b;letter-spacing:-0.02em;">6 days</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">Since Last Visit</div>
+                <div style="font-size:11px;color:#10b981;font-weight:600;margin-top:2px;">Last: 10 Apr 2026</div>
+            </div>
+        </div>
+    </div>
+</div>
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   MAIN GRID
+═══════════════════════════════════════════════════════════════════════════ #}
+<div class="grid grid-cols-1 lg:grid-cols-5 gap-6">
+
+{# ── LEFT COLUMN (3/5) ─────────────────────────────────────────────────── #}
+<div class="lg:col-span-3 space-y-6">
+
+    {# ── 3. Spending Metrics — trend chart ──────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900">Spending Metrics</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Monthly spend — last 12 months</p>
+            </div>
+            <div class="flex gap-4 text-xs text-right">
+                <div><div class="font-bold text-gray-900 text-sm">KES 12,200</div><div class="text-gray-400">Best month</div></div>
+                <div><div class="font-bold text-gray-900 text-sm">KES 5,400</div><div class="text-gray-400">Lowest</div></div>
+                <div><div class="font-bold text-emerald-600 text-sm">↑ Trending up</div><div class="text-gray-400">3-month</div></div>
+            </div>
+        </div>
+
+        {# SVG area chart — 12 months #}
+        <div style="position:relative;">
+            <svg viewBox="0 0 440 90" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:90px;overflow:visible;">
+                <defs>
+                    <linearGradient id="spendGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stop-color="#6366f1" stop-opacity="0.25"/>
+                        <stop offset="100%" stop-color="#6366f1" stop-opacity="0.02"/>
+                    </linearGradient>
+                </defs>
+                {# Grid lines #}
+                <line x1="0" y1="18" x2="440" y2="18" stroke="#f3f4f6" stroke-width="1"/>
+                <line x1="0" y1="44" x2="440" y2="44" stroke="#f3f4f6" stroke-width="1"/>
+                <line x1="0" y1="70" x2="440" y2="70" stroke="#f3f4f6" stroke-width="1"/>
+                {# Area fill — data: 5400,7800,6200,8900,7200,9100,10200,8400,11000,7600,9800,12200 #}
+                {# normalized to 80px height (y=82 baseline, y=2 top) — range 5400–12200=6800 #}
+                <path d="M0,82 L36,62 L76,71 L116,45 L156,61 L196,43 L236,31 L276,49 L316,22 L356,58 L396,34 L440,2 L440,82 Z"
+                      fill="url(#spendGrad)"/>
+                <path d="M0,82 L36,62 L76,71 L116,45 L156,61 L196,43 L236,31 L276,49 L316,22 L356,58 L396,34 L440,2"
+                      fill="none" stroke="#6366f1" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+                {# Data point dots #}
+                {% for pt in [
+                    [0,82],[36,62],[76,71],[116,45],[156,61],[196,43],[236,31],[276,49],[316,22],[356,58],[396,34],[440,2]
+                ] %}
+                <circle cx="{{ pt[0] }}" cy="{{ pt[1] }}" r="3" fill="#6366f1" stroke="#fff" stroke-width="1.5"/>
+                {% endfor %}
+                {# Highlight last point (Dec) #}
+                <circle cx="440" cy="2" r="5" fill="#6366f1" stroke="#fff" stroke-width="2"/>
+            </svg>
+
+            {# Month labels #}
+            <div class="flex justify-between mt-1 px-0.5">
+                {% for m in ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+                <span style="font-size:9px;color:#9ca3af;text-align:center;flex:1;">{{ m }}</span>
+                {% endfor %}
+            </div>
+        </div>
+    </div>
+
+    {# ── 2. Customer Timeline ───────────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900">Customer Timeline</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Most recent transactions — oldest last</p>
+            </div>
+            <a href="#" class="text-xs text-indigo-600 hover:text-indigo-800 font-medium">View all 47 →</a>
+        </div>
+
+        <div class="space-y-0">
+        {% set timeline = [
+            {date:'10 Apr 2026', time:'21:14', area:'VIP Lounge', service:'Whisky Premium', event:'Friday Night Jazz', amount:'KES 4,800', method:'M-Pesa', badge:'offer'},
+            {date:'04 Apr 2026', time:'19:42', area:'Main Bar',   service:'Cocktails',      event:'—',                 amount:'KES 1,600', method:'Card',   badge:''},
+            {date:'29 Mar 2026', time:'20:08', area:'VIP Lounge', service:'Whisky Premium', event:'End Month Special', amount:'KES 5,200', method:'M-Pesa', badge:'offer'},
+            {date:'22 Mar 2026', time:'18:55', area:'Terrace',    service:'Food & Drinks',  event:'—',                 amount:'KES 3,100', method:'Cash',   badge:''},
+            {date:'15 Mar 2026', time:'21:30', area:'Main Bar',   service:'Beers',          event:'Saturday DJ Night', amount:'KES 2,200', method:'M-Pesa', badge:'event'},
+            {date:'08 Mar 2026', time:'20:12', area:'VIP Lounge', service:'Whisky Premium', event:'—',                 amount:'KES 4,400', method:'Card',   badge:''},
+            {date:'01 Mar 2026', time:'19:00', area:'Terrace',    service:'Cocktails',      event:'End Month Special', amount:'KES 1,900', method:'M-Pesa', badge:'offer'},
+            {date:'22 Feb 2026', time:'21:05', area:'Main Bar',   service:'Beers',          event:'—',                 amount:'KES 1,100', method:'Cash',   badge:''},
+        ] %}
+        {% for txn in timeline %}
+        <div class="flex items-start gap-3 py-3 {{ not loop.last ? 'border-b border-gray-50' : '' }}">
+            <div class="shrink-0 mt-0.5" style="width:8px;height:8px;border-radius:50%;background:{{ txn.badge == 'offer' ? '#f59e0b' : txn.badge == 'event' ? '#6366f1' : '#d1d5db' }};margin-top:5px;"></div>
+            <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                    <span class="text-xs font-semibold text-gray-800">{{ txn.area }}</span>
+                    <span class="text-xs text-gray-400">·</span>
+                    <span class="text-xs text-gray-600">{{ txn.service }}</span>
+                    {% if txn.badge %}
+                    <span style="font-size:9px;font-weight:700;padding:1px 5px;background:{{ txn.badge == 'offer' ? 'rgba(245,158,11,0.12)' : 'rgba(99,102,241,0.12)' }};color:{{ txn.badge == 'offer' ? '#d97706' : '#6366f1' }};border-radius:8px;">
+                        {{ txn.badge == 'offer' ? 'Offer' : 'Event' }}
+                    </span>
+                    {% endif %}
+                </div>
+                {% if txn.event != '—' %}
+                <div class="text-xs text-gray-400 mt-0.5">{{ txn.event }}</div>
+                {% endif %}
+            </div>
+            <div class="shrink-0 text-right">
+                <div class="text-xs font-bold text-gray-900">{{ txn.amount }}</div>
+                <div class="text-xs text-gray-400">{{ txn.method }}</div>
+                <div class="text-xs text-gray-300">{{ txn.date }} {{ txn.time }}</div>
+            </div>
+        </div>
+        {% endfor %}
+        </div>
+    </div>
+
+    {# ── 11. Visit Timing Behavior ─────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <div class="mb-4">
+            <h3 class="text-sm font-semibold text-gray-900">Visit Timing Behavior</h3>
+            <p class="text-xs text-gray-400 mt-0.5">When this customer typically visits — darker = more frequent</p>
+        </div>
+
+        {# Heatmap: rows = time slots, cols = day of week #}
+        <div class="overflow-x-auto">
+            <table style="width:100%;border-collapse:collapse;font-size:10px;">
+                <thead>
+                    <tr>
+                        <th style="width:72px;color:#9ca3af;font-weight:500;text-align:left;padding:0 0 6px 0;"></th>
+                        {% for d in ['Mon','Tue','Wed','Thu','Fri','Sat','Sun'] %}
+                        <th style="color:#9ca3af;font-weight:600;text-align:center;padding:0 0 6px 0;">{{ d }}</th>
+                        {% endfor %}
+                    </tr>
+                </thead>
+                <tbody>
+                {# Each row: slot label, then 7 heat cells (0=none,1=low,2=med,3=high) #}
+                {% set heatmap = [
+                    {slot:'12pm–4pm', vals:[0,0,0,0,1,2,1]},
+                    {slot:'4pm–8pm',  vals:[0,0,1,1,3,3,2]},
+                    {slot:'8pm–12am', vals:[0,1,0,2,3,3,1]},
+                    {slot:'After 12', vals:[0,0,0,0,1,2,0]},
+                ] %}
+                {% for row in heatmap %}
+                <tr>
+                    <td style="color:#6b7280;padding:2px 0;font-size:10px;padding-right:8px;white-space:nowrap;">{{ row.slot }}</td>
+                    {% for v in row.vals %}
+                    <td style="padding:2px 2px;">
+                        <div style="height:22px;border-radius:4px;background:{{
+                            v == 3 ? '#4f46e5' :
+                            v == 2 ? '#a5b4fc' :
+                            v == 1 ? '#e0e7ff' :
+                            '#f3f4f6'
+                        }};"></div>
+                    </td>
+                    {% endfor %}
+                </tr>
+                {% endfor %}
+                </tbody>
+            </table>
+        </div>
+
+        <div class="flex items-center gap-3 mt-3">
+            <span style="font-size:10px;color:#9ca3af;">Frequency:</span>
+            {% for label, color in {None:'#f3f4f6', Low:'#e0e7ff', Medium:'#a5b4fc', High:'#4f46e5'} %}
+            <span class="inline-flex items-center gap-1">
+                <span style="display:inline-block;width:12px;height:12px;border-radius:3px;background:{{ color }};"></span>
+                <span style="font-size:10px;color:#6b7280;">{{ label }}</span>
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── 10. Growth & Engagement ───────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <div class="flex items-center justify-between mb-4">
+            <div>
+                <h3 class="text-sm font-semibold text-gray-900">Growth &amp; Engagement</h3>
+                <p class="text-xs text-gray-400 mt-0.5">Engagement score over time (0–100)</p>
+            </div>
+            <div class="text-right">
+                <div class="text-lg font-bold text-indigo-600">82<span class="text-xs font-normal text-gray-400">/100</span></div>
+                <div class="text-xs text-emerald-500 font-semibold">↑ +11 pts this month</div>
+            </div>
+        </div>
+        <svg viewBox="0 0 440 50" xmlns="http://www.w3.org/2000/svg" style="width:100%;height:50px;">
+            <defs>
+                <linearGradient id="engGrad" x1="0" y1="0" x2="0" y2="1">
+                    <stop offset="0%" stop-color="#10b981" stop-opacity="0.2"/>
+                    <stop offset="100%" stop-color="#10b981" stop-opacity="0"/>
+                </linearGradient>
+            </defs>
+            <path d="M0,38 L36,35 L76,40 L116,30 L156,28 L196,32 L236,22 L276,26 L316,18 L356,14 L396,12 L440,8 L440,50 L0,50 Z"
+                  fill="url(#engGrad)"/>
+            <path d="M0,38 L36,35 L76,40 L116,30 L156,28 L196,32 L236,22 L276,26 L316,18 L356,14 L396,12 L440,8"
+                  fill="none" stroke="#10b981" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"/>
+        </svg>
+        <div class="flex justify-between mt-1">
+            {% for m in ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'] %}
+            <span style="font-size:9px;color:#9ca3af;text-align:center;flex:1;">{{ m }}</span>
+            {% endfor %}
+        </div>
+    </div>
+
+</div>{# /left col #}
+
+{# ── RIGHT COLUMN (2/5) ────────────────────────────────────────────────── #}
+<div class="lg:col-span-2 space-y-4">
+
+    {# ── 1. Customer Identity ──────────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Customer Identity</h3>
+        <div class="space-y-2.5">
+            {% set identity = [
+                {label:'Customer ID',    value:'#1042'},
+                {label:'Phone',          value:'+254 712 345 678'},
+                {label:'Email',          value:'james.mwangi@email.com'},
+                {label:'First visit',    value:'14 Feb 2023'},
+                {label:'Last visit',     value:'10 Apr 2026'},
+                {label:'Primary area',   value:'VIP Lounge'},
+                {label:'Preferred time', value:'Fri/Sat evenings'},
+            ] %}
+            {% for row in identity %}
+            <div class="flex justify-between items-start">
+                <span style="font-size:11px;color:#9ca3af;">{{ row.label }}</span>
+                <span style="font-size:11px;font-weight:600;color:#374151;text-align:right;max-width:55%;">{{ row.value }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── 6. Customer Ranking ───────────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Customer Ranking</h3>
+
+        <div class="flex items-center gap-4 mb-4">
+            <div style="width:56px;height:56px;border-radius:50%;background:linear-gradient(135deg,#fbbf24,#f59e0b);display:flex;flex-direction:column;align-items:center;justify-content:center;box-shadow:0 4px 12px rgba(245,158,11,0.25);flex-shrink:0;">
+                <div style="font-size:14px;font-weight:800;color:#fff;line-height:1;">#12</div>
+                <div style="font-size:9px;color:rgba(255,255,255,0.8);">of 1,284</div>
+            </div>
+            <div>
+                <div style="font-size:13px;font-weight:700;color:#1e1b4b;">Top 1% spender</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">By total revenue contribution</div>
+            </div>
+        </div>
+
+        <div class="space-y-2">
+            {% for item in [
+                ['By total spend',    '#12 / 1,284', 98, '#6366f1'],
+                ['By visit frequency','#28 / 1,284', 96, '#8b5cf6'],
+                ['By avg spend/visit','#7 / 1,284',  99, '#f59e0b'],
+                ['By recency',        '#104 / 1,284',90, '#10b981'],
+            ] %}
+            <div>
+                <div class="flex justify-between mb-0.5">
+                    <span style="font-size:10px;color:#6b7280;">{{ item[0] }}</span>
+                    <span style="font-size:10px;font-weight:700;color:#374151;">{{ item[1] }}</span>
+                </div>
+                <div style="height:4px;background:#f3f4f6;border-radius:4px;">
+                    <div style="height:4px;border-radius:4px;background:{{ item[3] }};width:{{ item[2] }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── 7. Customer Loyalty & Lifecycle ──────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Loyalty &amp; Lifecycle</h3>
+
+        {# Lifecycle stage bar #}
+        <div class="flex rounded-lg overflow-hidden mb-4" style="height:28px;">
+            {% for item in [['New',10,false],['Growing',20,false],['Regular',20,false],['Loyal',20,true],['Champion',30,false]] %}
+            <div style="flex:{{ item[1] }};background:{{ item[2] ? '#4f46e5' : '#e0e7ff' }};display:flex;align-items:center;justify-content:center;">
+                <span style="font-size:9px;font-weight:{{ item[2] ? '700' : '500' }};color:{{ item[2] ? '#fff' : '#a5b4fc' }};white-space:nowrap;padding:0 2px;">{{ item[0] }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        <p style="font-size:11px;color:#6b7280;margin-bottom:12px;">Lifecycle stage: <strong style="color:#4f46e5;">Loyal</strong> — consistent high-value regular</p>
+
+        <div class="space-y-2.5">
+            {% for item in [
+                ['Loyalty tier',      'Gold',          '4,720 pts accumulated'],
+                ['Points balance',    '1,840 pts',     '≈ KES 920 redeemable'],
+                ['Times redeemed',    '6 times',       'Last: 22 Mar 2026'],
+                ['Member for',        '14 months',     'Since Feb 2023'],
+            ] %}
+            <div class="flex justify-between items-start">
+                <span style="font-size:11px;color:#9ca3af;">{{ item[0] }}</span>
+                <div class="text-right">
+                    <div style="font-size:11px;font-weight:700;color:#374151;">{{ item[1] }}</div>
+                    <div style="font-size:10px;color:#9ca3af;">{{ item[2] }}</div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── 5. Revenue Contribution ───────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Revenue Contribution</h3>
+        <div class="flex items-center gap-4 mb-3">
+            <div style="position:relative;width:60px;height:60px;flex-shrink:0;">
+                <svg viewBox="0 0 36 36" style="width:60px;height:60px;transform:rotate(-90deg);">
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#f3f4f6" stroke-width="3.5"/>
+                    <circle cx="18" cy="18" r="15.9" fill="none" stroke="#6366f1" stroke-width="3.5"
+                            stroke-dasharray="11.1 88.9" stroke-linecap="round"/>
+                </svg>
+                <div style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:800;color:#1e1b4b;">1.1%</div>
+            </div>
+            <div>
+                <div style="font-size:13px;font-weight:700;color:#1e1b4b;">1.1% of branch revenue</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">4.4× the average customer</div>
+                <div style="font-size:11px;color:#10b981;font-weight:600;margin-top:2px;">Top 5% contributor</div>
+            </div>
+        </div>
+        <div class="flex justify-between pt-2 border-t border-gray-100">
+            <div class="text-center">
+                <div style="font-size:13px;font-weight:700;color:#374151;">KES 8,300</div>
+                <div style="font-size:10px;color:#9ca3af;">Avg customer LTV</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size:13px;font-weight:700;color:#6366f1;">KES 94,200</div>
+                <div style="font-size:10px;color:#9ca3af;">This customer</div>
+            </div>
+            <div class="text-center">
+                <div style="font-size:13px;font-weight:700;color:#10b981;">11.4×</div>
+                <div style="font-size:10px;color:#9ca3af;">Multiplier</div>
+            </div>
+        </div>
+    </div>
+
+    {# ── 4. Visit Behavior ─────────────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Visit Behavior</h3>
+        <div class="grid grid-cols-2 gap-3">
+            {% for item in [
+                ['Frequency',    'Weekly',      '3.9 visits / month'],
+                ['Recency',      'Very recent', '6 days ago'],
+                ['Avg gap',      '7.6 days',    'Between visits'],
+                ['Longest gap',  '23 days',     'Feb–Mar 2025'],
+                ['Consistency',  'High',        'Visits every week'],
+                ['Peak day',     'Friday',      '38% of all visits'],
+            ] %}
+            <div style="background:#f9fafb;border-radius:10px;padding:10px;">
+                <div style="font-size:10px;color:#9ca3af;">{{ item[0] }}</div>
+                <div style="font-size:13px;font-weight:700;color:#1e1b4b;margin-top:2px;">{{ item[1] }}</div>
+                <div style="font-size:10px;color:#9ca3af;">{{ item[2] }}</div>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── 8. Churn Prediction ───────────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <div class="flex items-center justify-between mb-3">
+            <h3 class="text-sm font-semibold text-gray-900">Churn Prediction</h3>
+            <span style="font-size:11px;font-weight:700;padding:2px 8px;background:#f0fdf4;color:#16a34a;border-radius:20px;border:1px solid #bbf7d0;">
+                Low Risk
+            </span>
+        </div>
+
+        {# Risk gauge — simple bar #}
+        <div class="mb-3">
+            <div class="flex justify-between text-xs text-gray-400 mb-1">
+                <span>Churn probability</span><span class="font-semibold text-emerald-600">8%</span>
+            </div>
+            <div style="height:8px;background:#f3f4f6;border-radius:8px;">
+                <div style="height:8px;width:8%;background:linear-gradient(90deg,#10b981,#34d399);border-radius:8px;"></div>
+            </div>
+        </div>
+
+        <div class="space-y-1.5 mt-3">
+            <p style="font-size:10px;color:#9ca3af;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Risk factors</p>
+            {% for factor, direction in {
+                'Visit frequency': 'positive',
+                'Recency (6 days)': 'positive',
+                'Spend trend': 'positive',
+                'No visits 3+ weeks ago': 'neutral',
+            } %}
+            <div class="flex items-center gap-2">
+                <svg width="12" height="12" fill="none" stroke="{{ direction == 'positive' ? '#10b981' : '#9ca3af' }}" stroke-width="2.5" viewBox="0 0 24 24">
+                    {{ direction == 'positive' ? '<polyline points="20 6 9 17 4 12"/>' : '<line x1="5" y1="12" x2="19" y2="12"/>'|raw }}
+                </svg>
+                <span style="font-size:11px;color:#374151;">{{ factor }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+
+    {# ── 9. Customer Value Prediction ─────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Customer Value Prediction</h3>
+        <div class="space-y-3">
+            <div style="background:linear-gradient(135deg,rgba(99,102,241,0.08),rgba(139,92,246,0.06));border-radius:12px;padding:14px;border:1px solid rgba(99,102,241,0.12);">
+                <div style="font-size:10px;color:#6366f1;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Predicted next visit</div>
+                <div style="font-size:18px;font-weight:800;color:#1e1b4b;margin-top:4px;">14–16 Apr 2026</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">87% confidence — based on visit cadence</div>
+            </div>
+            <div style="background:linear-gradient(135deg,rgba(16,185,129,0.08),rgba(5,150,105,0.05));border-radius:12px;padding:14px;border:1px solid rgba(16,185,129,0.12);">
+                <div style="font-size:10px;color:#059669;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Predicted annual value</div>
+                <div style="font-size:18px;font-weight:800;color:#1e1b4b;margin-top:4px;">KES 118,000</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">↑ +25% vs current trailing 12 months</div>
+            </div>
+            <div style="background:linear-gradient(135deg,rgba(245,158,11,0.08),rgba(217,119,6,0.05));border-radius:12px;padding:14px;border:1px solid rgba(245,158,11,0.12);">
+                <div style="font-size:10px;color:#d97706;font-weight:700;text-transform:uppercase;letter-spacing:0.06em;">Predicted next spend</div>
+                <div style="font-size:18px;font-weight:800;color:#1e1b4b;margin-top:4px;">KES 2,400–3,100</div>
+                <div style="font-size:11px;color:#6b7280;margin-top:2px;">Based on similar Friday visits</div>
+            </div>
+        </div>
+    </div>
+
+    {# ── 12. Payment Behavior ──────────────────────────────────────────── #}
+    <div class="bg-white rounded-2xl border border-gray-200 p-5">
+        <h3 class="text-sm font-semibold text-gray-900 mb-3">Payment Behavior</h3>
+        <div class="space-y-2.5">
+            {% for item in [
+                ['M-Pesa',  58, '#22c55e'],
+                ['Card',    28, '#6366f1'],
+                ['Cash',    14, '#f59e0b'],
+            ] %}
+            <div>
+                <div class="flex justify-between mb-1">
+                    <span style="font-size:11px;color:#374151;font-weight:500;">{{ item[0] }}</span>
+                    <span style="font-size:11px;font-weight:700;color:#374151;">{{ item[1] }}%</span>
+                </div>
+                <div style="height:6px;background:#f3f4f6;border-radius:6px;">
+                    <div style="height:6px;background:{{ item[2] }};border-radius:6px;width:{{ item[1] }}%;"></div>
+                </div>
+            </div>
+            {% endfor %}
+        </div>
+        <div class="mt-4 pt-3 border-t border-gray-100">
+            <div style="font-size:10px;color:#9ca3af;margin-bottom:6px;font-weight:600;text-transform:uppercase;letter-spacing:0.06em;">Patterns</div>
+            <ul class="space-y-1">
+                <li style="font-size:11px;color:#6b7280;">● Pays with M-Pesa on weekdays</li>
+                <li style="font-size:11px;color:#6b7280;">● Uses card for large transactions (>KES 3k)</li>
+                <li style="font-size:11px;color:#6b7280;">● Never split payments</li>
+            </ul>
+        </div>
+    </div>
+
+</div>{# /right col #}
+
+</div>{# /main grid #}
+
+{% endblock %}

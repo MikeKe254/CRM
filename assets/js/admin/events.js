@@ -1,6 +1,6 @@
 // Admin — Events & Offers page
 
-const EVENTS_BASE = document.querySelector('[data-events-base]')?.dataset.eventsBase ?? '';
+const eventsBase = () => document.querySelector('[data-events-base]')?.dataset.eventsBase ?? '';
 
 // ── Page-level tab filter (All / Events / Offers) ─────────────────────────────
 let activeEntryType = '';
@@ -81,35 +81,15 @@ function buildFormHtml() {
                   class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"></textarea>
       </div>
 
-      <!-- Offer discount fields (hidden unless type=offer) -->
-      <div id="ev-offer-section" class="hidden space-y-3 p-3 bg-amber-50 border border-amber-200 rounded-lg">
-        <p class="text-xs font-semibold text-amber-800">Discount details</p>
-        <div class="grid grid-cols-2 gap-3">
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1">Discount type <span class="text-red-500">*</span></label>
-            <div class="flex gap-1.5">
-              <button type="button" data-dtype="percent" onclick="evSetDiscountType('percent')"
-                      class="ev-dtype-btn flex-1 h-8 rounded-lg border text-xs font-semibold transition-colors"
-                      style="background:#4f46e5;color:#fff;border-color:#4f46e5;">% Off</button>
-              <button type="button" data-dtype="fixed" onclick="evSetDiscountType('fixed')"
-                      class="ev-dtype-btn flex-1 h-8 rounded-lg border text-xs font-semibold transition-colors"
-                      style="background:#fff;color:#4b5563;border-color:#e5e7eb;">KES Off</button>
-            </div>
-            <input type="hidden" id="ev-discount-type" value="percent">
-          </div>
-          <div>
-            <label class="block text-xs font-semibold text-gray-700 mb-1" id="ev-disc-val-label">Amount (%) <span class="text-red-500">*</span></label>
-            <input id="ev-discount-value" type="number" min="0" step="0.01" placeholder="e.g. 20"
-                   class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400">
-          </div>
-        </div>
-        <div>
-          <label class="block text-xs font-semibold text-gray-700 mb-1">Applies to</label>
-          <select id="ev-applies-to" class="w-full h-9 px-3 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400 bg-white">
-            <option value="all">All items</option>
-            <option value="category">Specific category</option>
-            <option value="item">Specific item</option>
-          </select>
+      <!-- Offer notice (shown when type = offer) -->
+      <div id="ev-offer-section" class="hidden">
+        <div class="flex gap-2.5 p-3 bg-sky-50 border border-sky-200 rounded-lg">
+          <svg xmlns="http://www.w3.org/2000/svg" class="shrink-0 mt-0.5" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="#0369a1" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="16" x2="12" y2="12"/><line x1="12" y1="8" x2="12.01" y2="8"/></svg>
+          <p class="text-xs text-sky-800 leading-relaxed">
+            <strong>No discounts at the terminal.</strong> The amount your staff enters is assumed to be the
+            final amount — already post-discount. Offers are used for revenue classification and analytics
+            only; Patronr does not calculate or apply discounts at checkout.
+          </p>
         </div>
       </div>
 
@@ -241,19 +221,6 @@ window.evSetEntryType = function (type) {
     if (label) label.innerHTML = (type === 'offer' ? 'Offer Name' : 'Event Name') + ' <span class="text-red-500">*</span>';
 };
 
-// ── Discount type toggle ──────────────────────────────────────────────────────
-window.evSetDiscountType = function (dtype) {
-    document.getElementById('ev-discount-type').value = dtype;
-    document.querySelectorAll('.ev-dtype-btn').forEach(b => {
-        const on = b.dataset.dtype === dtype;
-        b.style.cssText = on
-            ? 'background:#4f46e5;color:#fff;border-color:#4f46e5;'
-            : 'background:#fff;color:#4b5563;border-color:#e5e7eb;';
-    });
-    const lbl = document.getElementById('ev-disc-val-label');
-    if (lbl) lbl.innerHTML = (dtype === 'percent' ? 'Amount (%)' : 'Amount (KES)') + ' <span class="text-red-500">*</span>';
-};
-
 // ── DOW toggle ────────────────────────────────────────────────────────────────
 window.evToggleDow = function (btn) {
     const on = btn.dataset.active === '1';
@@ -315,7 +282,7 @@ window.evSetMonthlyN = function (n) {
 };
 
 // ── Open Create ───────────────────────────────────────────────────────────────
-window.openCreate = function (defaultType = 'event') {
+window.openCreateEvent = function (defaultType = 'event') {
     openDrawer(
         defaultType === 'offer' ? 'Add Offer' : 'Add Event',
         buildFormHtml(),
@@ -345,15 +312,6 @@ window.openEditEvent = function (ev) {
     document.getElementById('ev-time-end').value    = ev.recurrence_time_end   ? ev.recurrence_time_end.substring(0, 5)   : '';
     document.getElementById('ev-valid-from').value  = ev.recurrence_valid_from  ?? '';
     document.getElementById('ev-valid-until').value = ev.recurrence_valid_until ?? '';
-
-    // Offer fields
-    if (entryType === 'offer') {
-        const dtype = ev.offer_discount_type ?? 'percent';
-        evSetDiscountType(dtype);
-        document.getElementById('ev-discount-value').value = ev.offer_discount_value ?? '';
-        const appEl = document.getElementById('ev-applies-to');
-        if (appEl) appEl.value = ev.offer_applies_to ?? 'all';
-    }
 
     const type = ev.recurrence_type || 'none';
     evSetRec(type);
@@ -405,13 +363,6 @@ window.submitEventForm = async function (mode, id) {
     params.append('description',      document.getElementById('ev-desc')?.value ?? '');
     params.append('recurrence_type',  type);
 
-    // Offer-specific
-    if (entryType === 'offer') {
-        params.append('offer_discount_type',  document.getElementById('ev-discount-type')?.value  ?? 'percent');
-        params.append('offer_discount_value', document.getElementById('ev-discount-value')?.value ?? '');
-        params.append('offer_applies_to',     document.getElementById('ev-applies-to')?.value     ?? 'all');
-    }
-
     // Schedule fields
     if (type === 'none') {
         const sa = document.getElementById('ev-starts-at')?.value;
@@ -440,7 +391,7 @@ window.submitEventForm = async function (mode, id) {
         }
     }
 
-    const url = mode === 'create' ? `${EVENTS_BASE}/create` : `${EVENTS_BASE}/${id}/update`;
+    const url = mode === 'create' ? `${eventsBase()}/create` : `${eventsBase()}/${id}/update`;
     await adminFetch(url, params, () => turboReload());
 };
 
@@ -456,7 +407,7 @@ window.setStatus = function (id, newStatus, name) {
         danger:      cancelling,
         onConfirm: async () => {
             const body = new URLSearchParams({ status: newStatus });
-            const res  = await fetch(`${EVENTS_BASE}/${id}/set-status`, { method: 'POST', body });
+            const res  = await fetch(`${eventsBase()}/${id}/set-status`, { method: 'POST', body });
             const data = await res.json();
             if (data.success) turboReload();
             else adminAlert({ title: 'Could not update status', message: data.message, type: 'error' });
@@ -472,7 +423,7 @@ window.deleteEvent = function (id, name) {
         confirmText: 'Delete',
         danger:      true,
         onConfirm: async () => {
-            const res  = await fetch(`${EVENTS_BASE}/${id}/delete`, { method: 'POST' });
+            const res  = await fetch(`${eventsBase()}/${id}/delete`, { method: 'POST' });
             const data = await res.json();
             if (data.success) document.getElementById(`event-row-${id}`)?.remove();
             else adminAlert({ title: 'Could not delete', message: data.message, type: 'error' });

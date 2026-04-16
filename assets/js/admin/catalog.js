@@ -1,7 +1,7 @@
 // Admin — Catalog page
 // BASE URL is passed via data-catalog-base on the page container.
 
-const BASE = document.querySelector('[data-catalog-base]')?.dataset.catalogBase ?? '';
+const catalogBase = () => document.querySelector('[data-catalog-base]')?.dataset.catalogBase ?? '';
 
 // ── Type filter ───────────────────────────────────────────────────────────────
 let activeType = '';
@@ -44,6 +44,7 @@ const F = (id, type, label, val = '', extra = '') =>
      </div>`;
 
 function catalogFormBody(item = {}) {
+    const showInTerminal = item.show_in_terminal !== undefined ? !!parseInt(item.show_in_terminal) : true;
     return `<div class="space-y-4">
       ${F('ci-name', 'text', 'Name <span class="text-red-500">*</span>', item.name ?? '', 'maxlength="120" required placeholder="e.g. Full Body Massage, Craft Beer"')}
       <div class="grid grid-cols-2 gap-3">
@@ -57,46 +58,75 @@ function catalogFormBody(item = {}) {
         ${F('ci-price', 'number', 'Default Price (KES, optional)', item.price ?? '', 'min="0" step="0.01" placeholder="e.g. 2500"')}
       </div>
       ${F('ci-cat', 'text', 'Category <span class="text-gray-400 font-normal">(optional)</span>', item.category ?? '', 'maxlength="80" placeholder="e.g. Food, Beverages, Wellness"')}
+      <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.625rem .875rem;border-radius:.5rem;border:1px solid #e5e7eb;background:#f9fafb;">
+        <div>
+          <p class="text-xs font-semibold text-gray-700">Show at terminal</p>
+          <p class="text-xs text-gray-400 mt-0.5">Appears on the checkout chip row for cashiers to tag transactions.</p>
+        </div>
+        <label style="position:relative;display:inline-flex;align-items:center;cursor:pointer;flex-shrink:0;">
+          <input type="checkbox" id="ci-terminal" value="1" ${showInTerminal ? 'checked' : ''}
+                 style="sr-only;position:absolute;opacity:0;width:0;height:0;">
+          <span id="ci-terminal-track"
+                style="width:36px;height:20px;border-radius:10px;transition:background .2s;background:${showInTerminal ? '#4f46e5' : '#d1d5db'};display:inline-block;position:relative;">
+            <span id="ci-terminal-knob"
+                  style="position:absolute;top:2px;width:16px;height:16px;border-radius:50%;background:#fff;transition:left .2s;left:${showInTerminal ? '18px' : '2px'};"></span>
+          </span>
+        </label>
+      </div>
       <div id="drawer-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
     </div>`;
 }
 
+function wireTerminalToggle() {
+    const cb    = document.getElementById('ci-terminal');
+    const track = document.getElementById('ci-terminal-track');
+    const knob  = document.getElementById('ci-terminal-knob');
+    if (!cb || !track || !knob) return;
+    cb.addEventListener('change', () => {
+        track.style.background = cb.checked ? '#4f46e5' : '#d1d5db';
+        knob.style.left        = cb.checked ? '18px'   : '2px';
+    });
+}
+
 // ── Create ────────────────────────────────────────────────────────────────────
-window.openCreate = function () {
+window.openCreateItem = function () {
     openDrawer(
-        'Add Catalog Item',
+        'Add Services & Items Entry',
         catalogFormBody(),
         `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-sm text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
-         <button data-primary onclick="submitCatalog(null)" class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Create Item</button>`,
+         <button data-primary onclick="submitCatalog(null)" class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Create</button>`,
     );
     document.getElementById('ci-name')?.focus();
+    wireTerminalToggle();
 };
 
 // ── Edit ──────────────────────────────────────────────────────────────────────
-window.openEdit = function (item) {
+window.openEditItem = function (item) {
     openDrawer(
-        'Edit Catalog Item',
+        'Edit Services & Items Entry',
         catalogFormBody(item),
         `<button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-sm text-gray-600 rounded-lg hover:bg-gray-50 transition-colors">Cancel</button>
          <button data-primary onclick="submitCatalog(${item.id})" class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">Save Changes</button>`,
     );
     document.getElementById('ci-name')?.focus();
+    wireTerminalToggle();
 };
 
 // ── Submit ────────────────────────────────────────────────────────────────────
 window.submitCatalog = async function (id) {
     const params = new URLSearchParams({
-        name:     document.getElementById('ci-name')?.value ?? '',
-        type:     document.getElementById('ci-type')?.value ?? 'service',
-        price:    document.getElementById('ci-price')?.value ?? '',
-        category: document.getElementById('ci-cat')?.value ?? '',
+        name:             document.getElementById('ci-name')?.value ?? '',
+        type:             document.getElementById('ci-type')?.value ?? 'service',
+        price:            document.getElementById('ci-price')?.value ?? '',
+        category:         document.getElementById('ci-cat')?.value ?? '',
+        show_in_terminal: document.getElementById('ci-terminal')?.checked ? '1' : '0',
     });
-    const url = id ? `${BASE}/${id}/update` : `${BASE}/create`;
+    const url = id ? `${catalogBase()}/${id}/update` : `${catalogBase()}/create`;
     await adminFetch(url, params, () => turboReload());
 };
 
 // ── Toggle Status ─────────────────────────────────────────────────────────────
-window.toggleStatus = function (id, currentStatus, name) {
+window.toggleItemStatus = function (id, currentStatus, name) {
     const label = currentStatus === 'active' ? 'Deactivate' : 'Activate';
     adminConfirm({
         title:       label + ' item',
@@ -104,7 +134,7 @@ window.toggleStatus = function (id, currentStatus, name) {
         confirmText: label,
         danger:      currentStatus === 'active',
         onConfirm: async () => {
-            const res  = await fetch(`${BASE}/${id}/toggle-status`, { method: 'POST' });
+            const res  = await fetch(`${catalogBase()}/${id}/toggle-status`, { method: 'POST' });
             const data = await res.json();
             if (data.success) turboReload();
             else adminAlert({ title: 'Could not update status', message: data.message, type: 'error' });
@@ -120,7 +150,7 @@ window.deleteItem = function (id, name) {
         confirmText: 'Delete',
         danger:      true,
         onConfirm: async () => {
-            const res  = await fetch(`${BASE}/${id}/delete`, { method: 'POST' });
+            const res  = await fetch(`${catalogBase()}/${id}/delete`, { method: 'POST' });
             const data = await res.json();
             if (data.success) document.getElementById(`catalog-row-${id}`)?.remove();
             else adminAlert({ title: 'Could not delete item', message: data.message, type: 'error' });

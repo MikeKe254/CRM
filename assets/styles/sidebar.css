@@ -21,6 +21,10 @@
 
 #sidebar.collapsed { width: 56px; }
 
+/* Scroll container for nav links. Must be position:relative so offsetParent
+   chain from any child link terminates here — needed for restoreNavScroll(). */
+#sidebar-nav { position: relative; }
+
 /* ── OVERLAY ────────────────────────────────────────────── */
 
 #sidebar-overlay {

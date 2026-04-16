@@ -107,16 +107,28 @@ class CheckoutController extends AbstractController
             ['branch_id' => $ctx['session']->branch->id],
         );
 
-        $catalogItems  = $this->catalog->listActiveForTerminal($ctx['session']->branch->id);
-        $activeEvents  = $this->eventService->findAllActive($ctx['session']->branch->id);
+        // Load terminal settings for this branch
+        $terminalSettings = $this->db->fetchAssociative(
+            'SELECT enable_pos_pricing, show_events_at_terminal
+               FROM pos_terminal_settings
+              WHERE company_id = :company_id AND branch_id = :branch_id
+              LIMIT 1',
+            ['company_id' => $ctx['session']->company->id, 'branch_id' => $ctx['session']->branch->id],
+        ) ?: ['enable_pos_pricing' => 0, 'show_events_at_terminal' => 1];
+
+        $catalogItems = $this->catalog->listActiveForTerminal($ctx['session']->branch->id);
+        $activeEvents = $terminalSettings['show_events_at_terminal']
+            ? $this->eventService->findAllActive($ctx['session']->branch->id)
+            : [];
 
         return $this->render('terminal/checkout/step1_info.html.twig', [
-            'draft'          => $draft,
-            'areas'          => $areas,
-            'catalog_items'  => $catalogItems,
-            'active_events'  => $activeEvents,
-            'can_discount'   => $this->can->check($ctx['session'], 'apply_discount'),
-            'route_params'   => $ctx['route_params'],
+            'draft'             => $draft,
+            'areas'             => $areas,
+            'catalog_items'     => $catalogItems,
+            'active_events'     => $activeEvents,
+            'terminal_settings' => $terminalSettings,
+            'can_discount'      => $this->can->check($ctx['session'], 'apply_discount'),
+            'route_params'      => $ctx['route_params'],
         ]);
     }
 
@@ -128,11 +140,17 @@ class CheckoutController extends AbstractController
             return $ctx;
         }
 
-        $amount         = (int) $request->request->get('amount', 0);
-        $areaId         = $request->request->get('area_id') ? (int) $request->request->get('area_id') : null;
-        $description    = trim((string) $request->request->get('description', ''));
-        $catalogItemId  = $request->request->get('catalog_item_id') ? (int) $request->request->get('catalog_item_id') : null;
-        $eventId        = $request->request->get('event_id') ? (int) $request->request->get('event_id') : null;
+        $amount       = (int) $request->request->get('amount', 0);
+        $areaId       = $request->request->get('area_id') ? (int) $request->request->get('area_id') : null;
+        $description  = trim((string) $request->request->get('description', ''));
+        $eventId      = $request->request->get('event_id') ? (int) $request->request->get('event_id') : null;
+
+        // Multi-select catalog items — submitted as catalog_item_ids (comma-separated string)
+        $catalogItemIdsRaw = trim((string) $request->request->get('catalog_item_ids', ''));
+        $catalogItemIds    = $catalogItemIdsRaw !== ''
+            ? array_values(array_filter(array_map('intval', explode(',', $catalogItemIdsRaw)), fn($id) => $id > 0))
+            : [];
+        $catalogItemId     = !empty($catalogItemIds) ? $catalogItemIds[0] : null;
         $coversRaw      = $request->request->get('covers', '');
         $covers         = ($coversRaw !== '' && ctype_digit((string) $coversRaw)) ? (int) $coversRaw : null;
 
@@ -166,6 +184,7 @@ class CheckoutController extends AbstractController
                 'area_id'          => $areaId,
                 'description'      => $description !== '' ? $description : null,
                 'catalog_item_id'  => $catalogItemId,
+                'catalog_item_ids' => $catalogItemIds,
                 'event_id'         => $eventId,
                 'covers'           => $covers,
             ],
@@ -338,8 +357,9 @@ class CheckoutController extends AbstractController
                 }
             }
 
-            // Resolve revenue_source_type from draft catalog_item_id
+            // Resolve revenue_source_type from draft catalog_item_id (primary / first)
             $draftCatalogId       = $draft->get('catalog_item_id') ? (int) $draft->get('catalog_item_id') : null;
+            $draftCatalogIds      = is_array($draft->get('catalog_item_ids')) ? $draft->get('catalog_item_ids') : [];
             $revenueSourceType    = $draftCatalogId ? 'catalog_item' : null;
 
             // Discount fields from draft
@@ -367,6 +387,20 @@ class CheckoutController extends AbstractController
                 discountReason:      $draft->get('discount_reason'),
                 discountByUserId:    $draftDiscountAmount > 0 ? $ctx['session']->user->id : null,
             );
+
+            // Write multi-item junction rows if the table exists (segment 40)
+            if (!empty($draftCatalogIds) && count($draftCatalogIds) > 1) {
+                try {
+                    foreach ($draftCatalogIds as $ciId) {
+                        $this->db->executeStatement(
+                            'INSERT IGNORE INTO pos_transaction_catalog_items (transaction_id, catalog_item_id) VALUES (?, ?)',
+                            [$txnId, $ciId],
+                        );
+                    }
+                } catch (\Throwable) {
+                    // Junction table not yet applied — silently skip until segment 40 runs
+                }
+            }
 
             $this->checkout->advanceDraft(
                 terminalIdentifier: $ctx['terminal'],

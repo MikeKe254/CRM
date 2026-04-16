@@ -1,6 +1,6 @@
 // Admin — Areas page
 
-const AREAS_BASE = document.querySelector('[data-areas-base]')?.dataset.areasBase ?? '';
+const areasBase = () => document.querySelector('[data-areas-base]')?.dataset.areasBase ?? '';
 
 document.getElementById('area-search')?.addEventListener('input', function () {
     const q = this.value.toLowerCase();
@@ -31,7 +31,7 @@ function areaFormBody(area = {}) {
         <input id="ar-trans" type="checkbox" ${trans} class="w-4 h-4 accent-indigo-600">
         <div>
           <div class="text-sm font-medium text-gray-800">Transactional area</div>
-          <div class="text-xs text-gray-400">Customers make payments in this area</div>
+          <div class="text-xs text-gray-400">Transaction data is captured in this area</div>
         </div>
       </label>
       <div id="drawer-error" class="hidden text-xs text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2"></div>
@@ -39,7 +39,7 @@ function areaFormBody(area = {}) {
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────
-window.openCreate = function () {
+window.openCreateArea = function () {
     openDrawer(
         'Add Area',
         areaFormBody(),
@@ -50,7 +50,7 @@ window.openCreate = function () {
 };
 
 // ── Edit ──────────────────────────────────────────────────────────────────────
-window.openEdit = function (area) {
+window.openEditArea = function (area) {
     openDrawer(
         'Edit Area',
         areaFormBody(area),
@@ -67,12 +67,12 @@ window.submitArea = async function (id) {
         description:      document.getElementById('ar-desc')?.value ?? '',
         is_transactional: document.getElementById('ar-trans')?.checked ? '1' : '0',
     });
-    const url = id ? `${AREAS_BASE}/${id}/update` : `${AREAS_BASE}/create`;
+    const url = id ? `${areasBase()}/${id}/update` : `${areasBase()}/create`;
     await adminFetch(url, params, () => turboReload());
 };
 
 // ── Toggle Status ─────────────────────────────────────────────────────────────
-window.toggleStatus = function (id, currentStatus, name) {
+window.toggleAreaStatus = function (id, currentStatus, name) {
     const label = currentStatus === 'active' ? 'Deactivate' : 'Activate';
     adminConfirm({
         title:       label + ' area',
@@ -80,7 +80,7 @@ window.toggleStatus = function (id, currentStatus, name) {
         confirmText: label,
         danger:      currentStatus === 'active',
         onConfirm: async () => {
-            const res  = await fetch(`${AREAS_BASE}/${id}/toggle-status`, { method: 'POST' });
+            const res  = await fetch(`${areasBase()}/${id}/toggle-status`, { method: 'POST' });
             const data = await res.json();
             if (data.success) turboReload();
             else adminAlert({ title: 'Could not update status', message: data.message, type: 'error' });
@@ -96,7 +96,7 @@ window.deleteArea = function (id, name) {
         confirmText: 'Delete',
         danger:      true,
         onConfirm: async () => {
-            const res  = await fetch(`${AREAS_BASE}/${id}/delete`, { method: 'POST' });
+            const res  = await fetch(`${areasBase()}/${id}/delete`, { method: 'POST' });
             const data = await res.json();
             if (data.success) document.getElementById(`area-row-${id}`)?.remove();
             else adminAlert({ title: 'Could not delete area', message: data.message, type: 'error' });

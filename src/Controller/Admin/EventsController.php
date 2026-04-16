@@ -90,23 +90,6 @@ class EventsController extends AdminBaseController
             return $this->error('Invalid recurrence type.');
         }
 
-        // Offer-specific fields
-        $offerDiscountType  = null;
-        $offerDiscountValue = null;
-        $offerAppliesTo     = 'all';
-        if ($entryType === 'offer') {
-            $offerDiscountType = $request->request->get('offer_discount_type', 'percent');
-            if (!in_array($offerDiscountType, ['percent', 'fixed'], true)) {
-                return $this->error('Invalid discount type.');
-            }
-            $rawValue = (float) $request->request->get('offer_discount_value', 0);
-            if ($rawValue <= 0) return $this->error('Discount value must be greater than zero.');
-            if ($offerDiscountType === 'percent' && $rawValue > 100) return $this->error('Percentage cannot exceed 100.');
-            $offerDiscountValue = $rawValue;
-            $offerAppliesTo = $request->request->get('offer_applies_to', 'all');
-            if (!in_array($offerAppliesTo, ['all', 'category', 'item'], true)) $offerAppliesTo = 'all';
-        }
-
         // One-off fields
         $startsAt = null;
         $endsAt   = null;
@@ -183,9 +166,6 @@ class EventsController extends AdminBaseController
             $recurrenceValidUntil,
             $recurrenceMonthlyDay,
             $entryType,
-            $offerDiscountType,
-            $offerDiscountValue,
-            $offerAppliesTo,
         );
 
         $this->activityLog->record($session, 'event.created', [
@@ -220,23 +200,6 @@ class EventsController extends AdminBaseController
         if (strlen($name) > 120) return $this->error('Name must be 120 characters or fewer.');
         if (!in_array($recurrenceType, ['none', 'daily', 'weekly', 'biweekly', 'monthly'], true)) {
             return $this->error('Invalid recurrence type.');
-        }
-
-        // Offer-specific fields
-        $offerDiscountType  = null;
-        $offerDiscountValue = null;
-        $offerAppliesTo     = 'all';
-        if ($entryType === 'offer') {
-            $offerDiscountType = $request->request->get('offer_discount_type', 'percent');
-            if (!in_array($offerDiscountType, ['percent', 'fixed'], true)) {
-                return $this->error('Invalid discount type.');
-            }
-            $rawValue = (float) $request->request->get('offer_discount_value', 0);
-            if ($rawValue <= 0) return $this->error('Discount value must be greater than zero.');
-            if ($offerDiscountType === 'percent' && $rawValue > 100) return $this->error('Percentage cannot exceed 100.');
-            $offerDiscountValue = $rawValue;
-            $offerAppliesTo = $request->request->get('offer_applies_to', 'all');
-            if (!in_array($offerAppliesTo, ['all', 'category', 'item'], true)) $offerAppliesTo = 'all';
         }
 
         $startsAt = null;
@@ -314,9 +277,6 @@ class EventsController extends AdminBaseController
             $recurrenceValidUntil,
             $recurrenceMonthlyDay,
             $entryType,
-            $offerDiscountType,
-            $offerDiscountValue,
-            $offerAppliesTo,
         );
 
         $this->activityLog->record($session, 'event.updated', [

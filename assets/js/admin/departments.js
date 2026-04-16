@@ -1,6 +1,6 @@
 // Admin — Departments page
 
-const DEPTS_BASE = document.querySelector('[data-depts-base]')?.dataset.deptsBase ?? '';
+const deptsBase = () => document.querySelector('[data-depts-base]')?.dataset.deptsBase ?? '';
 
 document.getElementById('dept-search')?.addEventListener('input', function () {
     const q = this.value.toLowerCase();
@@ -31,7 +31,7 @@ function deptFormBody(dept = {}) {
 }
 
 // ── Create ────────────────────────────────────────────────────────────────────
-window.openCreate = function () {
+window.openCreateDept = function () {
     openDrawer(
         'Add Department',
         deptFormBody(),
@@ -42,7 +42,7 @@ window.openCreate = function () {
 };
 
 // ── Edit ──────────────────────────────────────────────────────────────────────
-window.openEdit = function (dept) {
+window.openEditDept = function (dept) {
     openDrawer(
         'Edit Department',
         deptFormBody(dept),
@@ -58,12 +58,12 @@ window.submitDept = async function (id) {
         name:        document.getElementById('dp-name')?.value ?? '',
         description: document.getElementById('dp-desc')?.value ?? '',
     });
-    const url = id ? `${DEPTS_BASE}/${id}/update` : `${DEPTS_BASE}/create`;
+    const url = id ? `${deptsBase()}/${id}/update` : `${deptsBase()}/create`;
     await adminFetch(url, params, () => turboReload());
 };
 
 // ── Toggle Status ─────────────────────────────────────────────────────────────
-window.toggleStatus = function (id, currentStatus, name) {
+window.toggleDeptStatus = function (id, currentStatus, name) {
     const label = currentStatus === 'active' ? 'Deactivate' : 'Activate';
     adminConfirm({
         title:       label + ' department',
@@ -71,7 +71,7 @@ window.toggleStatus = function (id, currentStatus, name) {
         confirmText: label,
         danger:      currentStatus === 'active',
         onConfirm: async () => {
-            const res  = await fetch(`${DEPTS_BASE}/${id}/toggle-status`, { method: 'POST' });
+            const res  = await fetch(`${deptsBase()}/${id}/toggle-status`, { method: 'POST' });
             const data = await res.json();
             if (data.success) turboReload();
             else adminAlert({ title: 'Could not update status', message: data.message, type: 'error' });
@@ -87,7 +87,7 @@ window.deleteDept = function (id, name) {
         confirmText: 'Delete',
         danger:      true,
         onConfirm: async () => {
-            const res  = await fetch(`${DEPTS_BASE}/${id}/delete`, { method: 'POST' });
+            const res  = await fetch(`${deptsBase()}/${id}/delete`, { method: 'POST' });
             const data = await res.json();
             if (data.success) document.getElementById(`dept-row-${id}`)?.remove();
             else adminAlert({ title: 'Could not delete department', message: data.message, type: 'error' });

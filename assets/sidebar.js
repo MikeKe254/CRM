@@ -149,6 +149,29 @@ function initGroups() {
     });
 }
 
+// ── SIDEBAR NAV SCROLL — scroll active link into view ────────────────────────
+//
+// After the group expand transition completes (220 ms), getBoundingClientRect
+// returns accurate positions. We then smooth-scroll #sidebar-nav to centre
+// the active link. The delay is invisible on a hard refresh (the page is still
+// settling) and feels like a gentle, intentional glide on Turbo navigation.
+
+function restoreNavScroll() {
+    const nav = document.getElementById('sidebar-nav');
+    if (!nav) return;
+
+    const active = nav.querySelector('.sidebar-link.active, .sidebar-sublink.active');
+    if (!active) return;
+
+    setTimeout(() => {
+        const navRect  = nav.getBoundingClientRect();
+        const linkRect = active.getBoundingClientRect();
+        const target   = nav.scrollTop + (linkRect.top - navRect.top)
+                         - nav.clientHeight / 2 + active.clientHeight / 2;
+        nav.scrollTo({ top: Math.max(0, target), behavior: 'smooth' });
+    }, 240);
+}
+
 // ── INIT — runs on every Turbo navigation AND the first page load ─────────────
 //
 // Turbo does not re-execute cached JS modules on navigation, so a bare init()
@@ -172,6 +195,7 @@ function init() {
         if (overlay) overlay.classList.remove('visible');
         if (main) main.classList.remove('collapsed');
         initGroups();
+        restoreNavScroll();
         return;
     }
 
@@ -185,6 +209,7 @@ function init() {
     }
 
     initGroups();
+    restoreNavScroll();
 }
 
 document.addEventListener('turbo:load', init);

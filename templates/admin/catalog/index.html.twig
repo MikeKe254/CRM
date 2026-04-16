@@ -2,8 +2,8 @@
 {% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
 {% set tenant_domain = currentDomain() %}
 {% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
-{% block admin_title %}Catalog{% endblock %}
-{% block admin_subtitle %}Services and products — tag transactions to track revenue by what was sold{% endblock %}
+{% block admin_title %}Services &amp; Items{% endblock %}
+{% block admin_subtitle %}Tag transactions to classify what generated each sale — not a product or inventory system{% endblock %}
 
 {% block admin_actions %}
 <a href="?inactive={{ showInactive ? '0' : '1' }}"
@@ -11,7 +11,7 @@
     {{ showInactive ? 'Hide inactive' : 'Show inactive' }}
 </a>
 {% if can.create %}
-<button onclick="openCreate()"
+<button onclick="openCreateItem()"
         class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
     + Add Item
 </button>
@@ -46,6 +46,7 @@
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Item</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden sm:table-cell">Type</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden md:table-cell">Price</th>
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden md:table-cell">Terminal</th>
                     <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3 hidden sm:table-cell">Status</th>
                     <th class="px-4 py-3"></th>
                 </tr>
@@ -96,6 +97,13 @@
                         <span class="text-xs text-gray-400">—</span>
                     {% endif %}
                 </td>
+                <td class="px-4 py-3 hidden md:table-cell whitespace-nowrap">
+                    {% if item.show_in_terminal %}
+                        <span class="text-xs bg-indigo-50 text-indigo-600 px-2 py-0.5 rounded font-semibold">Shown</span>
+                    {% else %}
+                        <span class="text-xs bg-gray-100 text-gray-400 px-2 py-0.5 rounded font-semibold">Hidden</span>
+                    {% endif %}
+                </td>
                 <td class="px-4 py-3 hidden sm:table-cell whitespace-nowrap">
                     {% if item.status == 'active' %}
                         <span class="text-xs bg-emerald-50 text-emerald-700 px-2 py-0.5 rounded font-semibold">Active</span>
@@ -106,9 +114,9 @@
                 <td class="px-4 py-3 whitespace-nowrap">
                     <div class="flex items-center justify-end gap-1">
                         {% if can.edit %}
-                        <button onclick="openEdit({{ item|json_encode|e('html_attr') }})"
+                        <button onclick="openEditItem({{ item|json_encode|e('html_attr') }})"
                                 class="text-xs text-indigo-600 border border-indigo-200 bg-white hover:bg-indigo-50 px-2.5 py-1 rounded transition-colors">Edit</button>
-                        <button onclick="toggleStatus({{ item.id }}, '{{ item.status }}', '{{ item.name|e('js') }}')"
+                        <button onclick="toggleItemStatus({{ item.id }}, '{{ item.status }}', '{{ item.name|e('js') }}')"
                                 class="text-xs {{ item.status == 'active' ? 'text-amber-600 border-amber-200 hover:bg-amber-50' : 'text-emerald-600 border-emerald-200 hover:bg-emerald-50' }} border bg-white px-2.5 py-1 rounded transition-colors hidden sm:inline-flex">
                             {{ item.status == 'active' ? 'Deactivate' : 'Activate' }}
                         </button>
@@ -121,7 +129,7 @@
                 </td>
             </tr>
             {% else %}
-            <tr><td colspan="5" class="px-4 py-12 text-center text-sm text-gray-400">No catalog items found. Add services and products to classify revenue.</td></tr>
+            <tr><td colspan="6" class="px-4 py-12 text-center text-sm text-gray-400">No items found. Add services and products to classify revenue.</td></tr>
             {% endfor %}
             </tbody>
         </table>

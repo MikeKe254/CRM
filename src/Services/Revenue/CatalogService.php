@@ -33,7 +33,7 @@ final class CatalogService
         $statusFilter = $includeInactive ? '' : "AND ci.status = 'active'";
 
         return $this->db->fetchAllAssociative(
-            "SELECT ci.id, ci.name, ci.category, ci.type, ci.price, ci.status, ci.created_at
+            "SELECT ci.id, ci.name, ci.category, ci.type, ci.price, ci.show_in_terminal, ci.status, ci.created_at
                FROM catalog_items ci
               WHERE ci.company_id = :company_id
                 AND ci.branch_id  = :branch_id
@@ -55,9 +55,10 @@ final class CatalogService
         return $this->db->fetchAllAssociative(
             "SELECT id, name, category, type, price
                FROM catalog_items
-              WHERE branch_id  = :branch_id
-                AND status     = 'active'
-                AND deleted_at IS NULL
+              WHERE branch_id       = :branch_id
+                AND status          = 'active'
+                AND show_in_terminal = 1
+                AND deleted_at      IS NULL
               ORDER BY category ASC, name ASC",
             ['branch_id' => $branchId],
         );
@@ -85,15 +86,17 @@ final class CatalogService
         string $type,
         ?string $category,
         ?float $price,
+        bool $showInTerminal = true,
     ): int {
         $this->db->insert('catalog_items', [
-            'company_id' => $companyId,
-            'branch_id'  => $branchId,
-            'name'       => $name,
-            'type'       => $type,
-            'category'   => $category,
-            'price'      => $price,
-            'status'     => 'active',
+            'company_id'       => $companyId,
+            'branch_id'        => $branchId,
+            'name'             => $name,
+            'type'             => $type,
+            'category'         => $category,
+            'price'            => $price,
+            'show_in_terminal' => $showInTerminal ? 1 : 0,
+            'status'           => 'active',
         ]);
 
         return (int) $this->db->lastInsertId();
@@ -107,19 +110,22 @@ final class CatalogService
         string $type,
         ?string $category,
         ?float $price,
+        bool $showInTerminal = true,
     ): void {
         $this->db->executeStatement(
             'UPDATE catalog_items
-                SET name = :name, type = :type, category = :category, price = :price
+                SET name = :name, type = :type, category = :category,
+                    price = :price, show_in_terminal = :show_in_terminal
               WHERE id = :id AND company_id = :company_id AND branch_id = :branch_id',
             [
-                'name'       => $name,
-                'type'       => $type,
-                'category'   => $category,
-                'price'      => $price,
-                'id'         => $id,
-                'company_id' => $companyId,
-                'branch_id'  => $branchId,
+                'name'             => $name,
+                'type'             => $type,
+                'category'         => $category,
+                'price'            => $price,
+                'show_in_terminal' => $showInTerminal ? 1 : 0,
+                'id'               => $id,
+                'company_id'       => $companyId,
+                'branch_id'        => $branchId,
             ],
         );
     }
