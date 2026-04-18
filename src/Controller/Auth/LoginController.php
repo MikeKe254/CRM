@@ -175,7 +175,7 @@ class LoginController extends AbstractController
             }
 
             // Resolve post-login redirect URL
-            // $branchSlug is captured here so we can set the angavu_branch cookie.
+            // $branchSlug is captured here so we can set the patronr_branch cookie.
             // Null means the destination doesn't have a fixed branch yet (picker, platform).
             $branchSlug = null;
 
@@ -242,7 +242,7 @@ class LoginController extends AbstractController
 
             $cookieTtl = $remember ? 60 * 60 * 24 * 30 : 0;
             $response->headers->setCookie(
-                Cookie::create('angavu_token')
+                Cookie::create('patronr_token')
                     ->withValue($result->token)
                     ->withExpires($cookieTtl > 0 ? time() + $cookieTtl : 0)
                     ->withPath('/')
@@ -254,7 +254,7 @@ class LoginController extends AbstractController
             // Null when user needs the branch picker; the picker will set it after selection.
             if ($branchSlug !== null) {
                 $response->headers->setCookie(
-                    Cookie::create('angavu_branch')
+                    Cookie::create('patronr_branch')
                         ->withValue($branchSlug)
                         ->withExpires($cookieTtl > 0 ? time() + $cookieTtl : 0)
                         ->withPath('/')
@@ -286,8 +286,8 @@ class LoginController extends AbstractController
         }
 
         $response = $this->json(['success' => true, 'message' => 'Logged out.']);
-        $response->headers->clearCookie('angavu_token', '/');
-        $response->headers->clearCookie('angavu_branch', '/');
+        $response->headers->clearCookie('patronr_token', '/');
+        $response->headers->clearCookie('patronr_branch', '/');
 
         return $response;
     }
@@ -326,7 +326,7 @@ class LoginController extends AbstractController
             return substr($header, 7);
         }
 
-        return $request->cookies->get('angavu_token') ?: null;
+        return $request->cookies->get('patronr_token') ?: null;
     }
 
     private function resolveSubdomain(Request $request): ?string

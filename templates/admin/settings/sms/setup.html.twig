@@ -1,0 +1,897 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+
+<style>
+/* ── Card chrome ─────────────────────────────────────────────── */
+.sms-card {
+    background:#fff; border:1px solid #e5e7eb; border-radius:.875rem;
+    overflow:hidden; margin-bottom:1.5rem;
+    box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.sms-card-header {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.875rem 1.5rem; border-bottom:1px solid #f3f4f6;
+}
+.sms-card-empty { padding:3rem 2rem; text-align:center; }
+
+/* ── Config row ──────────────────────────────────────────────── */
+.sms-row {
+    display:flex; align-items:flex-start; gap:1rem;
+    padding:1rem 1.5rem; border-bottom:1px solid #f3f4f6;
+}
+.sms-row:last-child { border-bottom:none; }
+.sms-row-icon {
+    width:40px; height:40px; border-radius:10px;
+    background:#eef2ff; display:flex; align-items:center;
+    justify-content:center; flex-shrink:0; margin-top:.125rem;
+}
+.sms-row-body { flex:1; min-width:0; }
+.sms-row-name {
+    font-size:.875rem; font-weight:600; color:#111827;
+    display:flex; align-items:center; gap:.5rem; flex-wrap:wrap;
+}
+.sms-row-sub {
+    font-size:.75rem; color:#9ca3af; margin-top:3px;
+    display:flex; align-items:center; gap:.4rem; flex-wrap:wrap;
+}
+.sms-badge {
+    display:inline-flex; align-items:center; font-size:.6875rem;
+    font-weight:700; padding:.2rem .5rem; border-radius:.375rem;
+}
+
+/* ── Sender IDs inside a row ─────────────────────────────────── */
+.sms-sids { margin-top:.625rem; display:flex; flex-wrap:wrap; gap:.375rem; }
+.sms-sid-chip {
+    display:inline-flex; align-items:center; gap:.3rem;
+    padding:.1875rem .5rem .1875rem .625rem;
+    border:1px solid #e5e7eb; border-radius:.375rem;
+    font-size:.6875rem; font-weight:600; color:#374151; background:#fff;
+}
+.sms-sid-chip .chip-del {
+    display:inline-flex; align-items:center; justify-content:center;
+    width:14px; height:14px; border-radius:.25rem; cursor:pointer;
+    background:none; border:none; color:#9ca3af; padding:0;
+    transition:background .12s, color .12s;
+}
+.sms-sid-chip .chip-del:hover { background:#fee2e2; color:#dc2626; }
+
+/* ── Action buttons ──────────────────────────────────────────── */
+.sms-btn {
+    flex-shrink:0; display:inline-flex; align-items:center; gap:.35rem;
+    height:30px; padding:0 .75rem; font-size:.75rem; font-weight:600;
+    color:#4b5563; background:#fff; border:1px solid #e5e7eb;
+    border-radius:.5rem; cursor:pointer; transition:background .12s, border-color .12s;
+}
+.sms-btn:hover { background:#f9fafb; border-color:#d1d5db; }
+.sms-btn-primary {
+    background:#4f46e5; color:#fff; border-color:#4f46e5;
+}
+.sms-btn-primary:hover { background:#4338ca; border-color:#4338ca; }
+.sms-btn-danger { color:#ef4444; border-color:#fecaca; }
+.sms-btn-danger:hover { background:#fff5f5; border-color:#ef4444; }
+.sms-row-actions { display:flex; gap:.375rem; flex-shrink:0; flex-wrap:wrap; justify-content:flex-end; }
+
+/* ── Drawer ──────────────────────────────────────────────────── */
+.sms-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.35);
+    z-index:40; backdrop-filter:blur(1px);
+}
+.sms-overlay.open { display:block; }
+.sms-drawer {
+    position:fixed; top:0; right:0; bottom:0; width:420px; max-width:100%;
+    background:#fff; z-index:50; overflow-y:auto;
+    transform:translateX(100%); transition:transform .22s ease;
+    display:flex; flex-direction:column;
+    box-shadow:-4px 0 24px rgba(0,0,0,.1);
+}
+.sms-drawer.open { transform:translateX(0); }
+.sms-drawer-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:1rem 1.25rem; border-bottom:1px solid #f3f4f6;
+    position:sticky; top:0; background:#fff; z-index:1;
+}
+.sms-drawer-title { font-size:.9375rem; font-weight:700; color:#111827; }
+.sms-drawer-close {
+    width:30px; height:30px; border-radius:.5rem; background:none; border:none;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    color:#9ca3af; transition:background .12s, color .12s;
+}
+.sms-drawer-close:hover { background:#f3f4f6; color:#374151; }
+.sms-drawer-body { flex:1; padding:1.25rem; }
+.sms-drawer-footer {
+    padding:1rem 1.25rem; border-top:1px solid #f3f4f6;
+    display:flex; gap:.625rem; justify-content:flex-end;
+    position:sticky; bottom:0; background:#fff;
+}
+
+/* ── Form elements ───────────────────────────────────────────── */
+.d-group { margin-bottom:1.125rem; }
+.d-group-title {
+    font-size:.6875rem; font-weight:700; color:#9ca3af;
+    text-transform:uppercase; letter-spacing:.08em;
+    padding-bottom:.5rem; border-bottom:1px solid #f3f4f6; margin-bottom:.875rem;
+}
+.d-row-2 { display:grid; grid-template-columns:1fr 1fr; gap:.75rem; }
+.secret-wrap { position:relative; }
+.secret-wrap input { padding-right:2.5rem; }
+.secret-eye {
+    position:absolute; right:.625rem; top:50%; transform:translateY(-50%);
+    background:none; border:none; cursor:pointer; padding:.25rem;
+    color:#9ca3af; display:flex; align-items:center;
+}
+.secret-eye:hover { color:#6b7280; }
+
+/* ── Toast ───────────────────────────────────────────────────── */
+.sms-toast {
+    position:fixed; bottom:1.5rem; left:50%; transform:translateX(-50%) translateY(1rem);
+    background:#111827; color:#fff; border-radius:.625rem;
+    padding:.625rem 1.125rem; font-size:.8125rem; font-weight:500;
+    z-index:100; opacity:0; pointer-events:none;
+    transition:opacity .2s, transform .2s;
+    display:flex; align-items:center; gap:.5rem;
+}
+.sms-toast.show { opacity:1; transform:translateX(-50%) translateY(0); }
+.sms-toast.error { background:#dc2626; }
+
+@media (max-width:767px) {
+    .sms-row { flex-wrap:wrap; }
+    .sms-row-actions { width:100%; margin-top:.5rem; }
+    .sms-drawer { width:100%; }
+    .d-row-2 { grid-template-columns:1fr; }
+}
+</style>
+
+{# ─── Page header ─────────────────────────────────────────────────────────── #}
+<div class="settings-card sms-card" style="margin-bottom:1.5rem;">
+    <div class="sms-card-header">
+        <div>
+            <h1 class="text-sm font-semibold text-gray-900">SMS Providers</h1>
+            <p class="text-xs text-gray-500 mt-0.5">Configure SMS provider accounts and sender IDs for transactional &amp; promotional messaging.</p>
+        </div>
+        <div style="display:flex;align-items:center;gap:.625rem;">
+            <a href="{{ path('admin_settings_sms_outbox', _rp) }}"
+               class="sms-btn" data-turbo-action="replace">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+                </svg>
+                Outbox
+            </a>
+            {% if available_providers|length > 0 %}
+            <button type="button" class="sms-btn sms-btn-primary" onclick="openAddDrawer()">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+                </svg>
+                Add Provider
+            </button>
+            {% endif %}
+        </div>
+    </div>
+
+    {# ─── Config list ──────────────────────────────────────────────────────── #}
+    {% if configs is empty %}
+    <div class="sms-card-empty">
+        <div style="width:44px;height:44px;border-radius:12px;background:#eef2ff;display:flex;align-items:center;justify-content:center;margin:0 auto .875rem;">
+            <svg width="20" height="20" fill="none" stroke="#4f46e5" stroke-width="1.75" viewBox="0 0 24 24">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.4 2 2 0 0 1 3.62 1.22h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 21.73 16z"/>
+            </svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">No SMS providers configured</p>
+        <p class="text-xs text-gray-400">Click <strong>Add Provider</strong> to connect your first SMS account.</p>
+    </div>
+    {% else %}
+    {% for cfg in configs %}
+    {% set pdef = provider_defs[cfg.provider_key] ?? null %}
+    <div class="sms-row" data-config-id="{{ cfg.id }}">
+
+        <div class="sms-row-icon">
+            <svg width="17" height="17" fill="none" stroke="#4f46e5" stroke-width="1.75" viewBox="0 0 24 24">
+                <path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07A19.5 19.5 0 0 1 4.69 12 19.79 19.79 0 0 1 1.65 3.4 2 2 0 0 1 3.62 1.22h3a2 2 0 0 1 2 1.72c.13.96.36 1.9.7 2.81a2 2 0 0 1-.45 2.11L7.91 8.77a16 16 0 0 0 6 6l.96-.96a2 2 0 0 1 2.11-.45c.9.34 1.85.57 2.81.7A2 2 0 0 1 21.73 16z"/>
+            </svg>
+        </div>
+
+        <div class="sms-row-body">
+            <div class="sms-row-name">
+                {{ cfg.label ?: (pdef ? pdef.name : cfg.provider_key|capitalize) }}
+                {% if cfg.is_default %}
+                <span class="sms-badge bg-indigo-50 text-indigo-700">Default</span>
+                {% endif %}
+                {% if not cfg.is_active %}
+                <span class="sms-badge bg-red-50 text-red-600">Inactive</span>
+                {% endif %}
+                {% if pdef and pdef.systemOwned %}
+                <span class="sms-badge bg-violet-50 text-violet-700">System-owned IDs</span>
+                {% endif %}
+            </div>
+            <div class="sms-row-sub">
+                <span class="font-medium text-gray-500">{{ pdef ? pdef.name : cfg.provider_key }}</span>
+                {% if cfg.label %}
+                <span class="text-gray-300">·</span>
+                <span>{{ cfg.label }}</span>
+                {% endif %}
+                {% if cfg.default_sender_id_transactional %}
+                <span class="text-gray-300">·</span>
+                <span>TX: <span class="font-mono">{{ cfg.default_sender_id_transactional }}</span></span>
+                {% endif %}
+                {% if cfg.default_sender_id_promotional %}
+                <span class="text-gray-300">·</span>
+                <span>Promo: <span class="font-mono">{{ cfg.default_sender_id_promotional }}</span></span>
+                {% endif %}
+            </div>
+
+            {# Sender IDs #}
+            {% if pdef and not pdef.systemOwned %}
+            <div class="sms-sids" id="sids-{{ cfg.id }}">
+                {% for sid in cfg.sender_ids %}
+                <span class="sms-sid-chip" data-sid-id="{{ sid.id }}">
+                    {% if sid.type == 'transactional' %}
+                    <span style="color:#2563eb;font-size:.5625rem;">TX</span>
+                    {% elseif sid.type == 'promotional' %}
+                    <span style="color:#059669;font-size:.5625rem;">PR</span>
+                    {% else %}
+                    <span style="color:#7c3aed;font-size:.5625rem;">B</span>
+                    {% endif %}
+                    {{ sid.sender_id }}
+                    {% if sid.is_default %}<span style="font-weight:400;color:#9ca3af">★</span>{% endif %}
+                    <button type="button" class="chip-del"
+                            onclick="deleteSenderId({{ cfg.id }}, {{ sid.id }}, '{{ sid.sender_id|e('html_attr') }}', this)"
+                            title="Remove sender ID">
+                        <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    </button>
+                </span>
+                {% endfor %}
+                <button type="button" class="sms-btn" style="height:24px;padding:0 .5rem;font-size:.6875rem;"
+                        onclick="openSenderIdDrawer({{ cfg.id }})">
+                    <svg width="9" height="9" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                    Sender ID
+                </button>
+            </div>
+            {% elseif pdef and pdef.systemOwned %}
+            <div class="sms-sids">
+                <span class="sms-sid-chip">
+                    <span style="color:#2563eb;font-size:.5625rem;">TX</span>
+                    PATRONR
+                </span>
+                <span class="sms-sid-chip">
+                    <span style="color:#059669;font-size:.5625rem;">PR</span>
+                    PatronrInfo
+                </span>
+            </div>
+            {% endif %}
+        </div>
+
+        <div class="sms-row-actions">
+            <button type="button" class="sms-btn"
+                    onclick="openEditDrawer({{ cfg|json_encode|e('html_attr') }})">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/>
+                    <path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/>
+                </svg>
+                Edit
+            </button>
+            {% if not cfg.is_default %}
+            <button type="button" class="sms-btn"
+                    onclick="setDefault({{ cfg.id }})">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
+                </svg>
+                Set Default
+            </button>
+            {% endif %}
+            <button type="button" class="sms-btn sms-btn-danger"
+                    onclick="deleteConfig({{ cfg.id }}, '{{ (cfg.label ?: (pdef ? pdef.name : cfg.provider_key))|e('html_attr') }}')">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                    <polyline points="3 6 5 6 21 6"/>
+                    <path d="M19 6l-1 14H6L5 6"/>
+                    <path d="M10 11v6M14 11v6"/>
+                    <path d="M9 6V4h6v2"/>
+                </svg>
+                Delete
+            </button>
+        </div>
+    </div>
+    {% endfor %}
+    {% endif %}
+
+</div>{# /sms-card #}
+
+<div class="settings-card sms-card" style="margin-bottom:1.5rem;">
+    <div class="sms-card-header">
+        <div>
+            <h2 class="text-sm font-semibold text-gray-900">Send Test SMS</h2>
+            <p class="text-xs text-gray-500 mt-0.5">Queue a live test message through the configured provider flow.</p>
+        </div>
+    </div>
+    <div style="padding:1rem 1.5rem;">
+        <div class="d-row-2" style="margin-bottom:.875rem;">
+            <div>
+                <label class="s-label">Provider Config</label>
+                <div class="s-select-wrap">
+                    <select class="s-input" id="testSmsConfigId">
+                        <option value="">Use default route</option>
+                        {% for cfg in configs %}
+                        {% if cfg.is_active %}
+                        {% set pdef = provider_defs[cfg.provider_key] ?? null %}
+                        <option value="{{ cfg.id }}">{{ cfg.label ?: (pdef ? pdef.name : cfg.provider_key) }}{% if cfg.is_default %} (Default){% endif %}</option>
+                        {% endif %}
+                        {% endfor %}
+                    </select>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+            <div>
+                <label class="s-label">Message Type</label>
+                <div class="s-select-wrap">
+                    <select class="s-input" id="testSmsType">
+                        <option value="transactional">Transactional</option>
+                        <option value="promotional">Promotional</option>
+                    </select>
+                    <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                </div>
+            </div>
+        </div>
+        <div class="d-group">
+            <label class="s-label">Recipient</label>
+            <input type="text" class="s-input" id="testSmsRecipient" placeholder="e.g. 2547XXXXXXXX">
+        </div>
+        <div class="d-group" style="margin-bottom:0;">
+            <label class="s-label">Message</label>
+            <textarea class="s-input" id="testSmsMessage" rows="3" placeholder="Type a short test SMS..." style="resize:vertical;"></textarea>
+        </div>
+        <div style="display:flex;justify-content:flex-end;margin-top:1rem;">
+            <button type="button" class="sms-btn sms-btn-primary" id="testSmsSendBtn" onclick="submitTestSms()">
+                <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2z"/>
+                </svg>
+                Send Test SMS
+            </button>
+        </div>
+    </div>
+</div>
+
+
+{# ═══════════════════════════════════════════════════════════════════════════
+   DRAWERS
+   ═══════════════════════════════════════════════════════════════════════════ #}
+
+{# ─── Overlay ─────────────────────────────────────────────────────────────── #}
+<div class="sms-overlay" id="smsOverlay" onclick="closeAllDrawers()"></div>
+
+{# ─── ADD PROVIDER drawer ─────────────────────────────────────────────────── #}
+<div class="sms-drawer" id="addDrawer">
+    <div class="sms-drawer-head">
+        <span class="sms-drawer-title">Add SMS Provider</span>
+        <button type="button" class="sms-drawer-close" onclick="closeAllDrawers()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="sms-drawer-body">
+        <div class="d-group">
+            <label class="s-label">Provider</label>
+            <div class="s-select-wrap">
+                <select class="s-input" id="addProviderKey" onchange="onProviderChange(this,'add')">
+                    <option value="">— select a provider —</option>
+                    {% for p in available_providers %}
+                    <option value="{{ p.provider_key }}">{{ p.display_name }}</option>
+                    {% endfor %}
+                </select>
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+
+        <div class="d-group">
+            <label class="s-label">Label <span class="s-hint" style="display:inline;font-size:.6875rem;">(optional)</span></label>
+            <input type="text" class="s-input" id="addLabel" placeholder="e.g. Main account">
+        </div>
+
+        {# Dynamic credential fields — one block per provider, shown/hidden by JS #}
+        {% for key, pdef in provider_defs %}
+        <div id="addCreds_{{ key }}" class="add-creds-block" style="display:none;">
+            {% if pdef.notes %}
+            <p class="text-xs text-amber-600 bg-amber-50 border border-amber-100 rounded-lg px-3 py-2 mb-3">{{ pdef.notes }}</p>
+            {% endif %}
+            {% if pdef.fields|length > 0 %}
+            <div class="d-group">
+                <p class="d-group-title">Credentials</p>
+                {% for field in pdef.fields %}
+                <div class="d-group">
+                    <label class="s-label">
+                        {{ field.label }}
+                        {% if not field.required %}<span class="s-hint" style="display:inline;font-size:.6875rem;">(optional)</span>{% endif %}
+                    </label>
+                    {% if field.type == 'password' %}
+                    <div class="secret-wrap">
+                        <input type="password" class="s-input"
+                               name="add_{{ field.key }}"
+                               data-cred-key="{{ field.key }}"
+                               placeholder="{{ field.placeholder }}"
+                               autocomplete="new-password">
+                        <button type="button" class="secret-eye" onclick="toggleSecret(this)" tabindex="-1">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                    {% elseif field.type == 'select' %}
+                    <div class="s-select-wrap">
+                        <select class="s-input" name="add_{{ field.key }}" data-cred-key="{{ field.key }}">
+                            <option value="">— select —</option>
+                            <option value="0">Live</option>
+                            <option value="1">Sandbox</option>
+                        </select>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    {% else %}
+                    <input type="text" class="s-input"
+                           name="add_{{ field.key }}"
+                           data-cred-key="{{ field.key }}"
+                           placeholder="{{ field.placeholder }}">
+                    {% endif %}
+                    {% if field.helpText %}
+                    <p class="s-hint">{{ field.helpText }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not pdef.systemOwned %}
+            <div class="d-group">
+                <p class="d-group-title">Default Sender IDs <span style="font-weight:400;text-transform:none;letter-spacing:0;">(optional — set later if needed)</span></p>
+                <div class="d-row-2">
+                    <div>
+                        <label class="s-label">Transactional</label>
+                        <input type="text" class="s-input" id="addSenderTx_{{ key }}"
+                               placeholder="e.g. MYBRAND"
+                               style="text-transform:uppercase;"
+                               oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                    <div>
+                        <label class="s-label">Promotional</label>
+                        <input type="text" class="s-input" id="addSenderPromo_{{ key }}"
+                               placeholder="e.g. MYBRANDADS"
+                               style="text-transform:uppercase;"
+                               oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="sms-drawer-footer">
+        <button type="button" class="sms-btn" onclick="closeAllDrawers()">Cancel</button>
+        <button type="button" class="sms-btn sms-btn-primary" id="addSaveBtn" onclick="submitAdd()">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            Save
+        </button>
+    </div>
+</div>
+
+{# ─── EDIT CONFIG drawer ──────────────────────────────────────────────────── #}
+<div class="sms-drawer" id="editDrawer">
+    <div class="sms-drawer-head">
+        <span class="sms-drawer-title" id="editDrawerTitle">Edit Configuration</span>
+        <button type="button" class="sms-drawer-close" onclick="closeAllDrawers()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="sms-drawer-body">
+        <input type="hidden" id="editConfigId">
+
+        <div class="d-group">
+            <label class="s-label">Label <span class="s-hint" style="display:inline;font-size:.6875rem;">(optional)</span></label>
+            <input type="text" class="s-input" id="editLabel" placeholder="e.g. Main account">
+        </div>
+
+        <div class="d-group">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:.375rem;">
+                <label class="s-label" style="margin-bottom:0;">Active</label>
+                <label class="s-toggle">
+                    <input type="checkbox" id="editIsActive" value="1">
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <p class="s-hint">Disable to stop using this provider without deleting.</p>
+        </div>
+
+        {# Edit credential blocks per provider #}
+        {% for key, pdef in provider_defs %}
+        <div id="editCreds_{{ key }}" class="edit-creds-block" style="display:none;">
+            {% if pdef.fields|length > 0 %}
+            <div class="d-group">
+                <p class="d-group-title">Credentials <span style="font-weight:400;text-transform:none;letter-spacing:0;">(leave blank to keep existing)</span></p>
+                {% for field in pdef.fields %}
+                <div class="d-group">
+                    <label class="s-label">{{ field.label }}</label>
+                    {% if field.type == 'password' %}
+                    <div class="secret-wrap">
+                        <input type="password" class="s-input"
+                               name="edit_{{ field.key }}"
+                               data-cred-key="{{ field.key }}"
+                               placeholder="leave blank to keep unchanged"
+                               autocomplete="new-password">
+                        <button type="button" class="secret-eye" onclick="toggleSecret(this)" tabindex="-1">
+                            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24"><path d="M1 12s4-8 11-8 11 8 11 8-4 8-11 8-11-8-11-8z"/><circle cx="12" cy="12" r="3"/></svg>
+                        </button>
+                    </div>
+                    {% elseif field.type == 'select' %}
+                    <div class="s-select-wrap">
+                        <select class="s-input" name="edit_{{ field.key }}" data-cred-key="{{ field.key }}">
+                            <option value="">— keep current —</option>
+                            <option value="0">Live</option>
+                            <option value="1">Sandbox</option>
+                        </select>
+                        <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+                    </div>
+                    {% else %}
+                    <input type="text" class="s-input"
+                           name="edit_{{ field.key }}"
+                           data-cred-key="{{ field.key }}"
+                           placeholder="leave blank to keep unchanged">
+                    {% endif %}
+                    {% if field.helpText %}
+                    <p class="s-hint">{{ field.helpText }}</p>
+                    {% endif %}
+                </div>
+                {% endfor %}
+            </div>
+            {% endif %}
+
+            {% if not pdef.systemOwned %}
+            <div class="d-group">
+                <p class="d-group-title">Default Sender IDs</p>
+                <div class="d-row-2">
+                    <div>
+                        <label class="s-label">Transactional</label>
+                        <input type="text" class="s-input" id="editSenderTx"
+                               style="text-transform:uppercase;"
+                               oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                    <div>
+                        <label class="s-label">Promotional</label>
+                        <input type="text" class="s-input" id="editSenderPromo"
+                               style="text-transform:uppercase;"
+                               oninput="this.value=this.value.toUpperCase()">
+                    </div>
+                </div>
+            </div>
+            {% endif %}
+        </div>
+        {% endfor %}
+    </div>
+    <div class="sms-drawer-footer">
+        <button type="button" class="sms-btn" onclick="closeAllDrawers()">Cancel</button>
+        <button type="button" class="sms-btn sms-btn-primary" onclick="submitEdit()">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            Save Changes
+        </button>
+    </div>
+</div>
+
+{# ─── ADD SENDER ID drawer ────────────────────────────────────────────────── #}
+<div class="sms-drawer" id="senderIdDrawer">
+    <div class="sms-drawer-head">
+        <span class="sms-drawer-title">Add Sender ID</span>
+        <button type="button" class="sms-drawer-close" onclick="closeAllDrawers()">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="sms-drawer-body">
+        <input type="hidden" id="sidConfigId">
+
+        <div class="d-group">
+            <label class="s-label">Sender ID</label>
+            <input type="text" class="s-input" id="sidValue"
+                   placeholder="e.g. MYBRAND" maxlength="50"
+                   style="text-transform:uppercase;"
+                   oninput="this.value=this.value.toUpperCase()">
+            <p class="s-hint">Alphanumeric, max 11 characters for most providers.</p>
+        </div>
+
+        <div class="d-group">
+            <label class="s-label">Type</label>
+            <div class="s-select-wrap">
+                <select class="s-input" id="sidType">
+                    <option value="transactional">Transactional</option>
+                    <option value="promotional">Promotional</option>
+                    <option value="both">Both</option>
+                </select>
+                <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
+            </div>
+        </div>
+
+        <div class="d-group" style="display:flex;align-items:center;justify-content:space-between;">
+            <div>
+                <label class="s-label" style="margin-bottom:0;">Set as default</label>
+                <p class="s-hint" style="margin-top:2px;">Use this ID when no specific sender is requested.</p>
+            </div>
+            <label class="s-toggle">
+                <input type="checkbox" id="sidIsDefault" value="1">
+                <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+            </label>
+        </div>
+    </div>
+    <div class="sms-drawer-footer">
+        <button type="button" class="sms-btn" onclick="closeAllDrawers()">Cancel</button>
+        <button type="button" class="sms-btn sms-btn-primary" onclick="submitSenderId()">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+            Add
+        </button>
+    </div>
+</div>
+
+{# ─── Toast ───────────────────────────────────────────────────────────────── #}
+<div class="sms-toast" id="smsToast"></div>
+
+{% endblock %}
+
+{% block settings_scripts %}
+<script>
+(function () {
+/* ── Constants ──────────────────────────────────────────────────────────── */
+const PROVIDER_DEFS = {{ provider_defs|json_encode|raw }};
+const BASE_URL      = '{{ path('admin_settings_sms', _rp) }}';
+
+/* ── Utilities ──────────────────────────────────────────────────────────── */
+function toast(msg, isError = false) {
+    const el = document.getElementById('smsToast');
+    el.textContent = msg;
+    el.className = 'sms-toast' + (isError ? ' error' : '');
+    el.classList.add('show');
+    clearTimeout(el._t);
+    el._t = setTimeout(() => el.classList.remove('show'), 3400);
+}
+
+async function apiPost(url, body) {
+    const fd = new FormData();
+    for (const [k, v] of Object.entries(body)) if (v !== null && v !== undefined) fd.append(k, v);
+    const r = await fetch(url, { method: 'POST', body: fd });
+    return r.json();
+}
+
+function reload() { window.location.reload(); }
+
+/* ── Overlays / drawers ─────────────────────────────────────────────────── */
+function openDrawer(id) {
+    document.getElementById('smsOverlay').classList.add('open');
+    document.getElementById(id).classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeAllDrawers() {
+    document.querySelectorAll('.sms-drawer').forEach(d => d.classList.remove('open'));
+    document.getElementById('smsOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+/* ── Provider change → show/hide cred blocks ────────────────────────────── */
+function onProviderChange(sel, prefix) {
+    const key = sel.value;
+    document.querySelectorAll('.' + prefix + '-creds-block').forEach(el => el.style.display = 'none');
+    if (key) {
+        const block = document.getElementById(prefix + 'Creds_' + key);
+        if (block) block.style.display = '';
+    }
+}
+
+/* ── ADD drawer ─────────────────────────────────────────────────────────── */
+function openAddDrawer() {
+    document.getElementById('addProviderKey').value = '';
+    document.getElementById('addLabel').value = '';
+    document.querySelectorAll('.add-creds-block').forEach(b => {
+        b.style.display = 'none';
+        b.querySelectorAll('input,select').forEach(i => i.value = '');
+    });
+    openDrawer('addDrawer');
+}
+
+async function submitAdd() {
+    const key = document.getElementById('addProviderKey').value;
+    if (!key) { toast('Please select a provider.', true); return; }
+
+    const body = {
+        provider_key: key,
+        label:        document.getElementById('addLabel').value.trim(),
+    };
+
+    const block = document.getElementById('addCreds_' + key);
+    if (block) {
+        block.querySelectorAll('[data-cred-key]').forEach(el => {
+            body[el.dataset.credKey] = el.value;
+        });
+        const txEl    = document.getElementById('addSenderTx_' + key);
+        const promoEl = document.getElementById('addSenderPromo_' + key);
+        if (txEl)    body.default_sender_id_transactional = txEl.value.trim();
+        if (promoEl) body.default_sender_id_promotional   = promoEl.value.trim();
+    }
+
+    const btn = document.getElementById('addSaveBtn');
+    btn.disabled = true; btn.textContent = 'Saving…';
+
+    try {
+        const res = await apiPost(BASE_URL + '/create', body);
+        if (res.success) { closeAllDrawers(); toast(res.message || 'Provider added.'); setTimeout(reload, 800); }
+        else             { toast(res.message || 'Failed to save.', true); }
+    } catch { toast('Network error.', true); }
+    finally  { btn.disabled = false; btn.innerHTML = '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg> Save'; }
+}
+
+async function submitTestSms() {
+    const btn = document.getElementById('testSmsSendBtn');
+    const body = {
+        config_id: document.getElementById('testSmsConfigId').value,
+        type: document.getElementById('testSmsType').value,
+        recipient: document.getElementById('testSmsRecipient').value.trim(),
+        message: document.getElementById('testSmsMessage').value.trim(),
+    };
+
+    if (!body.recipient) { toast('Recipient is required.', true); return; }
+    if (!body.message) { toast('Message is required.', true); return; }
+
+    btn.disabled = true;
+    btn.textContent = 'Queueing...';
+
+    try {
+        const res = await apiPost(BASE_URL + '/test-send', body);
+        if (res.success) {
+            toast(res.message || 'Test SMS queued.');
+            document.getElementById('testSmsMessage').value = '';
+        } else {
+            toast(res.message || 'Failed to queue test SMS.', true);
+        }
+    } catch {
+        toast('Network error.', true);
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = '<svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><path d="M22 2 11 13"/><path d="M22 2 15 22 11 13 2 9 22 2z"/></svg> Send Test SMS';
+    }
+}
+
+/* ── EDIT drawer ────────────────────────────────────────────────────────── */
+function openEditDrawer(cfg) {
+    document.getElementById('editConfigId').value    = cfg.id;
+    document.getElementById('editLabel').value       = cfg.label || '';
+    document.getElementById('editIsActive').checked  = cfg.is_active == 1;
+
+    document.querySelectorAll('.edit-creds-block').forEach(b => {
+        b.style.display = 'none';
+        b.querySelectorAll('input[type=text],input[type=password]').forEach(i => i.value = '');
+    });
+
+    const block = document.getElementById('editCreds_' + cfg.provider_key);
+    if (block) {
+        block.style.display = '';
+        const txEl    = document.getElementById('editSenderTx');
+        const promoEl = document.getElementById('editSenderPromo');
+        if (txEl)    txEl.value    = cfg.default_sender_id_transactional || '';
+        if (promoEl) promoEl.value = cfg.default_sender_id_promotional   || '';
+    }
+
+    const def = PROVIDER_DEFS[cfg.provider_key];
+    document.getElementById('editDrawerTitle').textContent =
+        'Edit — ' + (cfg.label || (def ? def.name : cfg.provider_key));
+
+    openDrawer('editDrawer');
+}
+
+async function submitEdit() {
+    const id = document.getElementById('editConfigId').value;
+
+    // Determine provider key from whichever creds block is visible
+    let providerKey = '';
+    document.querySelectorAll('.edit-creds-block').forEach(b => {
+        if (b.style.display !== 'none') providerKey = b.id.replace('editCreds_', '');
+    });
+
+    const body = {
+        label:     document.getElementById('editLabel').value.trim(),
+        is_active: document.getElementById('editIsActive').checked ? '1' : '0',
+    };
+
+    if (providerKey) {
+        const block = document.getElementById('editCreds_' + providerKey);
+        if (block) {
+            block.querySelectorAll('[data-cred-key]').forEach(el => {
+                if (el.value.trim()) body[el.dataset.credKey] = el.value.trim();
+            });
+        }
+        const txEl    = document.getElementById('editSenderTx');
+        const promoEl = document.getElementById('editSenderPromo');
+        if (txEl)    body.default_sender_id_transactional = txEl.value.trim();
+        if (promoEl) body.default_sender_id_promotional   = promoEl.value.trim();
+    }
+
+    try {
+        const res = await apiPost(BASE_URL + '/' + id + '/save', body);
+        if (res.success) { closeAllDrawers(); toast(res.message || 'Saved.'); setTimeout(reload, 800); }
+        else             { toast(res.message || 'Failed.', true); }
+    } catch { toast('Network error.', true); }
+}
+
+/* ── Set default ────────────────────────────────────────────────────────── */
+async function setDefault(id) {
+    try {
+        const res = await apiPost(BASE_URL + '/' + id + '/set-default', {});
+        if (res.success) { toast(res.message || 'Default updated.'); setTimeout(reload, 800); }
+        else             { toast(res.message || 'Failed.', true); }
+    } catch { toast('Network error.', true); }
+}
+
+/* ── Delete config ──────────────────────────────────────────────────────── */
+async function deleteConfig(id, name) {
+    if (!confirm('Delete "' + name + '"? This cannot be undone.')) return;
+    try {
+        const res = await apiPost(BASE_URL + '/' + id + '/delete', {});
+        if (res.success) { toast(res.message || 'Deleted.'); setTimeout(reload, 800); }
+        else             { toast(res.message || 'Failed.', true); }
+    } catch { toast('Network error.', true); }
+}
+
+/* ── Sender ID drawer ───────────────────────────────────────────────────── */
+function openSenderIdDrawer(configId) {
+    document.getElementById('sidConfigId').value      = configId;
+    document.getElementById('sidValue').value         = '';
+    document.getElementById('sidType').value          = 'transactional';
+    document.getElementById('sidIsDefault').checked   = false;
+    openDrawer('senderIdDrawer');
+}
+
+async function submitSenderId() {
+    const configId = document.getElementById('sidConfigId').value;
+    const body = {
+        sender_id:  document.getElementById('sidValue').value.trim().toUpperCase(),
+        type:       document.getElementById('sidType').value,
+        is_default: document.getElementById('sidIsDefault').checked ? '1' : '0',
+    };
+    if (!body.sender_id) { toast('Sender ID is required.', true); return; }
+
+    try {
+        const res = await apiPost(BASE_URL + '/' + configId + '/sender-ids/add', body);
+        if (res.success) { closeAllDrawers(); toast(res.message || 'Sender ID added.'); setTimeout(reload, 800); }
+        else             { toast(res.message || 'Failed.', true); }
+    } catch { toast('Network error.', true); }
+}
+
+/* ── Delete sender ID ───────────────────────────────────────────────────── */
+async function deleteSenderId(configId, sidId, name, btn) {
+    if (!confirm('Remove sender ID "' + name + '"?')) return;
+    btn.disabled = true;
+    try {
+        const res = await apiPost(BASE_URL + '/' + configId + '/sender-ids/' + sidId + '/delete', {});
+        if (res.success) {
+            const chip = btn.closest('.sms-sid-chip');
+            if (chip) chip.remove();
+            toast(res.message || 'Removed.');
+        } else {
+            toast(res.message || 'Failed.', true);
+            btn.disabled = false;
+        }
+    } catch { toast('Network error.', true); btn.disabled = false; }
+}
+
+/* ── Password reveal ────────────────────────────────────────────────────── */
+function toggleSecret(btn) {
+    const input = btn.previousElementSibling;
+    input.type  = input.type === 'password' ? 'text' : 'password';
+}
+
+/* ── Close on ESC ───────────────────────────────────────────────────────── */
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeAllDrawers(); });
+
+/* ── Expose functions used in inline onclick attributes ─────────────────── */
+window.toggleSecret        = toggleSecret;
+window.onProviderChange    = onProviderChange;
+window.openAddDrawer       = openAddDrawer;
+window.submitAdd           = submitAdd;
+window.submitTestSms       = submitTestSms;
+window.closeAllDrawers     = closeAllDrawers;
+window.openEditDrawer      = openEditDrawer;
+window.submitEdit          = submitEdit;
+window.setDefault          = setDefault;
+window.deleteConfig        = deleteConfig;
+window.openSenderIdDrawer  = openSenderIdDrawer;
+window.submitSenderId      = submitSenderId;
+window.deleteSenderId      = deleteSenderId;
+
+})();
+</script>
+{% endblock %}

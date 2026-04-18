@@ -145,7 +145,7 @@ class QuickStkController extends AbstractController
             companyId:          $session->company->id,
             branchId:           $branchNode->id,
             areaId:             $areaId > 0 ? $areaId : null,
-            terminalIdentifier: (string) $request->cookies->get('angavu_terminal', ''),
+            terminalIdentifier: (string) $request->cookies->get('patronr_terminal', ''),
             cashierUserId:      $session->user->id,
             paymentMethodId:    $config->paymentMethodId,
             amount:             $amount,
@@ -284,8 +284,8 @@ class QuickStkController extends AbstractController
     /** @return array{0:mixed,1:mixed,2:array<string,mixed>,3:array<string,string>}|Response */
     private function resolveContext(Request $request, string $branch): array|Response
     {
-        $token      = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal   = (string) $request->cookies->get('angavu_terminal', '');
+        $token      = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal   = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain  = $this->domains->getSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 

@@ -1,0 +1,195 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
+{% set _rp = {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch} %}
+
+{% block admin_title %}Member Segments{% endblock %}
+{% block admin_subtitle %}Lifecycle intelligence — who needs attention right now{% endblock %}
+
+{% block admin_actions %}
+{% if can.manage_automations %}
+<a href="{{ path('admin_loyalty_automations', _rp) }}"
+   class="h-9 px-4 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-2">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+        <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+    </svg>
+    Automations
+</a>
+{% endif %}
+{% endblock %}
+
+{% block admin_content %}
+
+{% if not program %}
+<div class="flex flex-col items-center justify-center py-24 text-center">
+    <p class="text-sm text-gray-400">No loyalty programme configured. <a href="{{ path('admin_settings_loyalty', _rp) }}" class="text-indigo-600 hover:underline">Set it up →</a></p>
+</div>
+{% else %}
+
+{# ── Segment grid ────────────────────────────────────────────────────── #}
+{% set _stage_colors = {
+    indigo:  {bg: 'bg-indigo-50',  text: 'text-indigo-700',  dot: 'bg-indigo-400',  border: 'border-indigo-200',  btn: 'bg-indigo-600 hover:bg-indigo-700'},
+    emerald: {bg: 'bg-emerald-50', text: 'text-emerald-700', dot: 'bg-emerald-500', border: 'border-emerald-200', btn: 'bg-emerald-600 hover:bg-emerald-700'},
+    amber:   {bg: 'bg-amber-50',   text: 'text-amber-700',   dot: 'bg-amber-400',   border: 'border-amber-200',   btn: 'bg-amber-500 hover:bg-amber-600'},
+    orange:  {bg: 'bg-orange-50',  text: 'text-orange-700',  dot: 'bg-orange-500',  border: 'border-orange-200',  btn: 'bg-orange-500 hover:bg-orange-600'},
+    red:     {bg: 'bg-red-50',     text: 'text-red-700',     dot: 'bg-red-500',     border: 'border-red-200',     btn: 'bg-red-500 hover:bg-red-600'},
+    violet:  {bg: 'bg-violet-50',  text: 'text-violet-700',  dot: 'bg-violet-500',  border: 'border-violet-200',  btn: 'bg-violet-600 hover:bg-violet-700'},
+    yellow:  {bg: 'bg-yellow-50',  text: 'text-yellow-700',  dot: 'bg-yellow-400',  border: 'border-yellow-200',  btn: 'bg-yellow-500 hover:bg-yellow-600'},
+    sky:     {bg: 'bg-sky-50',     text: 'text-sky-700',     dot: 'bg-sky-500',     border: 'border-sky-200',     btn: 'bg-sky-500 hover:bg-sky-600'},
+    rose:    {bg: 'bg-rose-50',    text: 'text-rose-700',    dot: 'bg-rose-500',    border: 'border-rose-200',    btn: 'bg-rose-500 hover:bg-rose-600'}
+} %}
+
+<div class="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 gap-4">
+
+{% for seg in segments %}
+{% set _c = _stage_colors[seg.color] %}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden flex flex-col">
+    <div class="px-5 pt-5 pb-4 flex-1">
+        <div class="flex items-start justify-between gap-3 mb-3">
+            <div class="flex items-center gap-2">
+                <span class="w-2 h-2 rounded-full {{ _c.dot }} flex-shrink-0 mt-0.5"></span>
+                <h3 class="text-sm font-semibold text-gray-900">{{ seg.label }}</h3>
+            </div>
+            <span class="text-2xl font-bold {{ seg.count > 0 ? _c.text : 'text-gray-300' }} flex-shrink-0 leading-none">
+                {{ seg.count|number_format }}
+            </span>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">{{ seg.description }}</p>
+    </div>
+
+    {% if seg.count > 0 %}
+    <div class="px-5 pb-4 flex items-center gap-2">
+        {% if can.view_members %}
+        <a href="{{ path('admin_loyalty_members', _rp) }}?segment={{ seg.key }}"
+           class="flex-1 h-8 border border-gray-200 hover:bg-gray-50 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center justify-center">
+            View Members
+        </a>
+        {% endif %}
+        {% if can.send_messages and seg.action %}
+        <button type="button"
+                onclick="openSendDrawer('{{ seg.key }}', '{{ seg.label }}', {{ seg.count }}, '{{ seg.action }}')"
+                class="flex-1 h-8 {{ _c.btn }} text-white text-xs font-semibold rounded-lg transition-colors inline-flex items-center justify-center gap-1">
+            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Send Message
+        </button>
+        {% endif %}
+    </div>
+    {% else %}
+    <div class="px-5 pb-4">
+        <p class="text-xs text-gray-300 italic">No members in this segment</p>
+    </div>
+    {% endif %}
+</div>
+{% endfor %}
+
+</div>
+
+{# ── Send message drawer ─────────────────────────────────────────────── #}
+{% if can.send_messages %}
+<div id="send-drawer-overlay" class="hidden fixed inset-0 bg-black/30 z-40" onclick="closeSendDrawer()"></div>
+<div id="send-drawer" class="hidden fixed inset-y-0 right-0 w-full max-w-md bg-white shadow-2xl z-50 flex flex-col">
+    <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+        <h3 class="text-sm font-semibold text-gray-900" id="send-drawer-title">Send Message</h3>
+        <button onclick="closeSendDrawer()" class="w-8 h-8 flex items-center justify-center rounded-lg hover:bg-gray-100 text-gray-400 hover:text-gray-600 transition-colors">
+            <svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+        </button>
+    </div>
+    <div class="flex-1 overflow-y-auto p-5">
+        <div id="send-drawer-error" class="hidden mb-4 px-3 py-2.5 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+
+        <div class="mb-4 p-3 bg-gray-50 rounded-lg border border-gray-100">
+            <p class="text-xs text-gray-500 mb-1">Segment</p>
+            <p class="text-sm font-semibold text-gray-900" id="send-segment-label">—</p>
+            <p class="text-xs text-gray-400 mt-0.5"><span id="send-member-count">—</span> members will receive this message</p>
+        </div>
+
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1.5">Message <span class="text-red-500">*</span></label>
+            <textarea id="send-message" rows="5" maxlength="320"
+                      placeholder="Type your message... Use {first_name} to personalise."
+                      class="w-full px-3 py-2 border border-gray-300 rounded-lg text-sm text-gray-900 focus:outline-none focus:ring-2 focus:ring-indigo-300 resize-none"></textarea>
+            <p class="text-xs text-gray-400 mt-1">Max 320 characters. Supports <code class="bg-gray-100 px-1 rounded">{first_name}</code></p>
+        </div>
+
+        <div class="mb-5 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+            <p class="text-xs text-amber-700 font-medium">SMS billing note</p>
+            <p class="text-xs text-amber-600 mt-0.5">Each message counts as one SMS credit. Confirm before sending.</p>
+        </div>
+    </div>
+    <div class="px-5 py-4 border-t border-gray-100 flex gap-3">
+        <button onclick="closeSendDrawer()" type="button"
+                class="flex-1 h-10 border border-gray-200 hover:bg-gray-50 text-gray-600 text-sm font-medium rounded-lg transition-colors">
+            Cancel
+        </button>
+        <button onclick="confirmSend()" type="button" id="send-confirm-btn"
+                class="flex-1 h-10 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors disabled:opacity-50">
+            Send to <span id="send-btn-count">—</span> Members
+        </button>
+    </div>
+</div>
+
+<script>
+const _sendUrl = '{{ path('admin_loyalty_segments', _rp) }}/send';
+let _activeSegment = null;
+
+function openSendDrawer(segKey, label, count, action) {
+    _activeSegment = { key: segKey, action };
+    document.getElementById('send-segment-label').textContent = label;
+    document.getElementById('send-member-count').textContent = count;
+    document.getElementById('send-btn-count').textContent = count;
+    document.getElementById('send-message').value = '';
+    document.getElementById('send-drawer-error').classList.add('hidden');
+    document.getElementById('send-drawer').classList.remove('hidden');
+    document.getElementById('send-drawer-overlay').classList.remove('hidden');
+    setTimeout(() => document.getElementById('send-message').focus(), 80);
+}
+
+function closeSendDrawer() {
+    document.getElementById('send-drawer').classList.add('hidden');
+    document.getElementById('send-drawer-overlay').classList.add('hidden');
+    _activeSegment = null;
+}
+
+function confirmSend() {
+    const message = document.getElementById('send-message').value.trim();
+    const errEl   = document.getElementById('send-drawer-error');
+    const btn     = document.getElementById('send-confirm-btn');
+
+    errEl.classList.add('hidden');
+    if (!message) { errEl.textContent = 'Message is required.'; errEl.classList.remove('hidden'); return; }
+    if (!_activeSegment) return;
+
+    btn.disabled = true;
+    btn.textContent = 'Sending…';
+
+    const fd = new FormData();
+    fd.append('segment', _activeSegment.key);
+    fd.append('trigger_type', _activeSegment.action);
+    fd.append('message', message);
+
+    fetch(_sendUrl, { method: 'POST', body: fd })
+        .then(r => r.json())
+        .then(d => {
+            if (d.success) {
+                closeSendDrawer();
+                window.location.reload();
+            } else {
+                errEl.textContent = d.message ?? 'Failed to send.';
+                errEl.classList.remove('hidden');
+                btn.disabled = false;
+                btn.textContent = 'Send';
+            }
+        })
+        .catch(() => {
+            errEl.textContent = 'Network error. Please try again.';
+            errEl.classList.remove('hidden');
+            btn.disabled = false;
+            btn.textContent = 'Send';
+        });
+}
+</script>
+{% endif %}
+
+{% endif %}
+{% endblock %}

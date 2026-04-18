@@ -23,7 +23,7 @@ use Symfony\Component\HttpFoundation\Response;
  * Base controller for all admin panel controllers.
  *
  * Handles:
- *   - Validating angavu_token cookie
+ *   - Validating patronr_token cookie
  *   - Rejecting POS sessions
  *   - Checking required permissions
  *   - Providing helpers for JSON responses
@@ -230,6 +230,40 @@ abstract class AdminBaseController extends AbstractController
     }
 
     /**
+     * Block access to pages/actions that only make sense when multi-branch is enabled.
+     *
+     * Returns null when multi-branch IS enabled — caller may proceed.
+     * Returns a Response when multi-branch is off — caller must return it immediately.
+     *
+     * HTML requests → redirect to the dashboard on the same branch.
+     * Fetch/AJAX    → 403 JSON error.
+     */
+    protected function requireMultiBranch(Request $request, object $session): ?Response
+    {
+        if ($this->isMultiBranchEnabled($session->company->id)) {
+            return null;
+        }
+
+        // Reuse the same AJAX-detection logic as denyAccess()
+        if (
+            $request->isXmlHttpRequest() ||
+            str_contains($request->headers->get('Accept', ''), 'application/json') ||
+            (
+                $request->headers->get('Content-Type') === 'application/x-www-form-urlencoded'
+                && $request->isMethod('POST')
+            )
+        ) {
+            return $this->json(['success' => false, 'message' => 'This feature requires multi-branch to be enabled.'], 403);
+        }
+
+        return $this->redirectToRoute('app_dashboard', [
+            'subdomain' => (string) $request->attributes->get('subdomain', ''),
+            'domain'    => (string) $request->attributes->get('domain', ''),
+            'branch'    => (string) $request->attributes->get('branch', ''),
+        ]);
+    }
+
+    /**
      * Returns true if the multi-branch feature is both platform-released
      * and included in the company's active subscription.
      *
@@ -381,6 +415,6 @@ abstract class AdminBaseController extends AbstractController
             return substr($header, 7);
         }
 
-        return $request->cookies->get('angavu_token') ?: null;
+        return $request->cookies->get('patronr_token') ?: null;
     }
 }

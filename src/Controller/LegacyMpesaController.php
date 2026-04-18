@@ -19,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Serves the POS dashboard.
- * Access is gated by the angavu_terminal cookie.
+ * Access is gated by the patronr_terminal cookie.
  */
 #[Route('/{branch}/terminal', host: '{subdomain}.{domain}', requirements: ['subdomain' => '(?!admin\.)[A-Za-z0-9-]+', 'domain' => '.+', 'branch' => '[A-Za-z0-9-]+'])]
 class LegacyMpesaController extends AbstractController
@@ -37,7 +37,7 @@ class LegacyMpesaController extends AbstractController
     #[Route('/dashboard', name: 'terminal_dashboard', priority: 1)]
     public function dashboard(Request $request, string $domain, string $branch): Response
     {
-        $terminal = $request->cookies->get('angavu_terminal', '');
+        $terminal = $request->cookies->get('patronr_terminal', '');
         $subdomain = $this->resolveSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 
@@ -78,7 +78,7 @@ class LegacyMpesaController extends AbstractController
             return $this->redirectToRoute('terminal_login_page', ['subdomain' => $subdomain, 'domain' => $baseDomain, 'branch' => $branch]);
         }
 
-        $token    = $request->cookies->get('angavu_pos_token') ?: null;
+        $token    = $request->cookies->get('patronr_pos_token') ?: null;
         $isLocked = true;
         $userName = null;
         $session  = null;

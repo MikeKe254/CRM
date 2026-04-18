@@ -1,0 +1,417 @@
+{% extends 'admin/settings/_layout.html.twig' %}
+
+{% block settings_content %}
+
+<style>
+/* ── Page header ───────────────────────────────────────────────── */
+.ob-header {
+    display:flex; align-items:center; justify-content:space-between;
+    margin-bottom:1.25rem; gap:1rem; flex-wrap:wrap;
+}
+.ob-title { font-size:.9375rem; font-weight:700; color:#111827; }
+.ob-sub   { font-size:.75rem; color:#9ca3af; margin-top:1px; }
+
+/* ── Filter bar ────────────────────────────────────────────────── */
+.ob-filters {
+    display:flex; gap:.5rem; flex-wrap:wrap; align-items:center;
+    background:#fff; border:1px solid #e5e7eb; border-radius:.75rem;
+    padding:.625rem .875rem; margin-bottom:1rem;
+    box-shadow:0 1px 3px rgba(0,0,0,.05);
+}
+.ob-filters form { display:contents; }
+.ob-filter-select {
+    height:32px; padding:0 2rem 0 .75rem; font-size:.8125rem;
+    border:1px solid #e5e7eb; border-radius:.5rem; background:#fff;
+    color:#374151; appearance:none; cursor:pointer;
+    background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' fill='none' stroke='%239ca3af' stroke-width='2' viewBox='0 0 24 24'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+    background-repeat:no-repeat; background-position:right .5rem center;
+}
+.ob-filter-select:focus { outline:none; border-color:#6366f1; box-shadow:0 0 0 3px rgba(99,102,241,.1); }
+.ob-filter-btn {
+    height:32px; padding:0 .875rem; font-size:.8125rem; font-weight:600;
+    background:#4f46e5; color:#fff; border:none; border-radius:.5rem;
+    cursor:pointer; transition:background .12s;
+}
+.ob-filter-btn:hover { background:#4338ca; }
+.ob-filter-reset {
+    height:32px; padding:0 .75rem; font-size:.8125rem; font-weight:500;
+    background:none; color:#9ca3af; border:1px solid #e5e7eb; border-radius:.5rem;
+    cursor:pointer; transition:background .12s, color .12s;
+}
+.ob-filter-reset:hover { background:#f9fafb; color:#374151; }
+
+/* ── Table ──────────────────────────────────────────────────────── */
+.ob-table-wrap {
+    background:#fff; border:1px solid #e5e7eb; border-radius:.875rem;
+    overflow:hidden; box-shadow:0 1px 4px rgba(0,0,0,.06);
+}
+.ob-table { width:100%; border-collapse:collapse; font-size:.8125rem; }
+.ob-table th {
+    font-size:.6875rem; font-weight:700; color:#9ca3af;
+    text-transform:uppercase; letter-spacing:.06em;
+    padding:.625rem 1rem; text-align:left;
+    background:#f9fafb; border-bottom:1px solid #f3f4f6;
+    white-space:nowrap;
+}
+.ob-table td {
+    padding:.75rem 1rem; border-bottom:1px solid #f9fafb;
+    vertical-align:middle; color:#374151;
+}
+.ob-table tr:last-child td { border-bottom:none; }
+.ob-table tr:hover td { background:#fafafa; }
+
+/* ── Status badges ──────────────────────────────────────────────── */
+.ob-status {
+    display:inline-flex; align-items:center; gap:.3rem;
+    font-size:.6875rem; font-weight:700; padding:.225rem .5rem;
+    border-radius:.375rem;
+}
+.ob-status-pending   { background:#fefce8; color:#ca8a04; }
+.ob-status-queued    { background:#eff6ff; color:#2563eb; }
+.ob-status-sent      { background:#f0fdf4; color:#16a34a; }
+.ob-status-delivered { background:#ecfdf5; color:#059669; }
+.ob-status-failed    { background:#fef2f2; color:#dc2626; }
+
+/* ── Message body expand ────────────────────────────────────────── */
+.ob-body-cell {
+    max-width:240px; white-space:nowrap; overflow:hidden;
+    text-overflow:ellipsis; cursor:pointer; color:#4b5563;
+}
+.ob-body-cell.expanded { white-space:normal; }
+
+/* ── Recipient mono ─────────────────────────────────────────────── */
+.ob-msisdn { font-family:monospace; font-size:.8125rem; }
+
+/* ── Timestamp ──────────────────────────────────────────────────── */
+.ob-ts { font-size:.75rem; color:#9ca3af; white-space:nowrap; }
+
+/* ── Empty ──────────────────────────────────────────────────────── */
+.ob-empty { padding:3.5rem 2rem; text-align:center; }
+
+/* ── Pagination ─────────────────────────────────────────────────── */
+.ob-pagination {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:.75rem 1rem; border-top:1px solid #f3f4f6;
+    gap:.5rem; flex-wrap:wrap;
+}
+.ob-pag-info { font-size:.75rem; color:#9ca3af; }
+.ob-pag-btns { display:flex; gap:.375rem; }
+.ob-pag-btn {
+    height:30px; min-width:30px; padding:0 .625rem;
+    font-size:.75rem; font-weight:600; color:#374151;
+    background:#fff; border:1px solid #e5e7eb; border-radius:.5rem;
+    cursor:pointer; transition:background .12s;
+    display:inline-flex; align-items:center; justify-content:center;
+    text-decoration:none;
+}
+.ob-pag-btn:hover   { background:#f9fafb; border-color:#d1d5db; }
+.ob-pag-btn.active  { background:#4f46e5; color:#fff; border-color:#4f46e5; pointer-events:none; }
+.ob-pag-btn.disabled { opacity:.4; pointer-events:none; }
+
+/* ── Detail modal ───────────────────────────────────────────────── */
+.ob-modal-overlay {
+    display:none; position:fixed; inset:0; background:rgba(0,0,0,.4);
+    z-index:40; backdrop-filter:blur(1px);
+}
+.ob-modal-overlay.open { display:flex; align-items:center; justify-content:center; padding:1rem; }
+.ob-modal {
+    background:#fff; border-radius:.875rem; width:100%; max-width:480px;
+    max-height:85vh; overflow-y:auto;
+    box-shadow:0 20px 50px rgba(0,0,0,.15);
+}
+.ob-modal-head {
+    display:flex; align-items:center; justify-content:space-between;
+    padding:1rem 1.25rem; border-bottom:1px solid #f3f4f6;
+    position:sticky; top:0; background:#fff;
+}
+.ob-modal-close {
+    width:28px; height:28px; border-radius:.5rem; background:none; border:none;
+    cursor:pointer; display:flex; align-items:center; justify-content:center;
+    color:#9ca3af; transition:background .12s;
+}
+.ob-modal-close:hover { background:#f3f4f6; color:#374151; }
+.ob-modal-body { padding:1.25rem; }
+.ob-dl { display:grid; grid-template-columns:8rem 1fr; gap:.5rem .75rem; font-size:.8125rem; }
+.ob-dl dt { color:#9ca3af; font-weight:600; }
+.ob-dl dd { color:#111827; word-break:break-all; margin:0; }
+.ob-code {
+    margin-top:.875rem; background:#f9fafb; border:1px solid #f3f4f6;
+    border-radius:.5rem; padding:.75rem; font-size:.75rem; font-family:monospace;
+    color:#374151; white-space:pre-wrap; word-break:break-all;
+}
+
+@media (max-width:767px) {
+    .ob-table-wrap { border-radius:.625rem; }
+    .ob-table th:nth-child(3),
+    .ob-table td:nth-child(3),
+    .ob-table th:nth-child(5),
+    .ob-table td:nth-child(5)  { display:none; }
+    .ob-dl { grid-template-columns:6rem 1fr; }
+}
+</style>
+
+{# ─── Header ──────────────────────────────────────────────────────────────── #}
+<div class="ob-header">
+    <div>
+        <h1 class="ob-title">SMS Outbox</h1>
+        <p class="ob-sub">
+            {% if total > 0 %}
+                {{ total|number_format }} message{{ total != 1 ? 's' : '' }} total
+            {% else %}
+                No messages yet
+            {% endif %}
+        </p>
+    </div>
+    <a href="{{ path('admin_settings_sms', _rp) }}" class="sms-btn" data-turbo-action="replace"
+       style="display:inline-flex;align-items:center;gap:.35rem;height:30px;padding:0 .75rem;
+              font-size:.75rem;font-weight:600;color:#4b5563;background:#fff;border:1px solid #e5e7eb;
+              border-radius:.5rem;text-decoration:none;">
+        <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+            <line x1="19" y1="12" x2="5" y2="12"/><polyline points="12 19 5 12 12 5"/>
+        </svg>
+        Back to Setup
+    </a>
+</div>
+
+{# ─── Filters ─────────────────────────────────────────────────────────────── #}
+<div class="ob-filters">
+    <form method="GET" action="{{ path('admin_settings_sms_outbox', _rp) }}">
+        <select name="status" class="ob-filter-select" aria-label="Filter by status">
+            <option value="">All statuses</option>
+            {% for s in ['pending','queued','sent','delivered','failed'] %}
+            <option value="{{ s }}" {{ filter_status == s ? 'selected' : '' }}>{{ s|capitalize }}</option>
+            {% endfor %}
+        </select>
+
+        <select name="provider" class="ob-filter-select" aria-label="Filter by provider">
+            <option value="">All providers</option>
+            {% for key, adapter in providers %}
+            <option value="{{ key }}" {{ filter_provider == key ? 'selected' : '' }}>
+                {{ adapter.describeConfiguration().displayName }}
+            </option>
+            {% endfor %}
+        </select>
+
+        <button type="submit" class="ob-filter-btn">Filter</button>
+
+        {% if filter_status or filter_provider %}
+        <a href="{{ path('admin_settings_sms_outbox', _rp) }}" class="ob-filter-reset">Clear</a>
+        {% endif %}
+    </form>
+</div>
+
+{# ─── Table ───────────────────────────────────────────────────────────────── #}
+<div class="ob-table-wrap">
+    {% if rows is empty %}
+    <div class="ob-empty">
+        <div style="width:44px;height:44px;border-radius:12px;background:#eef2ff;display:flex;align-items:center;justify-content:center;margin:0 auto .875rem;">
+            <svg width="20" height="20" fill="none" stroke="#4f46e5" stroke-width="1.75" viewBox="0 0 24 24">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/>
+            </svg>
+        </div>
+        <p class="text-sm font-semibold text-gray-700 mb-1">No messages found</p>
+        <p class="text-xs text-gray-400">
+            {% if filter_status or filter_provider %}
+                Try clearing the filters.
+            {% else %}
+                Messages will appear here once your SMS service starts sending.
+            {% endif %}
+        </p>
+    </div>
+    {% else %}
+    <table class="ob-table">
+        <thead>
+            <tr>
+                <th>#</th>
+                <th>Recipient</th>
+                <th>Provider / Sender</th>
+                <th>Message</th>
+                <th>Type</th>
+                <th>Status</th>
+                <th>Sent at</th>
+                <th></th>
+            </tr>
+        </thead>
+        <tbody>
+        {% for row in rows %}
+        <tr>
+            <td class="text-gray-400 text-xs">{{ row.id }}</td>
+            <td><span class="ob-msisdn">{{ row.recipient_msisdn }}</span></td>
+            <td>
+                <div style="font-size:.8125rem;font-weight:600;color:#374151;">{{ row.provider_key|capitalize }}</div>
+                {% if row.sender_id %}
+                <div style="font-size:.75rem;color:#9ca3af;font-family:monospace;">{{ row.sender_id }}</div>
+                {% endif %}
+                {% if row.config_label %}
+                <div style="font-size:.6875rem;color:#d1d5db;">{{ row.config_label }}</div>
+                {% endif %}
+            </td>
+            <td class="ob-body-cell" onclick="this.classList.toggle('expanded')" title="Click to expand">
+                {{ row.message_body }}
+            </td>
+            <td>
+                {% if row.message_type == 'promotional' %}
+                <span style="font-size:.6875rem;font-weight:700;color:#059669;background:#ecfdf5;padding:.15rem .4rem;border-radius:.25rem;">Promo</span>
+                {% else %}
+                <span style="font-size:.6875rem;font-weight:700;color:#2563eb;background:#eff6ff;padding:.15rem .4rem;border-radius:.25rem;">TX</span>
+                {% endif %}
+            </td>
+            <td>
+                <span class="ob-status ob-status-{{ row.status }}">
+                    {% if row.status == 'pending' %}
+                    <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+                    {% elseif row.status == 'queued' %}
+                    <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-.07-3.26"/></svg>
+                    {% elseif row.status in ['sent', 'delivered'] %}
+                    <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"/></svg>
+                    {% else %}
+                    <svg width="8" height="8" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+                    {% endif %}
+                    {{ row.status|capitalize }}
+                </span>
+            </td>
+            <td class="ob-ts">
+                {% if row.sent_at %}
+                    {{ row.sent_at|date('d M, H:i') }}
+                {% elseif row.failed_at %}
+                    <span style="color:#ef4444;">{{ row.failed_at|date('d M, H:i') }}</span>
+                {% else %}
+                    <span style="color:#d1d5db;">—</span>
+                {% endif %}
+            </td>
+            <td>
+                <button type="button"
+                        onclick="openDetail({{ row|json_encode|e('html_attr') }})"
+                        style="background:none;border:none;cursor:pointer;color:#9ca3af;padding:.25rem;border-radius:.375rem;display:flex;"
+                        title="View details">
+                    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+                        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
+                    </svg>
+                </button>
+            </td>
+        </tr>
+        {% endfor %}
+        </tbody>
+    </table>
+
+    {# ─── Pagination ───────────────────────────────────────────────────── #}
+    {% if pages > 1 %}
+    <div class="ob-pagination">
+        <span class="ob-pag-info">
+            Page {{ page }} of {{ pages }} &nbsp;·&nbsp; {{ total|number_format }} total
+        </span>
+        <div class="ob-pag-btns">
+            {% set _pq = {status: filter_status, provider: filter_provider} %}
+
+            <a href="{{ path('admin_settings_sms_outbox', _rp|merge(_pq|merge({page: 1}))) }}"
+               class="ob-pag-btn {{ page == 1 ? 'disabled' : '' }}">«</a>
+
+            <a href="{{ path('admin_settings_sms_outbox', _rp|merge(_pq|merge({page: max(1, page - 1)}))) }}"
+               class="ob-pag-btn {{ page == 1 ? 'disabled' : '' }}">‹</a>
+
+            {% set _start = max(1, page - 2) %}
+            {% set _end   = min(pages, page + 2) %}
+            {% for p in _start.._end %}
+            <a href="{{ path('admin_settings_sms_outbox', _rp|merge(_pq|merge({page: p}))) }}"
+               class="ob-pag-btn {{ p == page ? 'active' : '' }}">{{ p }}</a>
+            {% endfor %}
+
+            <a href="{{ path('admin_settings_sms_outbox', _rp|merge(_pq|merge({page: min(pages, page + 1)}))) }}"
+               class="ob-pag-btn {{ page == pages ? 'disabled' : '' }}">›</a>
+
+            <a href="{{ path('admin_settings_sms_outbox', _rp|merge(_pq|merge({page: pages}))) }}"
+               class="ob-pag-btn {{ page == pages ? 'disabled' : '' }}">»</a>
+        </div>
+    </div>
+    {% endif %}
+
+    {% endif %}{# /rows not empty #}
+</div>
+
+{# ─── Detail modal ────────────────────────────────────────────────────────── #}
+<div class="ob-modal-overlay" id="obModalOverlay" onclick="closeDetail(event)">
+    <div class="ob-modal" onclick="event.stopPropagation()">
+        <div class="ob-modal-head">
+            <span style="font-size:.875rem;font-weight:700;color:#111827;" id="obModalTitle">Message Detail</span>
+            <button type="button" class="ob-modal-close" onclick="closeDetailDirect()">
+                <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24">
+                    <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+                </svg>
+            </button>
+        </div>
+        <div class="ob-modal-body" id="obModalBody"></div>
+    </div>
+</div>
+
+{% endblock %}
+
+{% block settings_scripts %}
+<script>
+(function () {
+function openDetail(row) {
+    const statuses = {
+        pending: 'ob-status-pending', queued: 'ob-status-queued',
+        sent: 'ob-status-sent', delivered: 'ob-status-delivered', failed: 'ob-status-failed'
+    };
+
+    document.getElementById('obModalTitle').textContent = '#' + row.id + ' — ' + row.recipient_msisdn;
+
+    const items = [
+        ['Status',    `<span class="ob-status ${statuses[row.status] || ''}">${cap(row.status)}</span>`],
+        ['Recipient', `<span class="ob-msisdn">${esc(row.recipient_msisdn)}</span>`],
+        ['Provider',  esc(cap(row.provider_key))],
+        ['Sender ID', esc(row.sender_id || '—')],
+        ['Type',      esc(cap(row.message_type || 'transactional'))],
+    ];
+    if (row.config_label) items.push(['Config', esc(row.config_label)]);
+    if (row.provider_message_id) items.push(['Provider ID', `<span class="ob-msisdn">${esc(row.provider_message_id)}</span>`]);
+    if (row.sent_at)      items.push(['Sent at',    esc(row.sent_at)]);
+    if (row.delivered_at) items.push(['Delivered',  esc(row.delivered_at)]);
+    if (row.failed_at)    items.push(['Failed at',  esc(row.failed_at)]);
+    if (row.created_at)   items.push(['Created',    esc(row.created_at)]);
+
+    let html = '<dl class="ob-dl">';
+    for (const [dt, dd] of items) {
+        html += `<dt>${esc(dt)}</dt><dd>${dd}</dd>`;
+    }
+    html += '</dl>';
+    html += `<div class="ob-code" style="margin-top:1rem;">${esc(row.message_body)}</div>`;
+
+    if (row.failure_reason) {
+        html += `<div class="ob-code" style="border-color:#fecaca;color:#dc2626;margin-top:.5rem;">
+            <strong>Failure reason:</strong>\n${esc(row.failure_reason)}</div>`;
+    }
+    if (row.provider_response) {
+        let prettyJson = row.provider_response;
+        try { prettyJson = JSON.stringify(JSON.parse(row.provider_response), null, 2); } catch {}
+        html += `<p style="font-size:.6875rem;font-weight:700;color:#9ca3af;text-transform:uppercase;
+                            letter-spacing:.08em;margin:.875rem 0 .375rem;">Provider response</p>`;
+        html += `<div class="ob-code">${esc(prettyJson)}</div>`;
+    }
+
+    document.getElementById('obModalBody').innerHTML = html;
+    document.getElementById('obModalOverlay').classList.add('open');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeDetail(e) {
+    if (e.target === document.getElementById('obModalOverlay')) closeDetailDirect();
+}
+function closeDetailDirect() {
+    document.getElementById('obModalOverlay').classList.remove('open');
+    document.body.style.overflow = '';
+}
+
+function cap(s) { return s ? s.charAt(0).toUpperCase() + s.slice(1) : ''; }
+function esc(s) {
+    return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+                          .replace(/"/g,'&quot;').replace(/'/g,'&#039;');
+}
+
+document.addEventListener('keydown', e => { if (e.key === 'Escape') closeDetailDirect(); });
+
+window.openDetail = openDetail;
+
+})();
+</script>
+{% endblock %}

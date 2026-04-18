@@ -49,8 +49,8 @@ class LoyaltyController extends AbstractController
     #[Route('/check-phone', name: 'terminal_loyalty_check_phone', methods: ['GET'])]
     public function checkPhone(Request $request, string $branch): JsonResponse
     {
-        $token     = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal  = (string) $request->cookies->get('angavu_terminal', '');
+        $token     = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal  = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain = $this->domains->getSubdomain($request);
 
         if ($token === null || $subdomain === null) {
@@ -104,8 +104,8 @@ class LoyaltyController extends AbstractController
     #[Route('/check', name: 'terminal_loyalty_check', methods: ['GET'])]
     public function check(Request $request, string $branch): Response
     {
-        $token      = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal   = (string) $request->cookies->get('angavu_terminal', '');
+        $token      = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal   = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain  = $this->domains->getSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 
@@ -148,8 +148,8 @@ class LoyaltyController extends AbstractController
     #[Route('/enroll', name: 'terminal_loyalty_enroll', methods: ['GET', 'POST'])]
     public function enroll(Request $request, string $branch): Response
     {
-        $token      = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal   = (string) $request->cookies->get('angavu_terminal', '');
+        $token      = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal   = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain  = $this->domains->getSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 

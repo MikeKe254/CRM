@@ -44,7 +44,7 @@ class PosLoginController extends AbstractController
     #[Route('/login', name: 'terminal_login_page', methods: ['GET'])]
     public function loginPage(Request $request, string $domain, string $branch): Response
     {
-        $terminal = $request->cookies->get('angavu_terminal', '');
+        $terminal = $request->cookies->get('patronr_terminal', '');
         $subdomain = $this->resolveSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 
@@ -152,7 +152,7 @@ class PosLoginController extends AbstractController
             ]);
 
             $response->headers->setCookie(
-                Cookie::create('angavu_pos_auth_token')
+                Cookie::create('patronr_pos_auth_token')
                     ->withValue($result->token)
                     ->withExpires(time() + 900)
                     ->withPath('/')
@@ -169,7 +169,7 @@ class PosLoginController extends AbstractController
     #[Route('/login/authorize-terminal', name: 'terminal_login_authorize_terminal', methods: ['POST'])]
     public function authorizeTerminal(Request $request, string $domain): JsonResponse
     {
-        $token = $request->cookies->get('angavu_pos_auth_token');
+        $token = $request->cookies->get('patronr_pos_auth_token');
         $baseDomain = $this->domains->getBaseDomain($request);
 
         if (!$token) {
@@ -289,9 +289,9 @@ class PosLoginController extends AbstractController
             ]),
         ]);
 
-        $response->headers->clearCookie('angavu_pos_auth_token', '/');
+        $response->headers->clearCookie('patronr_pos_auth_token', '/');
         $response->headers->setCookie(
-            Cookie::create('angavu_terminal')
+            Cookie::create('patronr_terminal')
                 ->withValue($terminalIdentifier)
                 ->withExpires(time() + 60 * 60 * 24 * self::TERMINAL_DAYS)
                 ->withPath('/')

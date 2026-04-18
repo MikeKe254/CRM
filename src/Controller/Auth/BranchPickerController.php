@@ -113,7 +113,7 @@ final class BranchPickerController extends AbstractController
             return substr($header, 7);
         }
 
-        return $request->cookies->get('angavu_token') ?: null;
+        return $request->cookies->get('patronr_token') ?: null;
     }
 
     private function resolveSubdomain(Request $request): ?string

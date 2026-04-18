@@ -234,8 +234,11 @@ class UserController extends AdminBaseController
 
         $this->activityLog->record($session, 'user.view', request: $request);
 
-        // Show the scope toggle only when the current branch has sub-branches.
+        // Show the scope toggle only when multi-branch is enabled AND the current branch has sub-branches.
+        // Guard on isMultiBranchEnabled so the toggle never appears in single-location mode,
+        // even if legacy branch data exists in the DB from a previous plan downgrade.
         $hasSubBranches = $session->branch !== null
+            && $this->isMultiBranchEnabled($session->company->id)
             && count($this->hierarchy->getDescendantIds($session->branch->id)) > 0;
 
         $departments = $activeBranchId !== null

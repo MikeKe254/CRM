@@ -153,8 +153,8 @@ class MpesaFeedController extends AbstractController
      */
     private function resolveContext(Request $request, string $branch): array|Response
     {
-        $token      = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal   = (string) $request->cookies->get('angavu_terminal', '');
+        $token      = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal   = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain  = $this->domains->getSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 

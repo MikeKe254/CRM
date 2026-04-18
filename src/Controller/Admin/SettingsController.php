@@ -48,6 +48,22 @@ class SettingsController extends AdminBaseController
     }
 
     // =========================================================================
+    // TAB: BILLING & PLAN
+    // =========================================================================
+
+    #[Route('/billing', name: 'admin_settings_billing', methods: ['GET'])]
+    public function billing(Request $request): Response
+    {
+        $session = $this->requireSettingsAccess($request);
+        if ($session instanceof Response) return $session;
+        return $this->redirectToRoute('admin_billing', [
+            'subdomain' => (string) $request->attributes->get('subdomain'),
+            'domain' => (string) $request->attributes->get('domain'),
+            'branch' => (string) $request->attributes->get('branch'),
+        ]);
+    }
+
+    // =========================================================================
     // TAB: COMPANY
     // =========================================================================
 
@@ -1104,8 +1120,12 @@ class SettingsController extends AdminBaseController
         $redemptionEnabled = $request->request->get('redemption_enabled') === '1' ? 1 : 0;
         $autoAwardEnabled = $request->request->get('auto_award_enabled') === '1' ? 1 : 0;
         $autoEnrollOnPayment = $request->request->get('auto_enroll_on_payment') === '1' ? 1 : 0;
-        $kesPerPoint      = max(0.01, (float) $request->request->get('kes_per_point', 1.0));
-        $maxRedemptionPct = min(100, max(1, (int) $request->request->get('max_redemption_pct', 100)));
+        $kesPerPoint          = max(0.01, (float) $request->request->get('kes_per_point', 1.0));
+        $maxRedemptionPct     = min(100, max(1, (int) $request->request->get('max_redemption_pct', 100)));
+        $pointsExpiryEnabled  = $request->request->get('points_expiry_enabled') === '1' ? 1 : 0;
+        $pointsExpiryDays     = $pointsExpiryEnabled
+            ? max(1, min(3650, (int) $request->request->get('points_expiry_days', 365)))
+            : null;
 
         $existing = $this->db->fetchOne(
             'SELECT id FROM loyalty_programs WHERE company_id = ? AND branch_id = ? LIMIT 1',
@@ -1119,14 +1139,16 @@ class SettingsController extends AdminBaseController
                     points_per_unit = ?, unit_amount = ?, enroll_bonus_points = ?,
                     is_active = ?, redemption_enabled = ?, auto_award_enabled = ?,
                     auto_enroll_on_payment = ?, kes_per_point = ?,
-                    max_redemption_pct = ?
+                    max_redemption_pct = ?, points_expiry_enabled = ?,
+                    points_expiry_days = ?
                  WHERE company_id = ? AND branch_id = ?',
                 [
                     $programName, $pointsName, $pointsSymbol,
                     $pointsPerUnit, $unitAmount, $enrollBonus,
                     $isActive, $redemptionEnabled, $autoAwardEnabled,
                     $autoEnrollOnPayment, $kesPerPoint,
-                    $maxRedemptionPct, $companyId, $branchId,
+                    $maxRedemptionPct, $pointsExpiryEnabled,
+                    $pointsExpiryDays, $companyId, $branchId,
                 ],
             );
         } else {
@@ -1135,13 +1157,15 @@ class SettingsController extends AdminBaseController
                     (company_id, branch_id, program_name, points_name, points_symbol,
                      points_per_unit, unit_amount, enroll_bonus_points, is_active,
                      redemption_enabled, auto_award_enabled, auto_enroll_on_payment,
-                     kes_per_point, max_redemption_pct)
-                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
+                     kes_per_point, max_redemption_pct, points_expiry_enabled,
+                     points_expiry_days)
+                 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
                 [
                     $companyId, $branchId, $programName, $pointsName, $pointsSymbol,
                     $pointsPerUnit, $unitAmount, $enrollBonus,
                     $isActive, $redemptionEnabled, $autoAwardEnabled,
                     $autoEnrollOnPayment, $kesPerPoint, $maxRedemptionPct,
+                    $pointsExpiryEnabled, $pointsExpiryDays,
                 ],
             );
         }
@@ -1363,6 +1387,220 @@ class SettingsController extends AdminBaseController
         }
 
         return false;
+    }
+
+    private function buildPlanFeatureComparison(array $plans, array $featureRows): array
+    {
+        $sections = [];
+
+        foreach ($featureRows as $row) {
+            $moduleKey = (string) $row['module_slug'];
+            $submoduleKey = (string) $row['submodule_slug'];
+            $planId = (int) $row['plan_id'];
+
+            if (!isset($sections[$moduleKey])) {
+                $sections[$moduleKey] = [
+                    'title' => (string) $row['module_name'],
+                    'rows' => [],
+                ];
+            }
+
+            if (!isset($sections[$moduleKey]['rows'][$submoduleKey])) {
+                $sections[$moduleKey]['rows'][$submoduleKey] = [
+                    'label' => $this->formatPlanSubmoduleLabel((string) $row['submodule_name']),
+                    'plans' => [],
+                ];
+            }
+
+            $sections[$moduleKey]['rows'][$submoduleKey]['plans'][$planId] = true;
+        }
+
+        foreach ($sections as &$section) {
+            $section['rows'] = array_values($section['rows']);
+
+            foreach ($section['rows'] as &$row) {
+                foreach ($plans as $plan) {
+                    $planId = (int) $plan['id'];
+                    $row['plans'][$planId] = $row['plans'][$planId] ?? false;
+                }
+            }
+            unset($row);
+        }
+        unset($section);
+
+        return array_values($sections);
+    }
+
+    private function buildPlanLimitComparison(array $plans, array $limitRows): array
+    {
+        $labels = [
+            'max_users' => 'Users',
+            'max_branches' => 'Branches',
+            'max_products' => 'Services & items',
+            'sms_per_month' => 'SMS per month',
+            'api_calls_per_month' => 'API calls / month',
+            'data_retention_days' => 'Data retention',
+        ];
+
+        $byPlan = [];
+        foreach ($limitRows as $row) {
+            $byPlan[(int) $row['plan_id']][(string) $row['limit_key']] = (int) $row['limit_value'];
+        }
+
+        $rows = [];
+        foreach ($labels as $key => $label) {
+            $values = [];
+            foreach ($plans as $plan) {
+                $planId = (int) $plan['id'];
+                $values[$planId] = $this->formatPlanLimitValue($key, $byPlan[$planId][$key] ?? null);
+            }
+
+            $rows[] = [
+                'label' => $label,
+                'values' => $values,
+            ];
+        }
+
+        return [
+            'rows' => $rows,
+            'by_plan' => $byPlan,
+        ];
+    }
+
+    private function buildPlanHighlights(int $planId, array $sections): array
+    {
+        $highlights = [];
+
+        foreach ($sections as $section) {
+            foreach ($section['rows'] as $row) {
+                if (($row['plans'][$planId] ?? false) === true) {
+                    $highlights[] = $row['label'];
+                }
+            }
+        }
+
+        return array_slice($highlights, 0, 6);
+    }
+
+    private function formatPlanSubmoduleLabel(string $label): string
+    {
+        return match (strtolower(trim($label))) {
+            'profiles' => 'Customer profiles',
+            'activity' => 'Customer activity',
+            'segmentation' => 'Customer segmentation',
+            'records' => 'Transaction records',
+            'orders' => 'Orders',
+            'processing' => 'Payment processing',
+            'refunds' => 'Refunds',
+            'users' => 'Team access',
+            'permissions' => 'Permissions',
+            'branches' => 'Multi-branch operations',
+            'revenue' => 'Revenue analytics',
+            'products' => 'Products',
+            'categories' => 'Categories',
+            'availability' => 'Availability control',
+            'campaigns' => 'Campaigns',
+            'promotions' => 'Promotions',
+            'points' => 'Points and rewards',
+            'notifications' => 'Notifications',
+            'automation' => 'Automation',
+            'stock' => 'Stock tracking',
+            'alerts' => 'Inventory alerts',
+            'api' => 'API access',
+            'webhooks' => 'Webhooks',
+            default => $label,
+        };
+    }
+
+    private function formatPlanLimitValue(string $key, ?int $value): string
+    {
+        if ($value === null) {
+            return '—';
+        }
+
+        if ($value === -1) {
+            return 'Unlimited';
+        }
+
+        return match ($key) {
+            'sms_per_month', 'api_calls_per_month', 'max_users', 'max_branches', 'max_products' => number_format($value),
+            'data_retention_days' => $value . ' days',
+            default => (string) $value,
+        };
+    }
+
+    private function buildSubscriptionInsights(array|false $subscription): array
+    {
+        if (!$subscription) {
+            return [
+                'tone' => 'amber',
+                'headline' => 'No active subscription found',
+                'summary' => 'This company does not currently have a live subscription record driving feature entitlement.',
+                'next_label' => 'Next billing date',
+                'next_date' => null,
+                'period_label' => 'Access window',
+                'period_value' => 'Unavailable',
+            ];
+        }
+
+        $status = (string) ($subscription['status'] ?? '');
+        $billingCycle = (string) ($subscription['billing_cycle'] ?? '');
+        $trialEndsAt = $subscription['trial_ends_at'] ?? null;
+        $endsAt = $subscription['ends_at'] ?? null;
+        $startedAt = $subscription['started_at'] ?? null;
+
+        $tone = match ($status) {
+            'active' => 'emerald',
+            'trial' => 'indigo',
+            'past_due' => 'amber',
+            'cancelled', 'expired' => 'red',
+            default => 'slate',
+        };
+
+        $headline = match ($status) {
+            'active' => 'Subscription active',
+            'trial' => 'Trial currently running',
+            'past_due' => 'Payment attention needed',
+            'cancelled' => 'Subscription cancelled',
+            'expired' => 'Subscription expired',
+            default => 'Subscription status unavailable',
+        };
+
+        $summary = match ($status) {
+            'active' => 'The company is currently operating on an active paid or free plan.',
+            'trial' => 'The company is currently inside a trial window before normal billing takes over.',
+            'past_due' => 'The current subscription is in a past-due state and may lose access if not regularized.',
+            'cancelled' => 'The current subscription was cancelled and is only retained here for history and access tracking.',
+            'expired' => 'The previous subscription period ended and no current renewal is holding access open.',
+            default => 'Review the subscription record below to understand the current company state.',
+        };
+
+        $nextLabel = $status === 'trial' ? 'Trial ends' : 'Next billing date';
+        $nextDate = $status === 'trial' ? $trialEndsAt : $endsAt;
+
+        $periodLabel = 'Access window';
+        $periodValue = 'Open-ended';
+
+        if ($startedAt && $endsAt) {
+            $periodValue = sprintf('%s → %s', $startedAt, $endsAt);
+        } elseif ($startedAt) {
+            $periodValue = sprintf('Started %s', $startedAt);
+        }
+
+        if (in_array($billingCycle, ['lifetime', 'custom'], true) && !$endsAt) {
+            $nextLabel = 'Renewal model';
+            $nextDate = null;
+        }
+
+        return [
+            'tone' => $tone,
+            'headline' => $headline,
+            'summary' => $summary,
+            'next_label' => $nextLabel,
+            'next_date' => $nextDate,
+            'period_label' => $periodLabel,
+            'period_value' => $periodValue,
+        ];
     }
 
     // =========================================================================

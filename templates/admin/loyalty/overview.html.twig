@@ -1,0 +1,310 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
+{% set _rp = {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch} %}
+
+{% block admin_title %}Loyalty Programme{% endblock %}
+{% block admin_subtitle %}{{ program.program_name ?? 'Overview' }}{% endblock %}
+
+{% block admin_actions %}
+{% if can.edit_program %}
+<a href="{{ path('admin_settings_loyalty', _rp) }}"
+   class="h-9 px-4 border border-gray-200 bg-white hover:bg-gray-50 text-gray-700 text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-2">
+    <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">
+        <circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83-2.83l.06-.06A1.65 1.65 0 0 0 4.68 15a1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 2.83-2.83l.06.06A1.65 1.65 0 0 0 9 4.68a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 2.83l-.06.06A1.65 1.65 0 0 0 19.4 9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+    </svg>
+    Settings
+</a>
+{% endif %}
+{% endblock %}
+
+{% block admin_content %}
+
+{% if not program %}
+<div class="flex flex-col items-center justify-center py-24 text-center">
+    <div class="w-16 h-16 rounded-2xl bg-amber-50 flex items-center justify-center mb-5">
+        <svg width="28" height="28" fill="none" stroke="#d97706" stroke-width="1.5" viewBox="0 0 24 24">
+            <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+        </svg>
+    </div>
+    <h2 class="text-base font-semibold text-gray-900 mb-2">No loyalty programme configured</h2>
+    <p class="text-sm text-gray-500 max-w-sm mb-6">Set up your earning rules and branding to start rewarding customers.</p>
+    {% if can.edit_program %}
+    <a href="{{ path('admin_settings_loyalty', _rp) }}"
+       class="h-9 px-5 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors inline-flex items-center">
+        Configure Loyalty
+    </a>
+    {% endif %}
+</div>
+
+{% else %}
+
+{# ── Programme banner ────────────────────────────────────────────────── #}
+<div class="bg-white rounded-xl border border-gray-200 px-6 py-5 mb-5 flex flex-wrap items-center justify-between gap-4">
+    <div class="flex items-center gap-4">
+        <div class="w-11 h-11 rounded-xl bg-indigo-50 flex items-center justify-center flex-shrink-0">
+            <svg width="20" height="20" fill="none" stroke="#4f46e5" stroke-width="1.75" viewBox="0 0 24 24">
+                <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/>
+            </svg>
+        </div>
+        <div>
+            <div class="flex items-center gap-2">
+                <h2 class="text-sm font-semibold text-gray-900">{{ program.program_name }}</h2>
+                <span class="inline-flex items-center gap-1 text-xs font-semibold px-2 py-0.5 rounded-full
+                             {{ program.is_active ? 'bg-emerald-50 text-emerald-700' : 'bg-gray-100 text-gray-500' }}">
+                    <span class="w-1.5 h-1.5 rounded-full inline-block {{ program.is_active ? 'bg-emerald-500' : 'bg-gray-400' }}"></span>
+                    {{ program.is_active ? 'Active' : 'Paused' }}
+                </span>
+            </div>
+            <p class="text-xs text-gray-400 mt-0.5">
+                {{ program.points_per_unit }} {{ program.points_name ?? 'points' }} per {{ program.unit_amount }} KES
+                {% if program.redemption_enabled %} · Redemption on{% endif %}
+                {% if program.auto_award_enabled %} · Auto-award on{% endif %}
+            </p>
+        </div>
+    </div>
+    <div class="flex items-center gap-2">
+        {% if can.view_members %}
+        <a href="{{ path('admin_loyalty_members', _rp) }}"
+           class="h-8 px-3 border border-indigo-200 bg-indigo-50 hover:bg-indigo-100 text-indigo-700 text-xs font-semibold rounded-lg transition-colors inline-flex items-center gap-1.5">
+            View Members
+        </a>
+        {% endif %}
+        {% if can.view_reports %}
+        <a href="{{ path('admin_loyalty_reports', _rp) }}"
+           class="h-8 px-3 border border-gray-200 bg-white hover:bg-gray-50 text-gray-600 text-xs font-medium rounded-lg transition-colors inline-flex items-center gap-1.5">
+            Reports
+        </a>
+        {% endif %}
+    </div>
+</div>
+
+{# ── Needs your attention ────────────────────────────────────────────── #}
+{% set _has_actions = signals.at_risk_count > 0 or signals.lapsing_count > 0 or signals.upgrade_candidates > 0 or signals.expiring_points_kes > 0 %}
+{% if _has_actions %}
+<div class="bg-amber-50 border border-amber-200 rounded-xl px-5 py-4 mb-5">
+    <p class="text-xs font-semibold text-amber-700 uppercase tracking-wide mb-3">Needs your attention</p>
+    <div class="flex flex-col gap-2.5">
+
+        {% if signals.at_risk_count > 0 or signals.lapsing_count > 0 %}
+        {% set _inactive = signals.at_risk_count + signals.lapsing_count %}
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+            <p class="text-sm text-amber-900">
+                <span class="font-semibold">{{ _inactive }} member{{ _inactive != 1 ? 's' : '' }}</span>
+                haven't visited in 60+ days
+                {% if signals.lapsing_count > 0 %}<span class="text-amber-600"> · {{ signals.lapsing_count }} lapsing</span>{% endif %}
+            </p>
+            {% if can.view_segments %}
+            <a href="{{ path('admin_loyalty_segments', _rp) }}"
+               class="text-xs font-semibold text-amber-700 hover:text-amber-900 border border-amber-300 bg-white hover:bg-amber-50 px-3 h-7 rounded-lg inline-flex items-center transition-colors flex-shrink-0">
+                View &amp; Act →
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if signals.upgrade_candidates > 0 %}
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+            <p class="text-sm text-amber-900">
+                <span class="font-semibold">{{ signals.upgrade_candidates }} member{{ signals.upgrade_candidates != 1 ? 's' : '' }}</span>
+                within 100 {{ program.points_name ?? 'points' }} of tier upgrade
+            </p>
+            {% if can.view_segments %}
+            <a href="{{ path('admin_loyalty_segments', _rp) }}?segment=upgrade_candidates"
+               class="text-xs font-semibold text-amber-700 hover:text-amber-900 border border-amber-300 bg-white hover:bg-amber-50 px-3 h-7 rounded-lg inline-flex items-center transition-colors flex-shrink-0">
+                Send Nudge →
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+        {% if signals.expiring_points_kes > 0 %}
+        <div class="flex items-center justify-between gap-4 flex-wrap">
+            <p class="text-sm text-amber-900">
+                <span class="font-semibold">KES {{ signals.expiring_points_kes|number_format(0) }}</span>
+                in points expiring within 30 days
+            </p>
+            {% if can.view_segments %}
+            <a href="{{ path('admin_loyalty_segments', _rp) }}?segment=expiring_points"
+               class="text-xs font-semibold text-amber-700 hover:text-amber-900 border border-amber-300 bg-white hover:bg-amber-50 px-3 h-7 rounded-lg inline-flex items-center transition-colors flex-shrink-0">
+                Send Warning →
+            </a>
+            {% endif %}
+        </div>
+        {% endif %}
+
+    </div>
+</div>
+{% endif %}
+
+{# ── Intelligence cards ──────────────────────────────────────────────── #}
+<div class="grid grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-5">
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Total Members</p>
+        <p class="text-2xl font-bold text-gray-900">{{ stats.total_members|number_format }}</p>
+        <p class="text-xs text-gray-400 mt-1">Enrolled</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Active Rate</p>
+        <p class="text-2xl font-bold {{ signals.active_rate >= 60 ? 'text-emerald-600' : (signals.active_rate >= 35 ? 'text-amber-500' : 'text-red-500') }}">
+            {{ signals.active_rate|number_format(1) }}%
+        </p>
+        <p class="text-xs text-gray-400 mt-1">Visited last 60 days</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">{{ program.points_name ?? 'Points' }} This Month</p>
+        <p class="text-2xl font-bold text-gray-900">{{ stats.points_this_month|number_format(0) }}</p>
+        {% if stats.points_last_month > 0 %}
+        {% set _pct = ((stats.points_this_month - stats.points_last_month) / stats.points_last_month * 100)|round %}
+        <p class="text-xs mt-1 {{ _pct >= 0 ? 'text-emerald-600' : 'text-red-500' }}">
+            {{ _pct >= 0 ? '↑' : '↓' }} {{ _pct|abs }}% vs last month
+        </p>
+        {% else %}
+        <p class="text-xs text-gray-400 mt-1">Points awarded</p>
+        {% endif %}
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">At-Risk / Lapsing</p>
+        <p class="text-2xl font-bold {{ (signals.at_risk_count + signals.lapsing_count) > 0 ? 'text-amber-500' : 'text-gray-900' }}">
+            {{ signals.at_risk_count + signals.lapsing_count }}
+        </p>
+        <p class="text-xs text-gray-400 mt-1">
+            {{ signals.at_risk_count }} at-risk · {{ signals.lapsing_count }} lapsing
+        </p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Tier Levels</p>
+        <p class="text-2xl font-bold text-gray-900">{{ stats.tier_counts|length }}</p>
+        <p class="text-xs text-gray-400 mt-1">
+            {% if can.view_tiers %}<a href="{{ path('admin_loyalty_tiers', _rp) }}" class="text-indigo-500 hover:underline">Manage tiers</a>{% else %}Configured tiers{% endif %}
+        </p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Loyalty Spend</p>
+        {% if signals.loyalty_spend_multiple %}
+        <p class="text-2xl font-bold text-indigo-600">{{ signals.loyalty_spend_multiple }}×</p>
+        <p class="text-xs text-gray-400 mt-1">vs non-members (90d)</p>
+        {% else %}
+        <p class="text-2xl font-bold text-gray-300">—</p>
+        <p class="text-xs text-gray-400 mt-1">Not enough POS data</p>
+        {% endif %}
+    </div>
+
+</div>
+
+{# ── Tier distribution + quick nav ───────────────────────────────────── #}
+<div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+    {% if can.view_tiers and stats.tier_counts|length > 0 %}
+    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="flex items-center justify-between px-5 py-4 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">Tier Distribution</h3>
+            <a href="{{ path('admin_loyalty_tiers', _rp) }}" class="text-xs text-indigo-600 hover:underline">Manage →</a>
+        </div>
+        <div class="divide-y divide-gray-50">
+            {% set max_count = stats.tier_counts|map(t => t.count)|reduce((carry, v) => v > carry ? v : carry, 0) %}
+            {% for tier in stats.tier_counts %}
+            <div class="flex items-center gap-3 px-5 py-3">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{{ tier.color ?? '#6366f1' }};"></span>
+                <span class="text-sm text-gray-700 w-28 flex-shrink-0 truncate">{{ tier.name }}</span>
+                <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div class="h-2 rounded-full" style="width:{{ max_count > 0 ? (tier.count / max_count * 100)|round : 0 }}%;background:{{ tier.color ?? '#6366f1' }};"></div>
+                </div>
+                <span class="text-xs font-semibold text-gray-500 w-10 text-right flex-shrink-0">{{ tier.count }}</span>
+            </div>
+            {% endfor %}
+        </div>
+    </div>
+    {% else %}
+    <div class="lg:col-span-2 bg-white rounded-xl border border-gray-200 flex flex-col items-center justify-center py-12 text-center px-6">
+        <p class="text-sm text-gray-400">
+            {% if can.view_tiers %}
+                No tier data yet. <a href="{{ path('admin_loyalty_tiers', _rp) }}" class="text-indigo-600 hover:underline">Set up tiers →</a>
+            {% else %}
+                No tier data available.
+            {% endif %}
+        </p>
+    </div>
+    {% endif %}
+
+    {# Quick nav #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">Quick Navigation</h3>
+        </div>
+        <nav class="divide-y divide-gray-50">
+            {% if can.view_members %}
+            <a href="{{ path('admin_loyalty_members', _rp) }}"
+               class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group">
+                <div class="flex items-center gap-3">
+                    <svg width="15" height="15" fill="none" stroke="#6366f1" stroke-width="1.5" viewBox="0 0 24 24"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                    <span class="text-sm text-gray-700 group-hover:text-gray-900">Members</span>
+                </div>
+                <span class="text-xs font-bold text-gray-300 group-hover:text-indigo-500">→</span>
+            </a>
+            {% endif %}
+            {% if can.view_segments %}
+            <a href="{{ path('admin_loyalty_segments', _rp) }}"
+               class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group">
+                <div class="flex items-center gap-3">
+                    <svg width="15" height="15" fill="none" stroke="#f59e0b" stroke-width="1.5" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+                    <span class="text-sm text-gray-700 group-hover:text-gray-900">Segments</span>
+                    {% if signals.at_risk_count + signals.lapsing_count > 0 %}
+                    <span class="ml-auto text-xs font-bold text-amber-600 bg-amber-50 px-1.5 py-0.5 rounded-full">{{ signals.at_risk_count + signals.lapsing_count }}</span>
+                    {% endif %}
+                </div>
+                <span class="text-xs font-bold text-gray-300 group-hover:text-indigo-500">→</span>
+            </a>
+            {% endif %}
+            {% if can.view_tiers %}
+            <a href="{{ path('admin_loyalty_tiers', _rp) }}"
+               class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group">
+                <div class="flex items-center gap-3">
+                    <svg width="15" height="15" fill="none" stroke="#f59e0b" stroke-width="1.5" viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                    <span class="text-sm text-gray-700 group-hover:text-gray-900">Tiers</span>
+                </div>
+                <span class="text-xs font-bold text-gray-300 group-hover:text-indigo-500">→</span>
+            </a>
+            {% endif %}
+            {% if can.view_ledger %}
+            <a href="{{ path('admin_loyalty_ledger', _rp) }}"
+               class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group">
+                <div class="flex items-center gap-3">
+                    <svg width="15" height="15" fill="none" stroke="#10b981" stroke-width="1.5" viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/></svg>
+                    <span class="text-sm text-gray-700 group-hover:text-gray-900">Ledger</span>
+                </div>
+                <span class="text-xs font-bold text-gray-300 group-hover:text-indigo-500">→</span>
+            </a>
+            {% endif %}
+            <a href="{{ path('admin_loyalty_multipliers', _rp) }}"
+               class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group">
+                <div class="flex items-center gap-3">
+                    <svg width="15" height="15" fill="none" stroke="#8b5cf6" stroke-width="1.5" viewBox="0 0 24 24"><line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/></svg>
+                    <span class="text-sm text-gray-700 group-hover:text-gray-900">Multipliers</span>
+                </div>
+                <span class="text-xs font-bold text-gray-300 group-hover:text-indigo-500">→</span>
+            </a>
+            {% if can.view_reports %}
+            <a href="{{ path('admin_loyalty_reports', _rp) }}"
+               class="flex items-center justify-between px-5 py-3 hover:bg-gray-50 transition-colors group">
+                <div class="flex items-center gap-3">
+                    <svg width="15" height="15" fill="none" stroke="#3b82f6" stroke-width="1.5" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+                    <span class="text-sm text-gray-700 group-hover:text-gray-900">Reports</span>
+                </div>
+                <span class="text-xs font-bold text-gray-300 group-hover:text-indigo-500">→</span>
+            </a>
+            {% endif %}
+        </nav>
+    </div>
+
+</div>
+
+{% endif %}
+{% endblock %}

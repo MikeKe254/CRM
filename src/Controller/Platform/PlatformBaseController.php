@@ -95,7 +95,7 @@ abstract class PlatformBaseController extends AbstractController
             return substr($header, 7);
         }
 
-        return $request->cookies->get('angavu_token') ?: null;
+        return $request->cookies->get('patronr_token') ?: null;
     }
 
     private function redirectToPlatformLoginClearingCookie(): Response
@@ -104,7 +104,7 @@ abstract class PlatformBaseController extends AbstractController
         $response = $this->redirectToRoute('platform_login', [
             'domain' => (string) $request?->attributes->get('domain', ''),
         ]);
-        $response->headers->clearCookie('angavu_token', '/');
+        $response->headers->clearCookie('patronr_token', '/');
 
         return $response;
     }

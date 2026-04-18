@@ -9,6 +9,38 @@ framework:
                 retry_strategy:
                     max_retries: 3
                     multiplier: 2
+            payments:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: payments
+                retry_strategy:
+                    max_retries: 5
+                    delay: 1000
+                    multiplier: 2
+            notifications:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: notifications
+                retry_strategy:
+                    max_retries: 5
+                    delay: 1000
+                    multiplier: 2
+            integrations:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: integrations
+                retry_strategy:
+                    max_retries: 4
+                    delay: 2000
+                    multiplier: 2
+            maintenance:
+                dsn: '%env(MESSENGER_TRANSPORT_DSN)%'
+                options:
+                    queue_name: maintenance
+                retry_strategy:
+                    max_retries: 3
+                    delay: 5000
+                    multiplier: 2
             failed: 'doctrine://default?queue_name=failed'
             # sync: 'sync://'
 
@@ -18,9 +50,14 @@ framework:
             messenger.bus.default: []
 
         routing:
-            Symfony\Component\Mailer\Messenger\SendEmailMessage: async
-            Symfony\Component\Notifier\Message\ChatMessage: async
-            Symfony\Component\Notifier\Message\SmsMessage: async
+            Symfony\Component\Mailer\Messenger\SendEmailMessage: notifications
+            Symfony\Component\Notifier\Message\ChatMessage: notifications
+            Symfony\Component\Notifier\Message\SmsMessage: notifications
+            App\Message\Test\ProcessMpesaPaymentProbeMessage: async
+            App\Message\Payment\ProcessMpesaStkCallbackMessage: payments
+            App\Message\Payment\ProcessMpesaC2bConfirmationMessage: payments
+            App\Message\Sms\SendSmsMessage: notifications
+            App\Message\Webhook\ForwardWebhookPayloadMessage: integrations
 
             # Route your messages to the transports
             # 'App\Message\YourMessage': async

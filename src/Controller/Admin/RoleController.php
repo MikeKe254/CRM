@@ -531,6 +531,20 @@ class RoleController extends AdminBaseController
 
     private function getAllowedRoleScopes(mixed $session): array
     {
+        $multiBranchEnabled = $this->isMultiBranchEnabled($session->company->id);
+
+        // When multi-branch is off, HQ/region-level scope concepts do not exist.
+        // Only 'any' and 'branch' are meaningful for a single-location company.
+        if (!$multiBranchEnabled) {
+            if ($session->user->isSuperAdmin) {
+                return ['any', 'branch'];
+            }
+            if ($session->branch === null) {
+                return [];
+            }
+            return ['any', 'branch'];
+        }
+
         if ($session->user->isSuperAdmin) {
             return ['any', 'hq', 'region', 'branch'];
         }

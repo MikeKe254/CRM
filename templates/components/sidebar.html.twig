@@ -226,9 +226,38 @@
                 <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-group-content" id="sg-ov-loyalty">
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Global Program Config</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Cross-branch Ledger</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers & Thresholds</span>{{ _s|raw }}</a>
+                <a href="{{ path('admin_loyalty_overview', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_overview' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Program Overview</span>
+                </a>
+                <a href="{{ path('admin_loyalty_members', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_member' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Members</span>
+                </a>
+                <a href="{{ path('admin_loyalty_segments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_segments' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Segments</span>
+                </a>
+                <a href="{{ path('admin_loyalty_ledger', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_ledger' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Points Ledger</span>
+                </a>
+                <a href="{{ path('admin_loyalty_tiers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_tiers' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers</span>
+                </a>
+                <a href="{{ path('admin_loyalty_multipliers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_multiplier' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Multipliers</span>
+                </a>
+                <a href="{{ path('admin_loyalty_automations', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_automations' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Automations</span>
+                </a>
+                <a href="{{ path('admin_loyalty_reports', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_reports' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Reports</span>
+                </a>
             </div>
         </div>
 
@@ -251,7 +280,7 @@
 
         {# Configuration group #}
         {% if can('view_roles') or can('view_permissions') or can('view_departments') or can('view_areas') or can('view_catalog') or can('view_events') or can_view_settings or can_view_tenant_activity_logs %}
-        {% set _ca = (_r starts with 'admin_roles' or _r starts with 'admin_permissions' or _r starts with 'admin_departments' or _r starts with 'admin_areas' or _r starts with 'admin_catalog' or _r starts with 'admin_events' or _r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        {% set _ca = (_r starts with 'admin_roles' or _r starts with 'admin_permissions' or _r starts with 'admin_departments' or _r starts with 'admin_areas' or _r starts with 'admin_catalog' or _r starts with 'admin_events' or _r starts with 'admin_settings' or _r starts with 'admin_activity' or _r starts with 'admin_billing') %}
         <div class="sidebar-group">
             <button class="sidebar-group-btn {% if _ca %}has-active{% endif %}"
                     data-group="ov-config" data-tooltip="Configuration" onclick="toggleGroup('ov-config')">
@@ -306,7 +335,12 @@
                     <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Activity Logs</span>
                 </a>
                 {% endif %}
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Billing &amp; Plan</span>{{ _s|raw }}</a>
+                {% if can_view_settings %}
+                <a href="{{ path('admin_billing', {subdomain: tenant_subdomain, domain: tenant_domain, branch: 'overall'}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_billing' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Billing &amp; Plan</span>
+                </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -340,7 +374,7 @@
                 <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-group-content" id="sg-hq-customers">
-                {% if can('view_transactions') %}
+                {% if can('view_customers') %}
                 <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
                    class="sidebar-sublink {% if _r == 'app_customers' %}active{% endif %}">
                     <span class="sidebar-sublink-dot"></span><span class="sidebar-label">All Customers</span>
@@ -398,10 +432,38 @@
                 <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-group-content" id="sg-hq-loyalty">
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Program Config</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Points Ledger</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Redemption History</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers &amp; Thresholds</span>{{ _s|raw }}</a>
+                <a href="{{ path('admin_loyalty_overview', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_overview' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Overview</span>
+                </a>
+                <a href="{{ path('admin_loyalty_members', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_member' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Members</span>
+                </a>
+                <a href="{{ path('admin_loyalty_segments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_segments' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Segments</span>
+                </a>
+                <a href="{{ path('admin_loyalty_ledger', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_ledger' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Points Ledger</span>
+                </a>
+                <a href="{{ path('admin_loyalty_tiers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_tiers' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers</span>
+                </a>
+                <a href="{{ path('admin_loyalty_multipliers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_multiplier' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Multipliers</span>
+                </a>
+                <a href="{{ path('admin_loyalty_automations', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_automations' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Automations</span>
+                </a>
+                <a href="{{ path('admin_loyalty_reports', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_reports' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Reports</span>
+                </a>
             </div>
         </div>
 
@@ -553,7 +615,7 @@
 
         {# System group #}
         {% if can_view_settings or can_view_tenant_activity_logs or can('view_audit_logs') %}
-        {% set _sa = (_r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        {% set _sa = (_r starts with 'admin_settings' or _r starts with 'admin_activity' or _r starts with 'admin_billing') %}
         <div class="sidebar-group">
             <button class="sidebar-group-btn {% if _sa %}has-active{% endif %}"
                     data-group="hq-system" data-tooltip="System" onclick="toggleGroup('hq-system')">
@@ -580,7 +642,12 @@
                 {% if can('view_audit_logs') %}
                 <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Audit Trail</span>{{ _s|raw }}</a>
                 {% endif %}
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Billing &amp; Plan</span>{{ _s|raw }}</a>
+                {% if can_view_settings %}
+                <a href="{{ path('admin_billing', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_billing' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Billing &amp; Plan</span>
+                </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}
@@ -614,7 +681,7 @@
                 <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-group-content" id="sg-rg-customers">
-                {% if can('view_transactions') %}
+                {% if can('view_customers') %}
                 <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
                    class="sidebar-sublink {% if _r == 'app_customers' %}active{% endif %}">
                     <span class="sidebar-sublink-dot"></span><span class="sidebar-label">All Customers</span>
@@ -652,9 +719,26 @@
                 <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-group-content" id="sg-rg-loyalty">
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Program Overview</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Regional Redemptions</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers &amp; Thresholds</span>{{ _s|raw }}</a>
+                <a href="{{ path('admin_loyalty_overview', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_overview' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Overview</span>
+                </a>
+                <a href="{{ path('admin_loyalty_members', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_member' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Members</span>
+                </a>
+                <a href="{{ path('admin_loyalty_segments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_segments' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Segments</span>
+                </a>
+                <a href="{{ path('admin_loyalty_ledger', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_ledger' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Points Ledger</span>
+                </a>
+                <a href="{{ path('admin_loyalty_tiers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_tiers' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers</span>
+                </a>
             </div>
         </div>
 
@@ -797,7 +881,7 @@
 
         {# System group #}
         {% if can_view_settings or can_view_tenant_activity_logs %}
-        {% set _sa = (_r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        {% set _sa = (_r starts with 'admin_settings' or _r starts with 'admin_activity' or _r starts with 'admin_billing') %}
         <div class="sidebar-group">
             <button class="sidebar-group-btn {% if _sa %}has-active{% endif %}"
                     data-group="rg-system" data-tooltip="System" onclick="toggleGroup('rg-system')">
@@ -819,6 +903,12 @@
                 <a href="{{ path('admin_activity_logs', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
                    class="sidebar-sublink {% if _r starts with 'admin_activity' %}active{% endif %}">
                     <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Activity Logs</span>
+                </a>
+                {% endif %}
+                {% if can_view_settings %}
+                <a href="{{ path('admin_billing', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_billing' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Billing &amp; Plan</span>
                 </a>
                 {% endif %}
             </div>
@@ -854,7 +944,7 @@
                 <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-group-content" id="sg-br-customers">
-                {% if can('view_transactions') %}
+                {% if can('view_customers') %}
                 <a href="{{ path('app_customers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
                    class="sidebar-sublink {% if _r == 'app_customers' %}active{% endif %}">
                     <span class="sidebar-sublink-dot"></span><span class="sidebar-label">All Customers</span>
@@ -913,10 +1003,38 @@
                 <svg class="sidebar-group-chevron" width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="6 9 12 15 18 9"/></svg>
             </button>
             <div class="sidebar-group-content" id="sg-br-loyalty">
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Program Overview</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Points &amp; Rewards</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Redemptions</span>{{ _s|raw }}</a>
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers &amp; Thresholds</span>{{ _s|raw }}</a>
+                <a href="{{ path('admin_loyalty_overview', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_overview' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Overview</span>
+                </a>
+                <a href="{{ path('admin_loyalty_members', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_member' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Members</span>
+                </a>
+                <a href="{{ path('admin_loyalty_segments', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_segments' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Segments</span>
+                </a>
+                <a href="{{ path('admin_loyalty_ledger', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_ledger' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Points Ledger</span>
+                </a>
+                <a href="{{ path('admin_loyalty_tiers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_tiers' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Tiers</span>
+                </a>
+                <a href="{{ path('admin_loyalty_multipliers', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_loyalty_multiplier' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Multipliers</span>
+                </a>
+                <a href="{{ path('admin_loyalty_automations', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_automations' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Automations</span>
+                </a>
+                <a href="{{ path('admin_loyalty_reports', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r == 'admin_loyalty_reports' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Reports</span>
+                </a>
             </div>
         </div>
 
@@ -1035,7 +1153,7 @@
 
         {# System group #}
         {% if can_view_settings or can_view_tenant_activity_logs %}
-        {% set _sys = (_r starts with 'admin_settings' or _r starts with 'admin_activity') %}
+        {% set _sys = (_r starts with 'admin_settings' or _r starts with 'admin_activity' or _r starts with 'admin_billing') %}
         <div class="sidebar-group">
             <button class="sidebar-group-btn {% if _sys %}has-active{% endif %}"
                     data-group="br-system" data-tooltip="System" onclick="toggleGroup('br-system')">
@@ -1059,7 +1177,12 @@
                     <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Activity Logs</span>
                 </a>
                 {% endif %}
-                <a href="#" class="sidebar-sublink"><span class="sidebar-sublink-dot"></span><span class="sidebar-label">Billing &amp; Plan</span>{{ _s|raw }}</a>
+                {% if can_view_settings %}
+                <a href="{{ path('admin_billing', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}"
+                   class="sidebar-sublink {% if _r starts with 'admin_billing' %}active{% endif %}">
+                    <span class="sidebar-sublink-dot"></span><span class="sidebar-label">Billing &amp; Plan</span>
+                </a>
+                {% endif %}
             </div>
         </div>
         {% endif %}

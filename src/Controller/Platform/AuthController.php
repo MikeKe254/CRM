@@ -86,7 +86,7 @@ final class AuthController extends AbstractController
 
             $cookieTtl = $remember ? 60 * 60 * 24 * 30 : 0;
             $response->headers->setCookie(
-                Cookie::create('angavu_token')
+                Cookie::create('patronr_token')
                     ->withValue($result->token)
                     ->withExpires($cookieTtl > 0 ? time() + $cookieTtl : 0)
                     ->withPath('/')
@@ -113,7 +113,7 @@ final class AuthController extends AbstractController
         }
 
         $response = $this->json(['success' => true, 'message' => 'Logged out.']);
-        $response->headers->clearCookie('angavu_token', '/');
+        $response->headers->clearCookie('patronr_token', '/');
 
         return $response;
     }
@@ -125,7 +125,7 @@ final class AuthController extends AbstractController
             return substr($header, 7);
         }
 
-        return $request->cookies->get('angavu_token') ?: null;
+        return $request->cookies->get('patronr_token') ?: null;
     }
 
     private function redirectToPlatformLoginClearingCookie(): Response
@@ -133,7 +133,7 @@ final class AuthController extends AbstractController
         $response = $this->redirectToRoute('platform_login', [
             'domain' => (string) $this->container->get('request_stack')->getCurrentRequest()?->attributes->get('domain', ''),
         ]);
-        $response->headers->clearCookie('angavu_token', '/');
+        $response->headers->clearCookie('patronr_token', '/');
 
         return $response;
     }

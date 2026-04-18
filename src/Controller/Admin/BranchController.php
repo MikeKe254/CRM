@@ -44,6 +44,7 @@ class BranchController extends AdminBaseController
     {
         $session = $this->requireAdmin($request, 'manage_branches');
         if ($session instanceof Response) return $session;
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
 
         // Build the branch tree scoped by context:
         //   overall / superadmin → full company tree
@@ -124,6 +125,7 @@ class BranchController extends AdminBaseController
     {
         $session = $this->requireAdmin($request, 'manage_branches');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
 
         $name     = trim((string) $request->request->get('name', ''));
         $slug     = trim((string) $request->request->get('slug', ''));
@@ -225,6 +227,7 @@ class BranchController extends AdminBaseController
     {
         $session = $this->requireAdmin($request, 'manage_branches');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
 
         $newName = trim((string) $request->request->get('name', ''));
         if ($newName === '') return $this->error('Name is required.');
@@ -256,6 +259,7 @@ class BranchController extends AdminBaseController
     {
         $session = $this->requireAdmin($request, 'manage_branches');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
 
         $newParentId = (int) $request->request->get('parent_id', 0);
         if ($newParentId <= 0) return $this->error('Target parent branch is required.');
@@ -313,6 +317,7 @@ class BranchController extends AdminBaseController
     {
         $session = $this->requireAdmin($request, 'manage_branches');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
 
         $branch = $this->hierarchy->findById($id);
         if ($branch === null || $branch->companyId !== $session->company->id) {
@@ -348,6 +353,7 @@ class BranchController extends AdminBaseController
     {
         $session = $this->requireAdmin($request, 'manage_branches');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
 
         // For inactive branches, findById won't find them since deleted_at IS NULL filter is fine
         // but we need to also see inactive ones — query directly
@@ -384,6 +390,7 @@ class BranchController extends AdminBaseController
     {
         $session = $this->requireAdmin($request, 'manage_branches');
         if ($session instanceof Response) return $this->error('Unauthorized.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
 
         $branch = $this->hierarchy->findById($id);
         if ($branch === null || $branch->companyId !== $session->company->id) {

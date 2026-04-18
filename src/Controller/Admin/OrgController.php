@@ -72,6 +72,7 @@ final class OrgController extends AdminBaseController
     {
         $session = $this->requireAdmin($request);
         if ($session instanceof Response) return $session;
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
         if (!$this->canAccessOrgChart($session)) {
             return $this->denyAccess($request, 'You do not have permission to manage the organisation chart.', 403, $session);
         }
@@ -236,6 +237,7 @@ final class OrgController extends AdminBaseController
     {
         $session = $this->requireAdmin($request);
         if ($session instanceof Response) return $this->error('Unauthorised.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
         if (!$this->canAccessOrgChart($session)) {
             return $this->error('You do not have permission to manage the organisation chart.', 403);
         }
@@ -403,6 +405,7 @@ final class OrgController extends AdminBaseController
     {
         $session = $this->requireAdmin($request);
         if ($session instanceof Response) return $this->error('Unauthorised.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
         if (!$this->canAccessOrgChart($session)) {
             return $this->error('You do not have permission to manage the organisation chart.', 403);
         }
@@ -453,6 +456,7 @@ final class OrgController extends AdminBaseController
     {
         $session = $this->requireAdmin($request);
         if ($session instanceof Response) return $this->error('Unauthorised.', 403);
+        if ($r = $this->requireMultiBranch($request, $session)) return $r;
         if (!$this->canAccessOrgChart($session)) {
             return $this->error('You do not have permission to manage the organisation chart.', 403);
         }

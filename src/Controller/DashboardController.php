@@ -19,7 +19,7 @@ use Symfony\Component\Routing\Attribute\Route;
 
 /**
  * Main application dashboard.
- * Requires a valid angavu_token session cookie.
+ * Requires a valid patronr_token session cookie.
  */
 final class DashboardController extends AbstractController
 {
@@ -120,7 +120,7 @@ final class DashboardController extends AbstractController
             return substr($header, 7);
         }
 
-        return $request->cookies->get('angavu_token') ?: null;
+        return $request->cookies->get('patronr_token') ?: null;
     }
 
     private function resolveSubdomain(Request $request): ?string

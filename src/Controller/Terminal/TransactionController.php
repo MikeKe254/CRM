@@ -35,8 +35,8 @@ class TransactionController extends AbstractController
     #[Route('/transactions', name: 'terminal_transactions', methods: ['GET'])]
     public function index(Request $request, string $branch): Response
     {
-        $token      = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal   = (string) $request->cookies->get('angavu_terminal', '');
+        $token      = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal   = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain  = $this->domains->getSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 

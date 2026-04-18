@@ -22,7 +22,7 @@ use Twig\TwigFunction;
  *   {% if can('view_users') %}...{% endif %}
  *   {% if isSuperAdmin() %}...{% endif %}
  *
- * Reads the session from the angavu_token cookie on each request.
+ * Reads the session from the patronr_token cookie on each request.
  * Returns false safely if the session is missing or invalid.
  */
 final class PermissionExtension extends AbstractExtension implements GlobalsInterface
@@ -126,7 +126,7 @@ final class PermissionExtension extends AbstractExtension implements GlobalsInte
         }
 
         // Try cookie first (dashboard sessions), then Authorization header
-        $token = $request->cookies->get('angavu_token');
+        $token = $request->cookies->get('patronr_token');
 
         if (!$token) {
             $header = $request->headers->get('Authorization', '');

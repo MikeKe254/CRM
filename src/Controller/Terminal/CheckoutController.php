@@ -1380,8 +1380,8 @@ class CheckoutController extends AbstractController
      */
     private function requirePos(Request $request, string $branch): array|Response
     {
-        $token     = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal  = (string) $request->cookies->get('angavu_terminal', '');
+        $token     = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal  = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain = $this->domains->getSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 
@@ -1435,8 +1435,8 @@ class CheckoutController extends AbstractController
      */
     private function requirePosJson(Request $request, string $branch): array|JsonResponse
     {
-        $token    = $request->cookies->get('angavu_pos_token') ?: null;
-        $terminal = (string) $request->cookies->get('angavu_terminal', '');
+        $token    = $request->cookies->get('patronr_pos_token') ?: null;
+        $terminal = (string) $request->cookies->get('patronr_terminal', '');
         $subdomain = $this->domains->getSubdomain($request);
         $baseDomain = $this->domains->getBaseDomain($request);
 

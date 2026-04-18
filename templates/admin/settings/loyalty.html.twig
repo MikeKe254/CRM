@@ -114,6 +114,40 @@
 
     <div class="border-t border-gray-100 mx-8"></div>
 
+    <div class="settings-section" id="lp-expiry-section">
+        <div class="settings-section-desc">
+            <p class="text-sm font-semibold text-gray-900">Points expiry</p>
+            <p class="text-sm text-gray-500 mt-1 leading-relaxed">Automatically expire unused points after a set number of days of inactivity.</p>
+        </div>
+        <div class="settings-section-fields space-y-4">
+            {% set _expiry_on   = lp.points_expiry_enabled ?? 0 %}
+            {% set _expiry_days = lp.points_expiry_days ?? 365 %}
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:.875rem 1rem;border-radius:.625rem;border:1px solid #e5e7eb;background:#f9fafb;">
+                <div>
+                    <p class="text-sm font-semibold text-gray-800">Enable points expiry</p>
+                    <p class="text-xs text-gray-500 mt-0.5">Points that have not been earned or redeemed within the window will be expired.</p>
+                </div>
+                <label class="s-toggle">
+                    <input type="checkbox" name="points_expiry_enabled" value="1"
+                           id="lp-expiry-toggle" {{ _expiry_on ? 'checked' : '' }}>
+                    <span class="s-toggle-track"><span class="s-toggle-knob"></span></span>
+                </label>
+            </div>
+            <div id="lp-expiry-days-row" {{ not _expiry_on ? 'style="display:none"' : '' }}>
+                <label class="s-label" for="lp-expiry-days">Expiry window</label>
+                <div style="position:relative;max-width:14rem;">
+                    <input id="lp-expiry-days" type="number" name="points_expiry_days"
+                           value="{{ _expiry_days }}" min="1" max="3650" class="s-input"
+                           style="padding-right:3.5rem;">
+                    <span style="position:absolute;right:.75rem;top:50%;transform:translateY(-50%);font-size:.75rem;font-weight:600;color:#9ca3af;pointer-events:none;">days</span>
+                </div>
+                <p class="s-hint">Points are expired this many days after a customer's last transaction.</p>
+            </div>
+        </div>
+    </div>
+
+    <div class="border-t border-gray-100 mx-8"></div>
+
     <div class="settings-section">
         <div class="settings-section-desc">
             <p class="text-sm font-semibold text-gray-900">Redemption</p>
@@ -234,6 +268,15 @@
     }
     ppu.addEventListener('input', refresh);
     unit.addEventListener('input', refresh);
+})();
+
+(function () {
+    const toggle = document.getElementById('lp-expiry-toggle');
+    const row    = document.getElementById('lp-expiry-days-row');
+    if (!toggle || !row) return;
+    toggle.addEventListener('change', function () {
+        row.style.display = this.checked ? '' : 'none';
+    });
 })();
 </script>
 {% endblock %}

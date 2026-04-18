@@ -140,6 +140,7 @@ final class LoyaltyService
 
     /**
      * Calculate how many points will be awarded for a given amount.
+     * Applies the highest active point multiplier when one is present.
      * Returns a decimal value (e.g. 0.99, 1.50) — never floors to zero.
      * Returns 0.0 if no program is configured or amount is invalid.
      */
@@ -157,12 +158,61 @@ final class LoyaltyService
             return 0.0;
         }
 
-        return round(($amount / $unitAmount) * $pointsPerUnit, 2);
+        $base = round(($amount / $unitAmount) * $pointsPerUnit, 2);
+
+        // Apply highest active multiplier if any exist for this program
+        $multiplier = $this->getActiveMultiplier((int) $program['id']);
+        if ($multiplier > 1.0) {
+            $base = round($base * $multiplier, 2);
+        }
+
+        return $base;
+    }
+
+    /**
+     * Return the highest active point multiplier for a loyalty program right now.
+     * Checks day-of-week, time window, and date range.
+     * Returns 1.0 (no boost) if the loyalty_point_multipliers table does not exist
+     * or no active multiplier matches the current moment.
+     */
+    public function getActiveMultiplier(int $loyaltyProgramId): float
+    {
+        // Guard: table may not exist yet (segment 42 not yet applied)
+        try {
+            $now     = new \DateTimeImmutable('now', new \DateTimeZone('Africa/Nairobi'));
+            $dayMap  = [1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat', 7 => 'sun'];
+            $dayKey  = $dayMap[(int) $now->format('N')];
+            $timeNow = $now->format('H:i:s');
+            $dateNow = $now->format('Y-m-d');
+
+            $multiplier = $this->db->fetchOne(
+                "SELECT MAX(multiplier)
+                   FROM loyalty_point_multipliers
+                  WHERE loyalty_program_id = :program_id
+                    AND is_active = 1
+                    AND (applies_on IS NULL OR FIND_IN_SET(:day, applies_on) > 0)
+                    AND (time_from IS NULL OR :time >= time_from)
+                    AND (time_to   IS NULL OR :time <= time_to)
+                    AND (valid_from IS NULL OR :date >= valid_from)
+                    AND (valid_to   IS NULL OR :date <= valid_to)",
+                [
+                    'program_id' => $loyaltyProgramId,
+                    'day'        => $dayKey,
+                    'time'       => $timeNow,
+                    'date'       => $dateNow,
+                ],
+            );
+
+            return $multiplier !== false && $multiplier !== null ? (float) $multiplier : 1.0;
+        } catch (\Throwable) {
+            // Table does not exist yet — return no boost
+            return 1.0;
+        }
     }
 
     /**
      * Award points to a loyalty account after a completed transaction.
-     * Writes to ledger, updates balance, resolves tier.
+     * Writes to ledger, updates balance, resolves tier, maintains intelligence columns.
      * Returns points awarded as a decimal (0.0 if nothing awarded).
      */
     public function award(
@@ -179,14 +229,18 @@ final class LoyaltyService
             return 0.0;
         }
 
-        // Atomic update
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+
+        // Atomic update — maintain intelligence columns alongside balance
         $this->db->executeStatement(
             'UPDATE loyalty_accounts
-                SET points_balance      = points_balance + :pts,
-                    total_points_earned = total_points_earned + :pts,
-                    updated_at          = NOW()
+                SET points_balance          = points_balance + :pts,
+                    total_points_earned     = total_points_earned + :pts,
+                    last_transaction_at     = :now,
+                    visit_count             = visit_count + 1,
+                    updated_at              = :now
               WHERE id = :id AND company_id = :company_id',
-            ['pts' => $points, 'id' => $loyaltyAccountId, 'company_id' => $companyId],
+            ['pts' => $points, 'now' => $now, 'id' => $loyaltyAccountId, 'company_id' => $companyId],
         );
 
         // Fetch new balance for ledger
@@ -207,6 +261,9 @@ final class LoyaltyService
         );
 
         $this->resolveAndUpdateTier($loyaltyAccountId, $companyId);
+        $this->updateLifecycleStage($loyaltyAccountId, $companyId);
+        $this->markNotificationReturned($loyaltyAccountId, $companyId);
+        $this->checkAndAwardBirthdayBonus($loyaltyAccountId, $companyId);
 
         return $points;
     }
@@ -214,11 +271,12 @@ final class LoyaltyService
     /**
      * Resolve the correct tier for an account based on current points_balance
      * and update loyalty_tier_id on the account row.
+     * Queues a tier_upgrade notification when the tier improves.
      */
     public function resolveAndUpdateTier(int $loyaltyAccountId, int $companyId): void
     {
         $account = $this->db->fetchAssociative(
-            'SELECT la.points_balance, la.loyalty_program_id
+            'SELECT la.points_balance, la.loyalty_program_id, la.loyalty_tier_id
                FROM loyalty_accounts la
               WHERE la.id = :id AND la.company_id = :company_id
               LIMIT 1',
@@ -231,7 +289,7 @@ final class LoyaltyService
 
         // Find the highest tier the customer qualifies for
         $tier = $this->db->fetchAssociative(
-            'SELECT id FROM loyalty_tiers
+            'SELECT id, name, perks_description FROM loyalty_tiers
               WHERE loyalty_program_id = :program_id
                 AND min_points <= :balance
               ORDER BY min_points DESC
@@ -242,10 +300,24 @@ final class LoyaltyService
             ],
         );
 
+        $newTierId = $tier ? $tier['id'] : null;
+        $oldTierId = $account['loyalty_tier_id'];
+
         $this->db->executeStatement(
             'UPDATE loyalty_accounts SET loyalty_tier_id = :tier_id, updated_at = NOW() WHERE id = :id',
-            ['tier_id' => $tier ? $tier['id'] : null, 'id' => $loyaltyAccountId],
+            ['tier_id' => $newTierId, 'id' => $loyaltyAccountId],
         );
+
+        // Queue tier upgrade notification if tier improved
+        if ($tier && $newTierId !== $oldTierId && $oldTierId !== null) {
+            $this->queueAutomationNotification(
+                $loyaltyAccountId,
+                $companyId,
+                $account['loyalty_program_id'],
+                'tier_upgrade',
+                ['tier_name' => $tier['name'], 'perks_description' => $tier['perks_description'] ?? ''],
+            );
+        }
     }
 
     // =========================================================================
@@ -311,6 +383,14 @@ final class LoyaltyService
             return false; // Insufficient balance
         }
 
+        $now = (new \DateTimeImmutable())->format('Y-m-d H:i:s');
+
+        // Maintain last_transaction_at on redemption too — it's an engagement signal
+        $this->db->executeStatement(
+            'UPDATE loyalty_accounts SET last_transaction_at = :now, updated_at = :now WHERE id = :id',
+            ['now' => $now, 'id' => $loyaltyAccountId],
+        );
+
         $balanceAfter = (float) ($this->db->fetchOne(
             'SELECT points_balance FROM loyalty_accounts WHERE id = :id',
             ['id' => $loyaltyAccountId],
@@ -328,6 +408,8 @@ final class LoyaltyService
         );
 
         $this->resolveAndUpdateTier($loyaltyAccountId, $companyId);
+        $this->updateLifecycleStage($loyaltyAccountId, $companyId);
+        $this->markNotificationReturned($loyaltyAccountId, $companyId);
 
         return true;
     }
@@ -413,5 +495,205 @@ final class LoyaltyService
             'created_by_user_id'  => $createdByUserId,
             'created_at'          => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
         ]);
+    }
+
+    /**
+     * Compute and store the lifecycle stage for an account based on last_transaction_at.
+     *
+     * Stages:
+     *   new      — no earn/redeem ever, or enrolled < 14 days with no transaction
+     *   active   — transacted within last 60 days
+     *   at_risk  — last transaction 61–90 days ago
+     *   lapsing  — last transaction 91–180 days ago
+     *   churned  — no transaction and enrolled > 14 days, or last transaction > 180 days ago
+     */
+    public function updateLifecycleStage(int $loyaltyAccountId, int $companyId): void
+    {
+        $account = $this->db->fetchAssociative(
+            'SELECT last_transaction_at, enrolled_at FROM loyalty_accounts
+              WHERE id = :id AND company_id = :cid LIMIT 1',
+            ['id' => $loyaltyAccountId, 'cid' => $companyId],
+        );
+
+        if (!$account) {
+            return;
+        }
+
+        $now = new \DateTimeImmutable();
+
+        if ($account['last_transaction_at'] === null) {
+            $enrolledAt = new \DateTimeImmutable($account['enrolled_at']);
+            $daysSinceEnroll = (int) $now->diff($enrolledAt)->days;
+            $stage = $daysSinceEnroll <= 14 ? 'new' : 'churned';
+        } else {
+            $lastTxn = new \DateTimeImmutable($account['last_transaction_at']);
+            $daysSince = (int) $now->diff($lastTxn)->days;
+
+            $stage = match (true) {
+                $daysSince <= 60  => 'active',
+                $daysSince <= 90  => 'at_risk',
+                $daysSince <= 180 => 'lapsing',
+                default           => 'churned',
+            };
+        }
+
+        $this->db->executeStatement(
+            'UPDATE loyalty_accounts SET lifecycle_stage = :stage WHERE id = :id',
+            ['stage' => $stage, 'id' => $loyaltyAccountId],
+        );
+    }
+
+    /**
+     * Mark any open notification for this account as resolved (returned).
+     * Called on every earn transaction — if the member transacts after receiving
+     * a win-back, almost-tier, or expiry-warning notification, that loop is closed.
+     * Public so the M-Pesa auto-award path can close the same loop.
+     */
+    public function markNotificationReturned(int $loyaltyAccountId, int $companyId): void
+    {
+        try {
+            $this->db->executeStatement(
+                "UPDATE loyalty_notifications
+                    SET returned_at = NOW()
+                  WHERE loyalty_account_id = :id
+                    AND company_id         = :cid
+                    AND returned_at        IS NULL
+                    AND sent_at            >= DATE_SUB(NOW(), INTERVAL 30 DAY)",
+                ['id' => $loyaltyAccountId, 'cid' => $companyId],
+            );
+        } catch (\Throwable) {
+            // Table may not exist on older deployments — non-fatal
+        }
+    }
+
+    /**
+     * Award a birthday bonus if:
+     *   - The member's birth_month matches the current month
+     *   - No birthday_bonus ledger entry exists for this account in the current month
+     *   - A birthday_bonus automation is configured and active for this program
+     * Public so the M-Pesa auto-award path can trigger the same bonus.
+     */
+    public function checkAndAwardBirthdayBonus(int $loyaltyAccountId, int $companyId): void
+    {
+        try {
+            $account = $this->db->fetchAssociative(
+                'SELECT la.loyalty_program_id, c.birth_month
+                   FROM loyalty_accounts la
+                   JOIN customers c ON c.id = la.customer_id
+                  WHERE la.id = :id AND la.company_id = :cid LIMIT 1',
+                ['id' => $loyaltyAccountId, 'cid' => $companyId],
+            );
+
+            if (!$account || empty($account['birth_month'])) {
+                return;
+            }
+
+            $currentMonth = (int) (new \DateTimeImmutable())->format('n');
+            if ((int) $account['birth_month'] !== $currentMonth) {
+                return;
+            }
+
+            // Check if already awarded this month
+            $alreadyAwarded = $this->db->fetchOne(
+                "SELECT 1 FROM loyalty_ledger
+                  WHERE loyalty_account_id = :id
+                    AND type               = 'enroll_bonus'
+                    AND note               = 'Birthday bonus'
+                    AND YEAR(created_at)   = YEAR(NOW())
+                    AND MONTH(created_at)  = MONTH(NOW())
+                  LIMIT 1",
+                ['id' => $loyaltyAccountId],
+            );
+
+            if ($alreadyAwarded) {
+                return;
+            }
+
+            // Check automation config
+            $automation = $this->db->fetchAssociative(
+                "SELECT threshold_points FROM loyalty_automations
+                  WHERE loyalty_program_id = :pid
+                    AND trigger_type       = 'birthday_bonus'
+                    AND is_active          = 1
+                  LIMIT 1",
+                ['pid' => $account['loyalty_program_id']],
+            );
+
+            if (!$automation || (int) ($automation['threshold_points'] ?? 0) <= 0) {
+                return;
+            }
+
+            $bonusPoints = (float) $automation['threshold_points'];
+
+            $this->db->executeStatement(
+                'UPDATE loyalty_accounts
+                    SET points_balance      = points_balance + :pts,
+                        total_points_earned = total_points_earned + :pts,
+                        updated_at          = NOW()
+                  WHERE id = :id',
+                ['pts' => $bonusPoints, 'id' => $loyaltyAccountId],
+            );
+
+            $newBalance = (float) $this->db->fetchOne(
+                'SELECT points_balance FROM loyalty_accounts WHERE id = :id',
+                ['id' => $loyaltyAccountId],
+            );
+
+            $this->writeLedger($loyaltyAccountId, $companyId, 'enroll_bonus', $bonusPoints, $newBalance, 'Birthday bonus');
+        } catch (\Throwable) {
+            // Non-fatal — birthday bonus is a nice-to-have
+        }
+    }
+
+    /**
+     * Queue an automation notification if the trigger is configured and active.
+     * Replaces template variables ({first_name}, {tier_name}, etc.) with real values.
+     */
+    private function queueAutomationNotification(
+        int $loyaltyAccountId,
+        int $companyId,
+        int $loyaltyProgramId,
+        string $triggerType,
+        array $vars = [],
+    ): void {
+        try {
+            $automation = $this->db->fetchAssociative(
+                'SELECT message_template FROM loyalty_automations
+                  WHERE loyalty_program_id = :pid
+                    AND trigger_type       = :type
+                    AND is_active          = 1
+                  LIMIT 1',
+                ['pid' => $loyaltyProgramId, 'type' => $triggerType],
+            );
+
+            if (!$automation) {
+                return;
+            }
+
+            // Fetch member first name for the template
+            $firstName = (string) ($this->db->fetchOne(
+                'SELECT c.first_name FROM loyalty_accounts la
+                   JOIN customers c ON c.id = la.customer_id
+                  WHERE la.id = :id LIMIT 1',
+                ['id' => $loyaltyAccountId],
+            ) ?? '');
+
+            $message = $automation['message_template'];
+            $replacements = array_merge(['first_name' => $firstName], $vars);
+            foreach ($replacements as $key => $value) {
+                $message = str_replace('{' . $key . '}', (string) $value, $message);
+            }
+
+            $this->db->insert('loyalty_notifications', [
+                'company_id'         => $companyId,
+                'loyalty_account_id' => $loyaltyAccountId,
+                'trigger_type'       => $triggerType,
+                'channel'            => 'sms',
+                'message_text'       => $message,
+                'sent_at'            => (new \DateTimeImmutable())->format('Y-m-d H:i:s'),
+            ]);
+        } catch (\Throwable) {
+            // Non-fatal
+        }
     }
 }

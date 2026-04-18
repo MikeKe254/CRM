@@ -1,0 +1,541 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
+{% set _rp = {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch} %}
+
+{% block admin_title %}Loyalty Reports{% endblock %}
+{% block admin_subtitle %}Programme intelligence — understand what's working{% endblock %}
+
+{% block admin_actions %}
+<div class="flex items-center rounded-lg border border-gray-200 overflow-hidden text-xs font-medium">
+    {% for p, label in {'7': '7 days', '30': '30 days', '90': '90 days'} %}
+    <a href="?tab={{ tab }}&period={{ p }}"
+       class="px-3 h-8 flex items-center transition-colors
+              {{ period == p ? 'bg-indigo-600 text-white' : 'bg-white text-gray-500 hover:bg-gray-50' }}
+              {{ not loop.first ? 'border-l border-gray-200' : '' }}">
+        {{ label }}
+    </a>
+    {% endfor %}
+</div>
+{% endblock %}
+
+{% block admin_content %}
+
+{% if not program %}
+<div class="flex flex-col items-center justify-center py-24 text-center">
+    <p class="text-sm text-gray-400">No loyalty programme configured. <a href="{{ path('admin_settings_loyalty', _rp) }}" class="text-indigo-600 hover:underline">Set it up →</a></p>
+</div>
+{% else %}
+
+{# ── Tab navigation ───────────────────────────────────────────────────── #}
+{% set _tabs = [
+    {key: 'programme',   label: 'Programme',   icon: '<polyline points="22 12 18 12 15 21 9 3 6 12 2 12"/>'},
+    {key: 'retention',   label: 'Retention',   icon: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>'},
+    {key: 'revenue',     label: 'Revenue',     icon: '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>'},
+    {key: 'automations', label: 'Automations', icon: '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>'},
+] %}
+<div class="flex items-center gap-1 mb-6 border-b border-gray-200">
+    {% for t in _tabs %}
+    <a href="?tab={{ t.key }}&period={{ period }}"
+       class="flex items-center gap-1.5 px-4 py-2.5 text-sm font-medium border-b-2 transition-colors -mb-px
+              {{ tab == t.key ? 'border-indigo-600 text-indigo-600' : 'border-transparent text-gray-500 hover:text-gray-700 hover:border-gray-300' }}">
+        <svg width="13" height="13" fill="none" stroke="currentColor" stroke-width="1.75" viewBox="0 0 24 24">{{ t.icon|raw }}</svg>
+        {{ t.label }}
+    </a>
+    {% endfor %}
+</div>
+
+{# ════════════════════════════════════════════════════════════════════════
+   TAB: PROGRAMME
+   ════════════════════════════════════════════════════════════════════════ #}
+{% if tab == 'programme' %}
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Total enrolled</p>
+        {% set _total_enrolled = data.tier_distribution|map(t => t.count)|reduce((a, v) => a + v, 0) %}
+        <p class="text-2xl font-bold text-gray-900">{{ _total_enrolled|number_format(0) }}</p>
+        <p class="text-xs text-gray-400 mt-1">All-time members</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">New in period</p>
+        {% set _new_in_period = data.enrollment_trend|map(d => d.count)|reduce((a, v) => a + v, 0) %}
+        <p class="text-2xl font-bold text-indigo-600">{{ _new_in_period|number_format(0) }}</p>
+        <p class="text-xs text-gray-400 mt-1">Last {{ period }} days</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Points earned</p>
+        {% set _earned_total = data.points_flow_monthly|map(m => m.earned)|reduce((a, v) => a + v, 0) %}
+        <p class="text-2xl font-bold text-emerald-600">{{ _earned_total|number_format(0) }}</p>
+        <p class="text-xs text-gray-400 mt-1">Last 6 months</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Auto-award rate</p>
+        <p class="text-2xl font-bold text-gray-900">{{ data.auto_award_rate > 0 ? data.auto_award_rate|number_format(1) ~ '%' : '—' }}</p>
+        <p class="text-xs text-gray-400 mt-1">
+            {% if program.auto_award_enabled %}M-Pesa payments{% else %}Not enabled{% endif %}
+        </p>
+    </div>
+
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4 mb-5">
+
+    {# Enrolment trend bar chart #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">New Enrolments
+                <span class="text-gray-400 font-normal text-xs">— last {{ period }} days</span>
+            </h3>
+        </div>
+        {% if data.enrollment_trend|length > 0 %}
+        {% set _max_enroll = data.enrollment_trend|map(d => d.count)|reduce((carry, v) => v > carry ? v : carry, 0) %}
+        <div class="p-5">
+            <div class="flex items-end gap-px h-28">
+                {% for day in data.enrollment_trend %}
+                {% set _bh = _max_enroll > 0 ? ((day.count / _max_enroll) * 112)|round : 0 %}
+                <div class="flex-1 group cursor-default" title="{{ day.date }}: {{ day.count }}">
+                    <div class="w-full rounded-t-sm bg-indigo-200 group-hover:bg-indigo-500 transition-colors"
+                         style="height:{{ _bh > 0 ? _bh : 0 }}px;min-height:{{ day.count > 0 ? '3px' : '0' }};"></div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="flex items-center justify-between mt-2 text-xs text-gray-400">
+                <span>{{ data.enrollment_trend|first.date|date('d M') }}</span>
+                <span>{{ data.enrollment_trend|last.date|date('d M') }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="flex items-center justify-center py-14">
+            <p class="text-sm text-gray-400">No enrolment data for this period.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Points flow: earned vs redeemed by month #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100 flex items-center justify-between">
+            <h3 class="text-sm font-semibold text-gray-900">Points Flow
+                <span class="text-gray-400 font-normal text-xs">— last 6 months</span>
+            </h3>
+            <div class="flex items-center gap-3 text-xs text-gray-400">
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-indigo-400 inline-block"></span>Earned
+                </span>
+                <span class="flex items-center gap-1.5">
+                    <span class="w-2.5 h-2.5 rounded-sm bg-amber-300 inline-block"></span>Redeemed
+                </span>
+            </div>
+        </div>
+        {% if data.points_flow_monthly|length > 0 %}
+        {% set _max_flow = data.points_flow_monthly|map(m => m.earned > m.redeemed ? m.earned : m.redeemed)|reduce((carry, v) => v > carry ? v : carry, 1) %}
+        <div class="p-5">
+            <div class="flex items-end gap-2 h-28">
+                {% for month in data.points_flow_monthly %}
+                {% set _eh = (month.earned  / _max_flow * 112)|round %}
+                {% set _rh = (month.redeemed / _max_flow * 112)|round %}
+                <div class="flex-1 flex items-end gap-0.5"
+                     title="{{ month.month }}: {{ month.earned|number_format(0) }} earned / {{ month.redeemed|number_format(0) }} redeemed">
+                    <div class="flex-1 bg-indigo-400 rounded-t-sm"
+                         style="height:{{ _eh > 0 ? _eh : 0 }}px;min-height:{{ month.earned > 0 ? '3px' : '0' }};"></div>
+                    <div class="flex-1 bg-amber-300 rounded-t-sm"
+                         style="height:{{ _rh > 0 ? _rh : 0 }}px;min-height:{{ month.redeemed > 0 ? '3px' : '0' }};"></div>
+                </div>
+                {% endfor %}
+            </div>
+            <div class="flex items-center justify-between mt-2 text-xs text-gray-400">
+                <span>{{ data.points_flow_monthly|first.month }}</span>
+                <span>{{ data.points_flow_monthly|last.month }}</span>
+            </div>
+        </div>
+        {% else %}
+        <div class="flex items-center justify-center py-14">
+            <p class="text-sm text-gray-400">No points flow data yet.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{# Tier distribution #}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h3 class="text-sm font-semibold text-gray-900">Tier Distribution</h3>
+    </div>
+    {% if data.tier_distribution|length > 0 %}
+    {% set _td_total = data.tier_distribution|map(t => t.count)|reduce((a, v) => a + v, 0) %}
+    <div class="divide-y divide-gray-50">
+        {% for tier in data.tier_distribution %}
+        {% set _pct = _td_total > 0 ? (tier.count / _td_total * 100)|round : 0 %}
+        <div class="flex items-center gap-4 px-5 py-3">
+            <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{{ tier.color ?? '#6366f1' }};"></span>
+            <span class="text-sm text-gray-700 w-28 flex-shrink-0 truncate">{{ tier.name }}</span>
+            <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                <div class="h-2 rounded-full transition-all" style="width:{{ _pct }}%;background:{{ tier.color ?? '#6366f1' }};"></div>
+            </div>
+            <span class="text-xs text-gray-500 w-24 text-right flex-shrink-0">
+                {{ tier.count|number_format(0) }} <span class="text-gray-300">· {{ _pct }}%</span>
+            </span>
+        </div>
+        {% endfor %}
+    </div>
+    {% else %}
+    <div class="flex items-center justify-center py-14">
+        <p class="text-sm text-gray-400">No tier data available.</p>
+    </div>
+    {% endif %}
+</div>
+
+{# ════════════════════════════════════════════════════════════════════════
+   TAB: RETENTION
+   ════════════════════════════════════════════════════════════════════════ #}
+{% elseif tab == 'retention' %}
+
+{# Lifecycle stage cards #}
+<div class="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 mb-5">
+    {% for stage in data.lifecycle_breakdown %}
+    <div class="bg-white rounded-xl border border-gray-200 px-4 py-4 text-center">
+        <div class="w-2.5 h-2.5 rounded-full mx-auto mb-2" style="background:{{ stage.color }};"></div>
+        <p class="text-2xl font-bold text-gray-900">{{ stage.count|number_format(0) }}</p>
+        <p class="text-xs font-medium text-gray-500 mt-0.5">{{ stage.label }}</p>
+        <p class="text-xs text-gray-300 mt-0.5">{{ stage.pct }}%</p>
+    </div>
+    {% endfor %}
+</div>
+
+{# Health strip #}
+{% set _lt = data.lifecycle_breakdown|map(s => s.count)|reduce((a, v) => a + v, 0) %}
+{% if _lt > 0 %}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden mb-5">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h3 class="text-sm font-semibold text-gray-900">Programme Health</h3>
+        <p class="text-xs text-gray-400 mt-0.5">Proportion of members at each lifecycle stage</p>
+    </div>
+    <div class="p-5">
+        <div class="flex rounded-lg overflow-hidden h-6">
+            {% for stage in data.lifecycle_breakdown %}
+            {% if stage.count > 0 %}
+            {% set _sw = (stage.count / _lt * 100)|round(1) %}
+            <div class="h-full transition-all" style="width:{{ _sw }}%;background:{{ stage.color }};"
+                 title="{{ stage.label }}: {{ stage.count }} ({{ _sw }}%)"></div>
+            {% endif %}
+            {% endfor %}
+        </div>
+        <div class="flex flex-wrap gap-x-4 gap-y-1.5 mt-3">
+            {% for stage in data.lifecycle_breakdown %}
+            <span class="flex items-center gap-1.5 text-xs text-gray-500">
+                <span class="w-2 h-2 rounded-full inline-block flex-shrink-0" style="background:{{ stage.color }};"></span>
+                {{ stage.label }} · {{ stage.pct }}%
+            </span>
+            {% endfor %}
+        </div>
+    </div>
+</div>
+{% endif %}
+
+{# Cohort retention table #}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h3 class="text-sm font-semibold text-gray-900">Cohort Retention
+            <span class="text-gray-400 font-normal text-xs">— last 12 months</span>
+        </h3>
+        <p class="text-xs text-gray-400 mt-0.5">Members enrolled each month · current lifecycle stage breakdown</p>
+    </div>
+    {% if data.cohort_retention|length > 0 %}
+    <div class="overflow-x-auto">
+        <table class="w-full text-xs">
+            <thead>
+                <tr class="border-b border-gray-100 bg-gray-50">
+                    <th class="text-left font-semibold text-gray-500 uppercase tracking-wide px-5 py-3 w-24">Cohort</th>
+                    <th class="text-right font-semibold text-gray-500 uppercase tracking-wide px-3 py-3">Total</th>
+                    <th class="text-right font-semibold px-3 py-3" style="color:#6366f1;">New</th>
+                    <th class="text-right font-semibold px-3 py-3" style="color:#10b981;">Active</th>
+                    <th class="text-right font-semibold px-3 py-3" style="color:#f59e0b;">At-Risk</th>
+                    <th class="text-right font-semibold px-3 py-3" style="color:#f97316;">Lapsing</th>
+                    <th class="text-right font-semibold px-3 py-3" style="color:#ef4444;">Churned</th>
+                    <th class="text-right font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">Active %</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for cohort in data.cohort_retention %}
+            {% set _ap = cohort.total > 0 ? (cohort.active / cohort.total * 100)|round : 0 %}
+            <tr class="border-b border-gray-50 hover:bg-gray-50 last:border-0">
+                <td class="px-5 py-3 font-mono font-medium text-gray-700">{{ cohort.month }}</td>
+                <td class="px-3 py-3 text-right font-bold text-gray-900">{{ cohort.total }}</td>
+                <td class="px-3 py-3 text-right text-indigo-600">{{ cohort.new }}</td>
+                <td class="px-3 py-3 text-right text-emerald-600 font-medium">{{ cohort.active }}</td>
+                <td class="px-3 py-3 text-right text-amber-600">{{ cohort.at_risk }}</td>
+                <td class="px-3 py-3 text-right text-orange-600">{{ cohort.lapsing }}</td>
+                <td class="px-3 py-3 text-right text-red-500">{{ cohort.churned }}</td>
+                <td class="px-5 py-3 text-right">
+                    <span class="inline-flex items-center gap-2">
+                        <span class="w-14 bg-gray-100 rounded-full h-1.5 inline-block flex-shrink-0">
+                            <span class="block h-1.5 rounded-full {{ _ap >= 60 ? 'bg-emerald-500' : (_ap >= 35 ? 'bg-amber-400' : 'bg-red-400') }}"
+                                  style="width:{{ _ap }}%;"></span>
+                        </span>
+                        <span class="{{ _ap >= 60 ? 'text-emerald-700' : (_ap >= 35 ? 'text-amber-600' : 'text-red-500') }} font-semibold">{{ _ap }}%</span>
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+    {% else %}
+    <div class="flex flex-col items-center justify-center py-16 text-center">
+        <p class="text-sm text-gray-400">No cohort data yet.</p>
+        <p class="text-xs text-gray-300 mt-1">Cohorts appear after members have been enrolled for at least a month.</p>
+    </div>
+    {% endif %}
+</div>
+
+{# ════════════════════════════════════════════════════════════════════════
+   TAB: REVENUE
+   ════════════════════════════════════════════════════════════════════════ #}
+{% elseif tab == 'revenue' %}
+
+<div class="grid grid-cols-2 lg:grid-cols-4 gap-4 mb-5">
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Redemption rate</p>
+        <p class="text-2xl font-bold text-gray-900">{{ data.redemption_rate|number_format(1) }}%</p>
+        <p class="text-xs text-gray-400 mt-1">Members who redeemed ({{ period }}d)</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">KES value redeemed</p>
+        <p class="text-2xl font-bold text-emerald-600">{{ data.kes_redeemed|number_format(0) }}</p>
+        <p class="text-xs text-gray-400 mt-1">{{ data.total_redemptions|number_format(0) }} {{ program.points_name ?? 'pts' }} used</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Return within 14 days</p>
+        {% set _r14_fmt = data.total_redemptions > 0 ? data.redemption_return_14d|number_format(1) ~ '%' : '—' %}
+        <p class="text-2xl font-bold {{ data.redemption_return_14d >= 60 ? 'text-emerald-600' : (data.redemption_return_14d >= 30 ? 'text-amber-600' : 'text-gray-900') }}">{{ _r14_fmt }}</p>
+        <p class="text-xs text-gray-400 mt-1">Redeemers who came back</p>
+    </div>
+
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Return within 30 days</p>
+        {% set _r30_fmt = data.total_redemptions > 0 ? data.redemption_return_30d|number_format(1) ~ '%' : '—' %}
+        <p class="text-2xl font-bold {{ data.redemption_return_30d >= 70 ? 'text-emerald-600' : (data.redemption_return_30d >= 40 ? 'text-amber-600' : 'text-gray-900') }}">{{ _r30_fmt }}</p>
+        <p class="text-xs text-gray-400 mt-1">Redeemers who came back</p>
+    </div>
+
+</div>
+
+<div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+    {# Avg transaction value by tier #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">Avg Transaction Value by Tier</h3>
+            <p class="text-xs text-gray-400 mt-0.5">POS transactions · last {{ period }} days</p>
+        </div>
+        {% if data.avg_value_by_tier|length > 0 %}
+        {% set _max_avg = data.avg_value_by_tier|map(t => t.avg_value)|reduce((carry, v) => v > carry ? v : carry, 1) %}
+        <div class="divide-y divide-gray-50">
+            {% for tier in data.avg_value_by_tier %}
+            {% set _pct = (tier.avg_value / _max_avg * 100)|round %}
+            <div class="flex items-center gap-3 px-5 py-3">
+                <span class="w-2.5 h-2.5 rounded-full flex-shrink-0" style="background:{{ tier.color }};"></span>
+                <span class="text-sm text-gray-700 w-24 flex-shrink-0 truncate">{{ tier.tier_name }}</span>
+                <div class="flex-1 bg-gray-100 rounded-full h-2 overflow-hidden">
+                    <div class="h-2 rounded-full" style="width:{{ _pct }}%;background:{{ tier.color }};"></div>
+                </div>
+                <span class="text-xs font-semibold text-gray-700 w-24 text-right flex-shrink-0">
+                    KES {{ tier.avg_value|number_format(0) }}
+                    <span class="text-gray-300 font-normal">· {{ tier.tx_count }}tx</span>
+                </span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="flex flex-col items-center justify-center py-12 text-center">
+            <p class="text-sm text-gray-400">No POS transaction data available.</p>
+            <p class="text-xs text-gray-300 mt-1">Requires POS integration.</p>
+        </div>
+        {% endif %}
+    </div>
+
+    {# Top earners #}
+    <div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+        <div class="px-5 py-4 border-b border-gray-100">
+            <h3 class="text-sm font-semibold text-gray-900">Top Earners
+                <span class="text-gray-400 font-normal text-xs">— last {{ period }} days</span>
+            </h3>
+        </div>
+        {% if data.top_earners|length > 0 %}
+        {% set _max_earn = data.top_earners|map(e => e.points_earned)|reduce((carry, v) => v > carry ? v : carry, 1) %}
+        <div class="divide-y divide-gray-50">
+            {% for i, earner in data.top_earners %}
+            {% set _bw = (earner.points_earned / _max_earn * 100)|round %}
+            <div class="flex items-center gap-3 px-5 py-2.5">
+                <span class="text-xs font-bold text-gray-300 w-5 flex-shrink-0">{{ i + 1 }}</span>
+                <div class="w-7 h-7 rounded-full bg-indigo-50 text-indigo-600 flex items-center justify-center text-xs font-semibold flex-shrink-0">
+                    {{ earner.first_name|default('?')|first|upper }}
+                </div>
+                <div class="flex-1 min-w-0">
+                    <p class="text-sm font-medium text-gray-900 truncate">{{ earner.first_name ?? 'Unknown' }}</p>
+                    <div class="mt-1 bg-gray-100 rounded-full h-1 overflow-hidden">
+                        <div class="h-1 rounded-full bg-indigo-400" style="width:{{ _bw }}%;"></div>
+                    </div>
+                </div>
+                <span class="text-sm font-bold text-emerald-700 flex-shrink-0">{{ earner.points_earned|number_format(0) }}</span>
+            </div>
+            {% endfor %}
+        </div>
+        {% else %}
+        <div class="flex items-center justify-center py-12">
+            <p class="text-sm text-gray-400">No earn activity in this period.</p>
+        </div>
+        {% endif %}
+    </div>
+
+</div>
+
+{# ════════════════════════════════════════════════════════════════════════
+   TAB: AUTOMATIONS
+   ════════════════════════════════════════════════════════════════════════ #}
+{% elseif tab == 'automations' %}
+
+{% set _trigger_labels = {
+    win_back:       'Win-Back',
+    almost_tier:    'Almost There (Tier)',
+    tier_upgrade:   'Tier Upgrade',
+    expiry_warning: 'Expiry Warning',
+    birthday_bonus: 'Birthday Bonus',
+} %}
+
+{% if data.automation_performance|length > 0 %}
+
+{% set _total_sent     = data.automation_performance|map(a => a.sent_count)|reduce((a, v) => a + v, 0) %}
+{% set _total_returned = data.automation_performance|map(a => a.returned_count)|reduce((a, v) => a + v, 0) %}
+{% set _overall_rate   = _total_sent > 0 ? (_total_returned / _total_sent * 100)|round(1) : 0 %}
+
+<div class="grid grid-cols-3 gap-4 mb-5">
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Total sent</p>
+        <p class="text-2xl font-bold text-gray-900">{{ _total_sent|number_format(0) }}</p>
+        <p class="text-xs text-gray-400 mt-1">All-time automations</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Returned</p>
+        <p class="text-2xl font-bold text-emerald-600">{{ _total_returned|number_format(0) }}</p>
+        <p class="text-xs text-gray-400 mt-1">Transacted after message</p>
+    </div>
+    <div class="bg-white rounded-xl border border-gray-200 px-5 py-4">
+        <p class="text-xs font-medium text-gray-400 mb-1">Overall return rate</p>
+        <p class="text-2xl font-bold {{ _overall_rate >= 40 ? 'text-emerald-600' : (_overall_rate >= 20 ? 'text-amber-600' : 'text-gray-900') }}">
+            {{ _total_sent > 0 ? _overall_rate|number_format(1) ~ '%' : '—' }}
+        </p>
+        <p class="text-xs text-gray-400 mt-1">Across all triggers</p>
+    </div>
+</div>
+
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="px-5 py-4 border-b border-gray-100">
+        <h3 class="text-sm font-semibold text-gray-900">Per-Trigger Performance</h3>
+        <p class="text-xs text-gray-400 mt-0.5">Return = member transacted after receiving the automation message</p>
+    </div>
+    <div class="overflow-x-auto">
+        <table class="w-full">
+            <thead>
+                <tr class="border-b border-gray-100 bg-gray-50">
+                    <th class="text-left text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">Trigger</th>
+                    <th class="text-center text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Status</th>
+                    <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Sent</th>
+                    <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Returned</th>
+                    <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-4 py-3">Return rate</th>
+                    <th class="text-right text-xs font-semibold text-gray-500 uppercase tracking-wide px-5 py-3">Avg time to return</th>
+                </tr>
+            </thead>
+            <tbody>
+            {% for a in data.automation_performance %}
+            {% set _rrate = a.sent_count > 0 ? (a.returned_count / a.sent_count * 100)|round(1) : 0 %}
+            {% set _rrate_capped = _rrate > 100 ? 100 : _rrate %}
+            <tr class="border-b border-gray-50 hover:bg-gray-50 last:border-0">
+                <td class="px-5 py-4">
+                    <p class="text-sm font-medium text-gray-900">
+                        {{ _trigger_labels[a.trigger_type] is defined ? _trigger_labels[a.trigger_type] : a.trigger_type }}
+                    </p>
+                </td>
+                <td class="px-4 py-4 text-center">
+                    {% if a.is_active %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-emerald-50 text-emerald-700">
+                        <span class="w-1.5 h-1.5 rounded-full bg-emerald-500"></span>Active
+                    </span>
+                    {% else %}
+                    <span class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium bg-gray-100 text-gray-400">
+                        <span class="w-1.5 h-1.5 rounded-full bg-gray-300"></span>Off
+                    </span>
+                    {% endif %}
+                </td>
+                <td class="px-4 py-4 text-right">
+                    <span class="text-sm font-semibold text-gray-900">{{ a.sent_count|number_format(0) }}</span>
+                </td>
+                <td class="px-4 py-4 text-right">
+                    <span class="text-sm font-semibold text-emerald-700">{{ a.returned_count|number_format(0) }}</span>
+                </td>
+                <td class="px-4 py-4 text-right">
+                    {% if a.sent_count > 0 %}
+                    <div class="flex items-center justify-end gap-2">
+                        <div class="w-16 bg-gray-100 rounded-full h-1.5">
+                            <div class="h-1.5 rounded-full {{ _rrate >= 40 ? 'bg-emerald-500' : (_rrate >= 20 ? 'bg-amber-400' : 'bg-gray-300') }}"
+                                 style="width:{{ _rrate_capped }}%;"></div>
+                        </div>
+                        <span class="text-sm font-bold {{ _rrate >= 40 ? 'text-emerald-700' : (_rrate >= 20 ? 'text-amber-600' : 'text-gray-500') }} w-12 text-right">
+                            {{ _rrate|number_format(1) }}%
+                        </span>
+                    </div>
+                    {% else %}
+                    <span class="text-sm text-gray-300">—</span>
+                    {% endif %}
+                </td>
+                <td class="px-5 py-4 text-right">
+                    <span class="text-sm text-gray-600">
+                        {% if a.avg_hours_to_return is not null and a.avg_hours_to_return > 0 %}
+                            {% if a.avg_hours_to_return < 24 %}
+                                {{ a.avg_hours_to_return|number_format(1) }}h
+                            {% else %}
+                                {{ (a.avg_hours_to_return / 24)|number_format(1) }}d
+                            {% endif %}
+                        {% else %}
+                            —
+                        {% endif %}
+                    </span>
+                </td>
+            </tr>
+            {% endfor %}
+            </tbody>
+        </table>
+    </div>
+</div>
+
+{% else %}
+<div class="bg-white rounded-xl border border-gray-200 overflow-hidden">
+    <div class="flex flex-col items-center justify-center py-20 text-center px-8">
+        <div class="w-12 h-12 rounded-xl bg-gray-50 flex items-center justify-center mb-4">
+            <svg width="22" height="22" fill="none" stroke="#9ca3af" stroke-width="1.5" viewBox="0 0 24 24">
+                <polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>
+            </svg>
+        </div>
+        <p class="text-sm font-medium text-gray-700">No automations configured yet</p>
+        <p class="text-xs text-gray-400 mt-1 max-w-xs">Set up automation triggers and performance data will appear here once messages start going out.</p>
+        <a href="{{ path('admin_loyalty_automations', _rp) }}"
+           class="mt-4 h-9 px-4 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-medium rounded-lg transition-colors inline-flex items-center gap-2">
+            Configure Automations →
+        </a>
+    </div>
+</div>
+{% endif %}
+
+{% endif %}{# /tab #}
+
+{% endif %}{# /program #}
+{% endblock %}

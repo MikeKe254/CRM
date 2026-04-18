@@ -38,8 +38,8 @@ class SessionController extends AbstractController
         }
 
         $response = $this->json(['success' => true, 'message' => 'Session locked.']);
-        $response->headers->clearCookie('angavu_pos_token', '/');
-        $response->headers->clearCookie('angavu_pos_branch', '/');
+        $response->headers->clearCookie('patronr_pos_token', '/');
+        $response->headers->clearCookie('patronr_pos_branch', '/');
 
         return $response;
     }
@@ -57,7 +57,7 @@ class SessionController extends AbstractController
             ], 400);
         }
 
-        $terminal = (string) $request->cookies->get('angavu_terminal', '');
+        $terminal = (string) $request->cookies->get('patronr_terminal', '');
 
         if ($pin === '') {
             return $this->json(['success' => false, 'message' => 'PIN is required.'], 400);
@@ -109,7 +109,7 @@ class SessionController extends AbstractController
             ]);
 
             $response->headers->setCookie(
-                Cookie::create('angavu_pos_token')
+                Cookie::create('patronr_pos_token')
                     ->withValue($result->token)
                     ->withExpires(0)
                     ->withPath('/')
@@ -118,8 +118,8 @@ class SessionController extends AbstractController
             );
 
             // Branch slug cookie for POS — readable by JS (not httpOnly).
-            // Look up the branch assigned to this terminal via the angavu_terminal device cookie.
-            $posTerminalId = (string) $request->cookies->get('angavu_terminal', '');
+            // Look up the branch assigned to this terminal via the patronr_terminal device cookie.
+            $posTerminalId = (string) $request->cookies->get('patronr_terminal', '');
             if ($posTerminalId !== '') {
                 $branchSlug = $this->db->fetchOne(
                     'SELECT b.slug
@@ -134,7 +134,7 @@ class SessionController extends AbstractController
 
                 if ($branchSlug) {
                     $response->headers->setCookie(
-                        Cookie::create('angavu_pos_branch')
+                        Cookie::create('patronr_pos_branch')
                             ->withValue((string) $branchSlug)
                             ->withExpires(0)
                             ->withPath('/')
@@ -175,7 +175,7 @@ class SessionController extends AbstractController
             return substr($header, 7);
         }
 
-        return $request->cookies->get('angavu_pos_token') ?: null;
+        return $request->cookies->get('patronr_pos_token') ?: null;
     }
 
     private function resolveSubdomain(Request $request): ?string

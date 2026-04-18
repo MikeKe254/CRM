@@ -1,0 +1,731 @@
+{% extends 'layouts/admin.html.twig' %}
+{% set tenant_subdomain = session.company.subdomain|default(app.request.attributes.get('subdomain')) %}
+{% set tenant_domain = currentDomain() %}
+{% set current_branch = (session.branch is defined and session.branch) ? session.branch.slug : app.request.attributes.get('branch') %}
+{% set sub = subscription %}
+{% set info = subscription_insights %}
+{% set planOptions = plans|map(p => {
+    id: p.id,
+    name: p.name,
+    monthly_price: p.monthly_price,
+    annual_price: p.annual_price,
+    currency: p.currency,
+    trial_days: p.trial_days
+}) %}
+
+{% block admin_title %}Billing &amp; Plan{% endblock %}
+{% block admin_subtitle %}Review subscription health, compare plans, and request billing changes from one place{% endblock %}
+
+{% block admin_actions %}
+{% if can_request_change %}
+<button onclick="openPlanRequestDrawer()"
+        class="px-4 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">
+    Request Plan Change
+</button>
+{% endif %}
+{% endblock %}
+
+{% block admin_content %}
+<style>
+.billing-page { display:grid; grid-template-columns: 220px minmax(0, 1fr); gap:1.25rem; align-items:start; }
+.billing-rail { position:sticky; top:1.5rem; border:1px solid #e5e7eb; border-radius:1.2rem; background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%); box-shadow:0 10px 26px rgba(15,23,42,.05); padding:1rem; }
+.billing-rail-title { font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#9ca3af; margin-bottom:.8rem; }
+.billing-tab-btn { width:100%; display:flex; align-items:center; gap:.75rem; padding:.8rem .85rem; border-radius:.95rem; border:1px solid transparent; background:transparent; color:#475569; font-size:.86rem; font-weight:700; text-align:left; transition:.16s ease; cursor:pointer; }
+.billing-tab-btn + .billing-tab-btn { margin-top:.35rem; }
+.billing-tab-btn:hover { background:#f8fafc; border-color:#e5e7eb; color:#111827; }
+.billing-tab-btn.is-active { background:linear-gradient(135deg,#eef2ff 0%,#ffffff 100%); border-color:#c7d2fe; color:#3730a3; box-shadow:0 12px 30px rgba(79,70,229,.10); }
+.billing-tab-icon { width:2rem; height:2rem; border-radius:.8rem; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; background:#f1f5f9; color:#475569; }
+.billing-tab-btn.is-active .billing-tab-icon { background:#e0e7ff; color:#4338ca; }
+.billing-main { display:grid; gap:1rem; }
+.billing-hero { position:relative; overflow:hidden; border:1px solid #e5e7eb; border-radius:1.4rem; background:radial-gradient(circle at top right, rgba(79,70,229,.18), transparent 30%), radial-gradient(circle at bottom left, rgba(14,165,233,.10), transparent 22%), linear-gradient(145deg, #ffffff 0%, #f8fafc 60%, #eef2ff 100%); box-shadow:0 18px 46px rgba(15,23,42,.07); padding:1.3rem; }
+.billing-hero::after { content:""; position:absolute; right:-4rem; bottom:-5rem; width:15rem; height:15rem; border-radius:999px; background:linear-gradient(180deg, rgba(99,102,241,.10), rgba(99,102,241,.02)); }
+.billing-hero-inner { position:relative; z-index:1; display:grid; grid-template-columns: minmax(0,1.4fr) minmax(300px,.95fr); gap:1rem; }
+.billing-eyebrow { display:inline-flex; align-items:center; gap:.45rem; padding:.36rem .75rem; border-radius:999px; background:rgba(255,255,255,.88); border:1px solid #dbeafe; color:#3730a3; font-size:.68rem; font-weight:800; letter-spacing:.12em; text-transform:uppercase; }
+.billing-title { margin-top:.9rem; font-size:2.15rem; line-height:1.02; letter-spacing:-.05em; font-weight:900; color:#0f172a; max-width:44rem; }
+.billing-copy { margin-top:.8rem; font-size:.95rem; line-height:1.7; color:#64748b; max-width:42rem; }
+.billing-kpis { display:grid; grid-template-columns: repeat(4, minmax(0,1fr)); gap:.8rem; margin-top:1rem; }
+.billing-kpi { border:1px solid rgba(229,231,235,.9); border-radius:1rem; background:rgba(255,255,255,.88); padding:.95rem 1rem; }
+.billing-kpi-label { font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#94a3b8; }
+.billing-kpi-value { margin-top:.4rem; font-size:1rem; line-height:1.35; font-weight:800; letter-spacing:-.02em; color:#111827; }
+.billing-health { border:1px solid rgba(255,255,255,.85); border-radius:1.1rem; background:rgba(255,255,255,.88); backdrop-filter:blur(8px); box-shadow:0 14px 34px rgba(15,23,42,.06); padding:1rem; }
+.billing-health-top { display:flex; align-items:center; justify-content:space-between; gap:.75rem; }
+.billing-tone, .billing-pill { display:inline-flex; align-items:center; gap:.35rem; border-radius:999px; padding:.32rem .62rem; font-size:.68rem; font-weight:800; letter-spacing:.07em; text-transform:uppercase; }
+.tone-emerald { background:#ecfdf5; color:#047857; }
+.tone-indigo { background:#eef2ff; color:#4338ca; }
+.tone-amber { background:#fffbeb; color:#b45309; }
+.tone-red { background:#fef2f2; color:#b91c1c; }
+.tone-slate { background:#f1f5f9; color:#475569; }
+.billing-health-title { margin-top:.8rem; font-size:1.08rem; font-weight:800; color:#111827; }
+.billing-health-copy { margin-top:.4rem; color:#64748b; font-size:.85rem; line-height:1.6; }
+.billing-health-grid { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.7rem; margin-top:1rem; }
+.billing-health-box { border:1px solid #e5e7eb; border-radius:.95rem; background:#fff; padding:.85rem; }
+.billing-health-box .label { font-size:.68rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#9ca3af; }
+.billing-health-box .value { margin-top:.35rem; font-size:.92rem; line-height:1.45; font-weight:700; color:#111827; }
+.billing-health-actions { display:flex; gap:.65rem; flex-wrap:wrap; margin-top:1rem; }
+.billing-btn { display:inline-flex; align-items:center; justify-content:center; gap:.45rem; min-height:2.55rem; padding:0 1rem; border-radius:.9rem; font-size:.82rem; font-weight:700; transition:.15s ease; text-decoration:none; }
+.billing-btn-primary { background:#111827; color:#fff; box-shadow:0 14px 28px rgba(17,24,39,.12); }
+.billing-btn-primary:hover { background:#0f172a; }
+.billing-btn-secondary { border:1px solid #d1d5db; background:rgba(255,255,255,.95); color:#374151; }
+.billing-btn-secondary:hover { background:#f8fafc; }
+.billing-panel { border:1px solid #e5e7eb; border-radius:1.2rem; background:#fff; box-shadow:0 1px 3px rgba(15,23,42,.04); overflow:hidden; }
+.billing-panel-head { display:flex; align-items:center; justify-content:space-between; gap:1rem; padding:1rem 1.15rem; border-bottom:1px solid #f1f5f9; }
+.billing-panel-title { font-size:.96rem; font-weight:800; color:#111827; letter-spacing:-.01em; }
+.billing-panel-sub { margin-top:.2rem; color:#94a3b8; font-size:.78rem; }
+.billing-panel-body { padding:1.15rem; }
+.billing-tab-panel { display:none; }
+.billing-tab-panel.is-active { display:block; }
+.billing-overview-grid { display:grid; grid-template-columns:1.08fr .92fr; gap:1rem; }
+.billing-card { border:1px solid #e5e7eb; border-radius:1rem; background:linear-gradient(180deg,#ffffff 0%,#f8fafc 100%); padding:1rem; }
+.billing-card-label { font-size:.7rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#9ca3af; }
+.billing-card-value { margin-top:.45rem; font-size:1.35rem; font-weight:900; letter-spacing:-.03em; color:#111827; }
+.billing-card-copy { margin-top:.55rem; font-size:.86rem; line-height:1.6; color:#64748b; }
+.billing-detail-list { display:grid; gap:.7rem; margin-top:.9rem; }
+.billing-detail-row { display:flex; align-items:flex-start; justify-content:space-between; gap:1rem; font-size:.84rem; }
+.billing-detail-row span:first-child { color:#64748b; }
+.billing-detail-row strong { text-align:right; color:#111827; font-weight:700; }
+.billing-plan-grid { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:1rem; }
+.billing-plan-card { position:relative; display:flex; flex-direction:column; gap:.9rem; min-height:100%; border:1px solid #e5e7eb; border-radius:1.15rem; background:#fff; padding:1rem; }
+.billing-plan-card.is-current { border-color:#c7d2fe; background:linear-gradient(180deg,#eef2ff 0%,#ffffff 72%); box-shadow:0 16px 38px rgba(79,70,229,.12); }
+.billing-limit-box { display:grid; gap:.55rem; border:1px solid #e5e7eb; border-radius:.95rem; background:#f8fafc; padding:.9rem .92rem; }
+.billing-limit-row { display:flex; align-items:center; justify-content:space-between; gap:1rem; font-size:.82rem; }
+.billing-limit-row span:first-child { color:#6b7280; }
+.billing-limit-row strong { color:#111827; font-weight:700; }
+.billing-plan-list { display:grid; gap:.65rem; }
+.billing-plan-item { display:flex; align-items:flex-start; gap:.58rem; font-size:.82rem; line-height:1.45; color:#4b5563; }
+.billing-plan-dot { width:1.1rem; height:1.1rem; border-radius:999px; display:inline-flex; align-items:center; justify-content:center; flex-shrink:0; margin-top:.05rem; background:#eef2ff; color:#4f46e5; }
+.billing-plan-actions { margin-top:auto; padding-top:.4rem; }
+.billing-history-list, .billing-override-list { display:grid; gap:.85rem; }
+.billing-history-item, .billing-override-item, .billing-request-item { border:1px solid #e5e7eb; border-radius:1rem; background:#fff; padding:1rem; }
+.billing-meta-row { display:flex; align-items:center; gap:.55rem; flex-wrap:wrap; }
+.billing-item-copy { margin-top:.45rem; font-size:.84rem; line-height:1.6; color:#64748b; }
+.billing-request-grid { display:grid; grid-template-columns:1fr 1fr; gap:1rem; }
+.billing-table-wrap { overflow-x:auto; }
+.billing-table { width:100%; min-width:760px; border-collapse:collapse; }
+.billing-table th, .billing-table td { padding:.92rem 1rem; border-top:1px solid #f1f5f9; text-align:left; vertical-align:top; }
+.billing-table thead th { border-top:none; background:#f8fafc; font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; color:#94a3b8; }
+.billing-table td:first-child, .billing-table th:first-child { position:sticky; left:0; z-index:1; }
+.billing-table td:first-child { background:#fff; }
+.billing-table thead th:first-child { background:#f8fafc; z-index:2; }
+.billing-table-section td { background:#f8fafc !important; color:#94a3b8; font-size:.72rem; font-weight:800; letter-spacing:.08em; text-transform:uppercase; }
+@media (max-width: 1200px) {
+    .billing-page { grid-template-columns: 1fr; }
+    .billing-rail { position:static; }
+    .billing-hero-inner, .billing-overview-grid, .billing-request-grid, .billing-plan-grid { grid-template-columns:1fr; }
+    .billing-kpis { grid-template-columns:repeat(2,minmax(0,1fr)); }
+    .billing-rail-nav { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+    .billing-tab-btn { margin-top:0 !important; }
+}
+@media (max-width: 767px) {
+    .billing-title { font-size:1.7rem; }
+    .billing-kpis, .billing-health-grid, .billing-rail-nav { grid-template-columns:1fr; }
+    .billing-health-actions { flex-direction:column; }
+    .billing-btn { width:100%; }
+}
+</style>
+
+<div class="billing-page">
+    <aside class="billing-rail">
+        <div class="billing-rail-title">Billing sections</div>
+        <div class="billing-rail-nav">
+            <button type="button" class="billing-tab-btn is-active" data-billing-tab="overview">
+                <span class="billing-tab-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg></span>
+                <span>Overview</span>
+            </button>
+            <button type="button" class="billing-tab-btn" data-billing-tab="plans">
+                <span class="billing-tab-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><path d="M12 2l8 4v6c0 5.25-3.438 9.625-8 11-4.562-1.375-8-5.75-8-11V6l8-4z"/></svg></span>
+                <span>Plan Options</span>
+            </button>
+            <button type="button" class="billing-tab-btn" data-billing-tab="limits">
+                <span class="billing-tab-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg></span>
+                <span>Limits &amp; Features</span>
+            </button>
+            <button type="button" class="billing-tab-btn" data-billing-tab="history">
+                <span class="billing-tab-icon"><svg width="14" height="14" fill="none" stroke="currentColor" stroke-width="1.8" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg></span>
+                <span>History &amp; Requests</span>
+            </button>
+        </div>
+    </aside>
+
+    <div class="billing-main">
+        <section class="billing-hero">
+            <div class="billing-hero-inner">
+                <div>
+                    <span class="billing-eyebrow"><svg width="12" height="12" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><rect x="2" y="5" width="20" height="14" rx="2"></rect><line x1="2" y1="10" x2="22" y2="10"></line></svg>Billing &amp; Plan</span>
+                    <h2 class="billing-title">Your commercial state should be easy to understand and easy to act on.</h2>
+                    <p class="billing-copy">This page brings together live subscription status, next billing moment, available plans, operational limits, override context, and direct plan-change requests without burying them inside Settings.</p>
+
+                    <div class="billing-kpis">
+                        <div class="billing-kpi"><div class="billing-kpi-label">Current Plan</div><div class="billing-kpi-value">{{ sub.plan_name ?? 'No active plan' }}</div></div>
+                        <div class="billing-kpi"><div class="billing-kpi-label">Status</div><div class="billing-kpi-value">{{ sub ? sub.status|replace({'_':' '})|title : 'Inactive' }}</div></div>
+                        <div class="billing-kpi"><div class="billing-kpi-label">{{ info.next_label }}</div><div class="billing-kpi-value">{{ info.next_date ? info.next_date|date('d M Y') : '—' }}</div></div>
+                        <div class="billing-kpi"><div class="billing-kpi-label">Active Overrides</div><div class="billing-kpi-value">{{ active_overrides|length }}</div></div>
+                    </div>
+                </div>
+
+                <div class="billing-health">
+                    <div class="billing-health-top">
+                        <span class="billing-tone tone-{{ info.tone }}">{{ info.tone|title }} state</span>
+                        {% if sub %}
+                        <span class="billing-pill {{ sub.status in ['active','trial'] ? 'tone-emerald' : (sub.status == 'past_due' ? 'tone-amber' : 'tone-red') }}">{{ sub.status|replace({'_':' '})|title }}</span>
+                        {% endif %}
+                    </div>
+                    <div class="billing-health-title">{{ info.headline }}</div>
+                    <div class="billing-health-copy">{{ info.summary }}</div>
+
+                    <div class="billing-health-grid">
+                        <div class="billing-health-box">
+                            <div class="label">{{ info.next_label }}</div>
+                            <div class="value">{{ info.next_date ? info.next_date|date('d M Y, H:i') : 'No scheduled date' }}</div>
+                        </div>
+                        <div class="billing-health-box">
+                            <div class="label">{{ info.period_label }}</div>
+                            <div class="value">
+                                {% if sub and sub.started_at and sub.ends_at %}
+                                    {{ sub.started_at|date('d M Y') }} → {{ sub.ends_at|date('d M Y') }}
+                                {% elseif sub and sub.started_at %}
+                                    Started {{ sub.started_at|date('d M Y') }}
+                                {% else %}
+                                    {{ info.period_value }}
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+
+                    {% if can_request_change %}
+                    <div class="billing-health-actions">
+                        <button type="button" class="billing-btn billing-btn-primary" onclick="openPlanRequestDrawer()">Request plan change</button>
+                        <button type="button" class="billing-btn billing-btn-secondary" onclick="openPlanRequestDrawer(null, 'pause_cancel')">Pause or stop subscription</button>
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="billing-tab-panel is-active" data-billing-panel="overview">
+            <div class="billing-panel">
+                <div class="billing-panel-head">
+                    <div>
+                        <div class="billing-panel-title">Current subscription</div>
+                        <div class="billing-panel-sub">The active record driving plan entitlement right now.</div>
+                    </div>
+                </div>
+                <div class="billing-panel-body">
+                    {% if sub %}
+                    <div class="billing-overview-grid">
+                        <div class="billing-card">
+                            <div class="billing-card-label">Plan</div>
+                            <div class="billing-card-value">{{ sub.plan_name }}</div>
+                            {% if sub.plan_description %}
+                            <div class="billing-card-copy">{{ sub.plan_description }}</div>
+                            {% endif %}
+                            {% if sub.notes %}
+                            <div class="mt-4 rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3 text-sm leading-6 text-indigo-900">
+                                <strong class="font-semibold">Current note:</strong> {{ sub.notes }}
+                            </div>
+                            {% endif %}
+                        </div>
+                        <div class="billing-card">
+                            <div class="billing-card-label">Billing snapshot</div>
+                            <div class="billing-detail-list">
+                                <div class="billing-detail-row"><span>Cycle</span><strong>{{ sub.billing_cycle|title }}</strong></div>
+                                <div class="billing-detail-row"><span>Started</span><strong>{{ sub.started_at ? sub.started_at|date('d M Y, H:i') : '—' }}</strong></div>
+                                <div class="billing-detail-row"><span>Next billing</span><strong>{{ info.next_date ? info.next_date|date('d M Y, H:i') : '—' }}</strong></div>
+                                <div class="billing-detail-row"><span>Period end</span><strong>{{ sub.ends_at ? sub.ends_at|date('d M Y, H:i') : 'Open-ended' }}</strong></div>
+                                {% if sub.trial_ends_at %}
+                                <div class="billing-detail-row"><span>Trial end</span><strong>{{ sub.trial_ends_at|date('d M Y, H:i') }}</strong></div>
+                                {% endif %}
+                                {% if sub.amount_paid is not null %}
+                                <div class="billing-detail-row"><span>Amount paid</span><strong>{{ sub.currency }} {{ sub.amount_paid|number_format(2) }}</strong></div>
+                                {% endif %}
+                            </div>
+                        </div>
+                    </div>
+                    {% else %}
+                    <div class="rounded-xl border border-amber-200 bg-amber-50 px-4 py-4 text-sm leading-6 text-amber-800">
+                        No active subscription record was found for this company. That usually means plan entitlement is missing or the last subscription has fully expired.
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+
+        <section class="billing-tab-panel" data-billing-panel="plans">
+            <div class="billing-panel">
+                <div class="billing-panel-head">
+                    <div>
+                        <div class="billing-panel-title">Plan options</div>
+                        <div class="billing-panel-sub">Compare plans, then request the move directly from the plan card.</div>
+                    </div>
+                </div>
+                <div class="billing-panel-body">
+                    <div class="billing-plan-grid">
+                        {% for plan in plans %}
+                            {% set users = plan.limit_summary.users ?? null %}
+                            {% set branches = plan.limit_summary.branches ?? null %}
+                            {% set sms = plan.limit_summary.sms ?? null %}
+                            <article class="billing-plan-card {{ plan.is_current ? 'is-current' }}">
+                                <div class="flex items-start justify-between gap-3">
+                                    <div>
+                                        <div class="flex items-center gap-2 flex-wrap">
+                                            <h4 class="text-lg font-bold tracking-tight text-gray-900">{{ plan.name }}</h4>
+                                            {% if plan.is_current %}
+                                            <span class="billing-pill tone-indigo">Current</span>
+                                            {% elseif plan.featured %}
+                                            <span class="billing-pill tone-slate">Popular</span>
+                                            {% endif %}
+                                        </div>
+                                        {% if plan.description %}
+                                        <p class="mt-2 text-sm leading-6 text-gray-500">{{ plan.description }}</p>
+                                        {% endif %}
+                                    </div>
+                                    <span class="rounded-full bg-gray-100 px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.16em] text-gray-500">{{ plan.slug }}</span>
+                                </div>
+
+                                <div>
+                                    {% if plan.monthly_price == 0 %}
+                                    <div class="text-3xl font-black tracking-tight text-gray-900">Free</div>
+                                    <p class="mt-1 text-xs text-gray-500">No billing required.</p>
+                                    {% else %}
+                                    <div class="flex items-end gap-2">
+                                        <span class="text-3xl font-black tracking-tight text-gray-900">{{ plan.currency }} {{ plan.monthly_price|number_format(0) }}</span>
+                                        <span class="pb-1 text-xs text-gray-500">/ month</span>
+                                    </div>
+                                    <p class="mt-1 text-xs text-gray-500">
+                                        Annual {{ plan.currency }} {{ plan.annual_price|number_format(0) }}
+                                        {% if plan.trial_days > 0 %}· {{ plan.trial_days }}-day trial{% endif %}
+                                    </p>
+                                    {% endif %}
+                                </div>
+
+                                <div class="billing-limit-box">
+                                    <div class="billing-limit-row"><span>Users</span><strong>{{ users == -1 ? 'Unlimited' : (users is null ? '—' : users|number_format(0)) }}</strong></div>
+                                    <div class="billing-limit-row"><span>Branches</span><strong>{{ branches == -1 ? 'Unlimited' : (branches is null ? '—' : branches|number_format(0)) }}</strong></div>
+                                    <div class="billing-limit-row"><span>SMS / month</span><strong>{{ sms == -1 ? 'Unlimited' : (sms is null ? '—' : sms|number_format(0)) }}</strong></div>
+                                </div>
+
+                                <div class="billing-plan-list">
+                                    {% for highlight in plan.highlights|slice(0, 5) %}
+                                    <div class="billing-plan-item">
+                                        <span class="billing-plan-dot">
+                                            <svg width="11" height="11" fill="none" stroke="currentColor" stroke-width="2" viewBox="0 0 24 24"><polyline points="20 6 9 17 4 12"></polyline></svg>
+                                        </span>
+                                        <span>{{ highlight }}</span>
+                                    </div>
+                                    {% endfor %}
+                                </div>
+
+                                {% if can_request_change %}
+                                <div class="billing-plan-actions">
+                                    {% if plan.is_current %}
+                                    <button type="button" class="billing-btn billing-btn-secondary" onclick="openPlanRequestDrawer({{ plan.id }})">Change cycle or request review</button>
+                                    {% else %}
+                                    <button type="button" class="billing-btn billing-btn-primary" onclick="openPlanRequestDrawer({{ plan.id }})">Request this plan</button>
+                                    {% endif %}
+                                </div>
+                                {% endif %}
+                            </article>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="billing-tab-panel" data-billing-panel="limits">
+            <div class="billing-panel">
+                <div class="billing-panel-head">
+                    <div>
+                        <div class="billing-panel-title">Limits &amp; features</div>
+                        <div class="billing-panel-sub">Use this when someone asks what exactly changes if the company moves to another plan.</div>
+                    </div>
+                </div>
+                <div class="billing-panel-body">
+                    <div class="billing-table-wrap">
+                        <table class="billing-table">
+                            <thead>
+                                <tr>
+                                    <th>Capability</th>
+                                    {% for plan in plans %}
+                                    <th>
+                                        <div class="text-sm font-bold normal-case tracking-normal text-gray-900">{{ plan.name }}</div>
+                                        <div class="mt-1 text-[11px] font-medium normal-case tracking-normal text-gray-400">
+                                            {% if plan.monthly_price == 0 %}
+                                                Free
+                                            {% else %}
+                                                {{ plan.currency }} {{ plan.monthly_price|number_format(0) }}/mo
+                                            {% endif %}
+                                        </div>
+                                    </th>
+                                    {% endfor %}
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {% for section in comparison_sections %}
+                                <tr class="billing-table-section">
+                                    <td colspan="{{ plans|length + 1 }}">{{ section.title }}</td>
+                                </tr>
+                                {% for row in section.rows %}
+                                <tr>
+                                    <td class="text-sm font-medium text-gray-700">{{ row.label }}</td>
+                                    {% for plan in plans %}
+                                    <td>
+                                        {% if row.plans[plan.id] %}
+                                        <span class="billing-pill tone-emerald">Included</span>
+                                        {% else %}
+                                        <span class="billing-pill tone-slate">Not included</span>
+                                        {% endif %}
+                                    </td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                                {% endfor %}
+
+                                <tr class="billing-table-section">
+                                    <td colspan="{{ plans|length + 1 }}">Plan limits</td>
+                                </tr>
+                                {% for row in limit_rows %}
+                                <tr>
+                                    <td class="text-sm font-medium text-gray-700">{{ row.label }}</td>
+                                    {% for plan in plans %}
+                                    <td class="text-sm text-gray-600">{{ row.values[plan.id] }}</td>
+                                    {% endfor %}
+                                </tr>
+                                {% endfor %}
+                            </tbody>
+                        </table>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <section class="billing-tab-panel" data-billing-panel="history">
+            <div class="billing-request-grid">
+                <div class="billing-panel">
+                    <div class="billing-panel-head">
+                        <div>
+                            <div class="billing-panel-title">Recent requests</div>
+                            <div class="billing-panel-sub">Commercial requests submitted from this page.</div>
+                        </div>
+                    </div>
+                    <div class="billing-panel-body">
+                        {% if request_history is empty %}
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-500">
+                            No plan-change or cancellation requests have been logged yet.
+                        </div>
+                        {% else %}
+                        <div class="billing-history-list">
+                            {% for row in request_history %}
+                            <div class="billing-request-item">
+                                <div class="billing-meta-row">
+                                    <span class="billing-pill {{ row.meta.request_type == 'pause_cancel' ? 'tone-amber' : 'tone-indigo' }}">
+                                        {{ row.meta.request_type == 'pause_cancel' ? 'Pause / Stop' : 'Plan change' }}
+                                    </span>
+                                    <span class="text-sm font-semibold text-gray-900">{{ row.requester_name }}</span>
+                                    <span class="text-xs text-gray-400">{{ row.created_at|date('d M Y, H:i') }}</span>
+                                </div>
+                                <div class="billing-item-copy">{{ row.description }}</div>
+                                {% if row.meta.reason %}
+                                <div class="mt-2 text-sm leading-6 text-gray-600">
+                                    <strong class="font-semibold text-gray-800">Reason:</strong> {{ row.meta.reason }}
+                                </div>
+                                {% endif %}
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+
+                <div class="billing-panel">
+                    <div class="billing-panel-head">
+                        <div>
+                            <div class="billing-panel-title">Active overrides</div>
+                            <div class="billing-panel-sub">Temporary exceptions to the normal plan defaults.</div>
+                        </div>
+                    </div>
+                    <div class="billing-panel-body">
+                        {% if active_overrides is empty %}
+                        <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-500">
+                            No active feature overrides are currently applied to this company.
+                        </div>
+                        {% else %}
+                        <div class="billing-override-list">
+                            {% for override in active_overrides %}
+                            <div class="billing-override-item">
+                                <div class="billing-meta-row">
+                                    <span class="billing-pill {{ override.is_enabled ? 'tone-emerald' : 'tone-red' }}">{{ override.is_enabled ? 'Override on' : 'Override off' }}</span>
+                                    <span class="text-sm font-semibold text-gray-900">{{ override.feature_name }}</span>
+                                    <span class="text-xs text-gray-400">{{ override.module_name }} / {{ override.submodule_name }}</span>
+                                </div>
+                                {% if override.reason %}
+                                <div class="billing-item-copy">{{ override.reason }}</div>
+                                {% endif %}
+                                <div class="mt-2 text-xs text-gray-500">
+                                    {% if override.expires_at %}
+                                        Expires {{ override.expires_at|date('d M Y, H:i') }}
+                                    {% else %}
+                                        No expiry set
+                                    {% endif %}
+                                </div>
+                            </div>
+                            {% endfor %}
+                        </div>
+                        {% endif %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="billing-panel" style="margin-top:1rem;">
+                <div class="billing-panel-head">
+                    <div>
+                        <div class="billing-panel-title">Subscription history</div>
+                        <div class="billing-panel-sub">Recent plan changes and previous states for finance and support context.</div>
+                    </div>
+                </div>
+                <div class="billing-panel-body">
+                    {% if subscription_history is empty %}
+                    <div class="rounded-xl border border-gray-200 bg-gray-50 px-4 py-4 text-sm text-gray-500">
+                        No subscription history is available for this company yet.
+                    </div>
+                    {% else %}
+                    <div class="billing-history-list">
+                        {% for row in subscription_history %}
+                        <div class="billing-history-item">
+                            <div class="billing-meta-row">
+                                <span class="billing-pill {{ row.status in ['active','trial'] ? 'tone-emerald' : (row.status == 'past_due' ? 'tone-amber' : 'tone-slate') }}">
+                                    {{ row.status|replace({'_':' '})|title }}
+                                </span>
+                                <span class="text-sm font-semibold text-gray-900">{{ row.plan_name }}</span>
+                                <span class="text-xs text-gray-400">{{ row.billing_cycle|title }}</span>
+                            </div>
+                            <div class="billing-item-copy">
+                                Started {{ row.started_at ? row.started_at|date('d M Y, H:i') : '—' }}
+                                {% if row.ends_at %} · Ended {{ row.ends_at|date('d M Y, H:i') }}{% endif %}
+                                {% if row.amount_paid is not null %} · {{ row.currency }} {{ row.amount_paid|number_format(2) }}{% endif %}
+                                {% if row.cancelled_at %} · Cancelled {{ row.cancelled_at|date('d M Y, H:i') }}{% endif %}
+                            </div>
+                            {% if row.cancellation_reason or row.notes %}
+                            <div class="mt-2 text-sm leading-6 text-gray-600">
+                                {% if row.cancellation_reason %}
+                                <strong class="font-semibold text-gray-800">Reason:</strong> {{ row.cancellation_reason }}
+                                {% elseif row.notes %}
+                                <strong class="font-semibold text-gray-800">Note:</strong> {{ row.notes }}
+                                {% endif %}
+                            </div>
+                            {% endif %}
+                        </div>
+                        {% endfor %}
+                    </div>
+                    {% endif %}
+                </div>
+            </div>
+        </section>
+    </div>
+</div>
+{% endblock %}
+
+{% block admin_scripts %}
+<script>
+const PLAN_OPTIONS = {{ planOptions|json_encode|raw }};
+
+function billingSelectOptions(selectedId = '') {
+    return PLAN_OPTIONS.map(plan => {
+        const monthly = Number(plan.monthly_price || 0) === 0 ? 'Free' : `${plan.currency} ${Number(plan.monthly_price).toLocaleString()} / mo`;
+        return `<option value="${plan.id}" ${String(plan.id) === String(selectedId) ? 'selected' : ''}>${plan.name} — ${monthly}</option>`;
+    }).join('');
+}
+
+function billingDrawerFooter(onSave, primaryLabel = 'Submit Request') {
+    return `
+        <button onclick="closeDrawer()" class="px-4 h-9 border border-gray-200 text-gray-600 hover:bg-gray-50 text-sm font-medium rounded-lg transition-colors">Cancel</button>
+        <button data-primary onclick="${onSave}" class="flex-1 h-9 bg-indigo-600 hover:bg-indigo-700 text-white text-sm font-semibold rounded-lg transition-colors">${primaryLabel}</button>
+    `;
+}
+
+function planRequestFormHtml(planId = '', requestType = 'plan_change') {
+    const typeOptions = `
+        <option value="plan_change" ${requestType === 'plan_change' ? 'selected' : ''}>Plan change</option>
+        <option value="pause_cancel" ${requestType === 'pause_cancel' ? 'selected' : ''}>Pause or cancel subscription</option>
+    `;
+
+    return `
+        <div id="drawer-error" class="hidden mb-3 px-3 py-2 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg"></div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Request type *</label>
+            <select id="billing-request-type" onchange="toggleBillingRequestFields()" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                ${typeOptions}
+            </select>
+        </div>
+        <div id="billing-plan-fields">
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Target plan *</label>
+                <select id="billing-target-plan" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="">— Select plan —</option>
+                    ${billingSelectOptions(planId)}
+                </select>
+            </div>
+            <div class="mb-4">
+                <label class="block text-sm font-medium text-gray-700 mb-1">Preferred billing cycle</label>
+                <select id="billing-cycle" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                    <option value="monthly">Monthly</option>
+                    <option value="annual">Annual</option>
+                    <option value="custom">Custom / discuss with support</option>
+                </select>
+            </div>
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Preferred effective date</label>
+            <input id="billing-effective-date" type="date" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+        </div>
+        <div class="mb-4">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Urgency</label>
+            <select id="billing-urgency" class="w-full h-10 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-indigo-300">
+                <option value="normal">Normal</option>
+                <option value="soon">Soon</option>
+                <option value="urgent">Urgent</option>
+            </select>
+        </div>
+        <div class="mb-1">
+            <label class="block text-sm font-medium text-gray-700 mb-1">Reason *</label>
+            <textarea id="billing-reason" rows="5" placeholder="Explain what needs to change and why. For example: we need more branches, we want annual billing, or we need to pause temporarily." class="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm bg-white text-gray-900 resize-none focus:outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-400"></textarea>
+        </div>
+        <p class="text-xs text-gray-400 leading-relaxed">Submitting this logs a structured request in the system so support and finance can follow up with the right context.</p>
+    `;
+}
+
+function openPlanRequestDrawer(planId = '', requestType = 'plan_change') {
+    openDrawer(requestType === 'pause_cancel' ? 'Request Pause / Cancellation' : 'Request Plan Change', planRequestFormHtml(planId, requestType), billingDrawerFooter('submitBillingRequest()', requestType === 'pause_cancel' ? 'Submit Request' : 'Request Change'));
+    toggleBillingRequestFields();
+}
+
+function toggleBillingRequestFields() {
+    const typeEl = document.getElementById('billing-request-type');
+    const fields = document.getElementById('billing-plan-fields');
+    if (!typeEl || !fields) return;
+    const isPause = typeEl.value === 'pause_cancel';
+    fields.style.display = isPause ? 'none' : '';
+
+    const title = document.getElementById('admin-drawer-title');
+    if (title) {
+        title.textContent = isPause ? 'Request Pause / Cancellation' : 'Request Plan Change';
+    }
+
+    const primary = document.querySelector('#admin-drawer-footer button[data-primary]');
+    if (primary) {
+        primary.textContent = isPause ? 'Submit Request' : 'Request Change';
+    }
+}
+
+async function submitBillingRequest() {
+    const typeEl = document.getElementById('billing-request-type');
+    const planEl = document.getElementById('billing-target-plan');
+    const cycleEl = document.getElementById('billing-cycle');
+    const effectiveDateEl = document.getElementById('billing-effective-date');
+    const urgencyEl = document.getElementById('billing-urgency');
+    const reasonEl = document.getElementById('billing-reason');
+    const errorEl = document.getElementById('drawer-error');
+    const primary = document.querySelector('#admin-drawer-footer button[data-primary]');
+
+    if (!typeEl || !reasonEl) return;
+
+    const requestType = typeEl.value || 'plan_change';
+    const targetPlan = planEl ? planEl.value : '';
+    const reason = reasonEl.value.trim();
+
+    if (requestType === 'plan_change' && !targetPlan) {
+        if (errorEl) {
+            errorEl.textContent = 'Select the plan you want the team to review.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (!reason) {
+        if (errorEl) {
+            errorEl.textContent = 'Add a clear reason so support and finance can act on this quickly.';
+            errorEl.classList.remove('hidden');
+        }
+        return;
+    }
+
+    if (primary) {
+        primary.disabled = true;
+        primary.textContent = 'Submitting...';
+    }
+    if (errorEl) {
+        errorEl.textContent = '';
+        errorEl.classList.add('hidden');
+    }
+
+    try {
+        const response = await fetch('{{ path('admin_billing_request', {subdomain: tenant_subdomain, domain: tenant_domain, branch: current_branch}) }}', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+            body: new URLSearchParams({
+                request_type: requestType,
+                target_plan_id: targetPlan,
+                billing_cycle: cycleEl ? cycleEl.value : 'monthly',
+                preferred_effective_date: effectiveDateEl ? effectiveDateEl.value : '',
+                urgency: urgencyEl ? urgencyEl.value : 'normal',
+                reason: reason,
+            }).toString(),
+        });
+
+        const data = await response.json();
+        if (!data.success) {
+            if (errorEl) {
+                errorEl.textContent = data.message || 'Could not submit the request right now.';
+                errorEl.classList.remove('hidden');
+            }
+            return;
+        }
+
+        closeDrawer();
+        adminAlert({
+            title: 'Request submitted',
+            message: requestType === 'pause_cancel'
+                ? 'Your billing request has been logged for support and finance review.'
+                : 'Your plan change request has been logged and is ready for review.',
+            type: 'success',
+        });
+        setTimeout(() => turboReload(), 220);
+    } catch (error) {
+        if (errorEl) {
+            errorEl.textContent = 'An unexpected error occurred while submitting the request.';
+            errorEl.classList.remove('hidden');
+        }
+    } finally {
+        if (primary) {
+            primary.disabled = false;
+            primary.textContent = requestType === 'pause_cancel' ? 'Submit Request' : 'Request Change';
+        }
+    }
+}
+
+function activateBillingTab(tabName, syncHash = true) {
+    const next = tabName || 'overview';
+
+    document.querySelectorAll('[data-billing-tab]').forEach((button) => {
+        button.classList.toggle('is-active', button.dataset.billingTab === next);
+    });
+
+    document.querySelectorAll('[data-billing-panel]').forEach((panel) => {
+        panel.classList.toggle('is-active', panel.dataset.billingPanel === next);
+    });
+
+    if (syncHash && window.location.hash !== `#${next}`) {
+        history.replaceState(null, '', `${window.location.pathname}${window.location.search}#${next}`);
+    }
+}
+
+document.querySelectorAll('[data-billing-tab]').forEach((button) => {
+    button.addEventListener('click', () => activateBillingTab(button.dataset.billingTab));
+});
+
+window.addEventListener('hashchange', () => {
+    const fromHash = window.location.hash.replace('#', '');
+    if (fromHash) activateBillingTab(fromHash, false);
+});
+
+activateBillingTab(window.location.hash.replace('#', '') || 'overview', false);
+</script>
+{% endblock %}

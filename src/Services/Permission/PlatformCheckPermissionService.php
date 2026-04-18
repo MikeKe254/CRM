@@ -47,6 +47,24 @@ final class PlatformCheckPermissionService
         'view_api_credentials' => ['VIEW_API_CREDENTIALS'],
         'edit_api_credentials' => ['EDIT_API_CREDENTIALS'],
 
+        // ── Loyalty (tenant-facing, platform admin resolution) ────────────────
+        'view_loyalty_program'         => ['VIEW_COMPANY_SETTINGS', 'VIEW_COMPANY_LOYALTY'],
+        'edit_loyalty_program'         => ['EDIT_COMPANY_SETTINGS', 'MANAGE_COMPANY_LOYALTY'],
+        'view_loyalty_tiers'           => ['VIEW_COMPANY_SETTINGS', 'VIEW_COMPANY_LOYALTY'],
+        'manage_loyalty_tiers'         => ['EDIT_COMPANY_SETTINGS', 'MANAGE_COMPANY_LOYALTY'],
+        'view_loyalty_members'         => ['VIEW_COMPANY_ANALYTICS', 'VIEW_COMPANY_LOYALTY'],
+        'view_loyalty_member_detail'   => ['VIEW_COMPANY_ANALYTICS', 'VIEW_COMPANY_LOYALTY'],
+        'enroll_loyalty_member'        => ['PERFORM_COMPANY_SUPPORT_ACTIONS', 'MANAGE_COMPANY_LOYALTY'],
+        'adjust_loyalty_points'        => ['PERFORM_COMPANY_SUPPORT_ACTIONS', 'MANAGE_COMPANY_LOYALTY'],
+        'view_loyalty_ledger'          => ['VIEW_COMPANY_ANALYTICS', 'VIEW_COMPANY_LOYALTY'],
+        'manage_loyalty_multipliers'   => ['EDIT_COMPANY_SETTINGS', 'MANAGE_COMPANY_LOYALTY'],
+        'view_loyalty_reports'         => ['VIEW_COMPANY_ANALYTICS', 'VIEW_COMPANY_LOYALTY'],
+        'export_loyalty_data'          => ['VIEW_COMPANY_ANALYTICS', 'MANAGE_COMPANY_LOYALTY'],
+        'toggle_loyalty_module'        => ['EDIT_COMPANY_SETTINGS'],
+        'view_loyalty_segments'        => ['VIEW_COMPANY_ANALYTICS', 'VIEW_COMPANY_LOYALTY'],
+        'manage_loyalty_automations'   => ['EDIT_COMPANY_SETTINGS',  'MANAGE_COMPANY_LOYALTY'],
+        'send_loyalty_messages'        => ['PERFORM_COMPANY_SUPPORT_ACTIONS', 'MANAGE_COMPANY_LOYALTY'],
+
         // ── Misc ─────────────────────────────────────────────────────────────
         'authorize_pos_terminal' => ['AUTHORIZE_TERMINALS'],
         'view_audit_logs'        => ['VIEW_AUDIT_LOGS'],
